@@ -117,6 +117,11 @@ export function useAuth(options?: UseAuthOptions) {
       await Auth.clearUserInfo();
       setUser(null);
       setError(null);
+      
+      // Force page reload/redirect to home on web to clear all router caching
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.location.href = "/";
+      }
     }
   }, []);
 
