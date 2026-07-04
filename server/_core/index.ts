@@ -60,8 +60,28 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
 
-  app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, timestamp: Date.now() });
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db");
+      const { users, athletes, performanceData } = await import("../../drizzle/schema");
+      const db = await getDb();
+      if (!db) {
+        res.json({ ok: true, store: "mock" });
+        return;
+      }
+      const uCount = await db.select().from(users);
+      const aCount = await db.select().from(athletes);
+      const pCount = await db.select().from(performanceData);
+      res.json({
+        ok: true,
+        users: uCount.map(u => ({ id: u.id, openId: u.openId, name: u.name, role: u.role, teamId: u.teamId })),
+        athletes: aCount.map(a => ({ id: a.id, userId: a.userId, catapultName: a.catapultName, teamId: a.teamId })),
+        performanceDataCount: pCount.length,
+        performanceDataSample: pCount.slice(0, 5).map(p => ({ id: p.id, athleteId: p.athleteId, date: p.date, totalLoad: p.totalLoad }))
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.use(
