@@ -24,6 +24,36 @@ export const appRouter = router({
         name: z.string(),
       }))
       .mutation(async ({ input }) => {
+        // Upsert the demo user into the database during login token generation.
+        // Without this, the backend /api/auth/me query fails to validate the user details
+        // against the database records, causing a redirect loop back to the login screen.
+        let role: "coach" | "viewer" | "athlete" = "athlete";
+        let email = "";
+        const teamId = 1;
+        
+        if (input.openId === "democoach") {
+          role = "coach";
+          email = "admin@example.com";
+        } else if (input.openId === "demoviewer") {
+          role = "viewer";
+          email = "viewer@example.com";
+        } else {
+          role = "athlete";
+          if (input.openId === "demoathlete1") email = "sakura@example.com";
+          else if (input.openId === "demoathlete2") email = "hinata@example.com";
+          else if (input.openId === "demoathlete3") email = "mio@example.com";
+        }
+
+        await db.upsertUser({
+          openId: input.openId,
+          name: input.name,
+          email,
+          loginMethod: "manus",
+          role,
+          teamId,
+          lastSignedIn: new Date(),
+        });
+
         const token = await sdk.createSessionToken(input.openId, { name: input.name });
         return { token };
       }),
