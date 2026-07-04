@@ -3075,4 +3075,96 @@ export function resetMockStore() {
   mockCsvUploads = [];
 }
 
+export async function seedDatabase() {
+  const db = await getDb();
+  if (!db) {
+    console.log("[Database] Skipping seeding for mock store");
+    return;
+  }
+
+  try {
+    // 1. Seed initial team
+    const existingTeams = await db.select().from(teams).limit(1);
+    if (existingTeams.length === 0) {
+      console.log("[Database] Seeding initial team...");
+      await db.insert(teams).values({
+        id: 1,
+        name: "VolleyTrack Team",
+        coachId: 1,
+      });
+    }
+
+    // 2. Seed coach/admin user
+    const existingCoach = await db.select().from(users).where(eq(users.openId, "democoach")).limit(1);
+    if (existingCoach.length === 0) {
+      console.log("[Database] Seeding coach user...");
+      await db.insert(users).values({
+        id: 1,
+        openId: "democoach",
+        name: "スタッフ (管理者)",
+        email: "admin@example.com",
+        loginMethod: "manus",
+        role: "coach",
+        teamId: 1,
+      });
+    }
+
+    // 3. Seed viewer user
+    const existingViewer = await db.select().from(users).where(eq(users.openId, "demoviewer")).limit(1);
+    if (existingViewer.length === 0) {
+      console.log("[Database] Seeding viewer user...");
+      await db.insert(users).values({
+        id: 5,
+        openId: "demoviewer",
+        name: "スタッフ (閲覧用)",
+        email: "viewer@example.com",
+        loginMethod: "manus",
+        role: "viewer",
+        teamId: 1,
+      });
+    }
+
+    // 4. Seed athlete users & records
+    const athletesToSeed = [
+      { id: 2, openId: "demoathlete1", name: "宮下 さくら", email: "sakura@example.com", jersey: 1, pos: "S" },
+      { id: 3, openId: "demoathlete2", name: "日向 ひなた", email: "hinata@example.com", jersey: 2, pos: "OH" },
+      { id: 4, openId: "demoathlete3", name: "長谷川 みお", email: "mio@example.com", jersey: 3, pos: "MB" },
+    ];
+
+    for (const a of athletesToSeed) {
+      const existingUser = await db.select().from(users).where(eq(users.openId, a.openId)).limit(1);
+      if (existingUser.length === 0) {
+        console.log(`[Database] Seeding athlete user: ${a.name}`);
+        await db.insert(users).values({
+          id: a.id,
+          openId: a.openId,
+          name: a.name,
+          email: a.email,
+          loginMethod: "manus",
+          role: "athlete",
+          teamId: 1,
+        });
+      }
+
+      const existingAthlete = await db.select().from(athletes).where(eq(athletes.userId, a.id)).limit(1);
+      if (existingAthlete.length === 0) {
+        console.log(`[Database] Seeding athlete record: ${a.name}`);
+        await db.insert(athletes).values({
+          id: a.id,
+          userId: a.id,
+          teamId: 1,
+          jerseyNumber: a.jersey,
+          position: a.pos,
+          onetapName: a.name,
+          catapultName: a.name,
+          soxaiEmail: a.email,
+        });
+      }
+    }
+    console.log("[Database] Seeding completed successfully!");
+  } catch (error) {
+    console.error("[Database] Seeding failed:", error);
+  }
+}
+
 
