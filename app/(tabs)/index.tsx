@@ -191,6 +191,11 @@ export default function HomeScreen() {
   const [trendMetric, setTrendMetric] = useState<"load" | "jumps">("load");
   const mockTokenMutation = trpc.auth.getMockToken.useMutation();
 
+  const [selectedUserType, setSelectedUserType] = useState<"coach" | "athlete" | null>(null);
+  const [selectedAthleteIndex, setSelectedAthleteIndex] = useState<number | null>(null);
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   // Fetch athlete info
   const { data: athlete, isLoading: athleteLoading } = trpc.athlete.getByUser.useQuery(
     undefined,
@@ -318,15 +323,29 @@ export default function HomeScreen() {
     };
 
     const handleDemoLogin = async (role: "coach" | "athlete", idx?: number) => {
+      // Validate password
+      if (role === "coach") {
+        if (password !== "staff123") {
+          setLoginError("スタッフ用パスワードが正しくありません。");
+          return;
+        }
+      } else {
+        if (password !== "athlete123") {
+          setLoginError("選手用パスワードが正しくありません。");
+          return;
+        }
+      }
+
       if (isLoggingIn) return;
       setIsLoggingIn(true);
+      setLoginError(null);
 
       let demoUser;
       if (role === "coach") {
         demoUser = {
           id: 1,
           openId: "democoach",
-          name: "監督",
+          name: "スタッフ",
           email: "coach@example.com",
           loginMethod: "manus",
           role: "coach",
@@ -359,6 +378,7 @@ export default function HomeScreen() {
         router.push(`/oauth/callback?sessionToken=${token}&user=${userBase64}`);
       } catch (e) {
         console.error("Failed to generate mock token:", e);
+        setLoginError("ログイン中にエラーが発生しました。");
         setIsLoggingIn(false);
       }
     };
@@ -370,46 +390,89 @@ export default function HomeScreen() {
             <IconSymbol size={36} name="figure.volleyball" color="#FF6B35" />
           </View>
           <View className="gap-2 items-center">
-            <Text className="text-2xl font-extrabold text-foreground tracking-tight text-center">VolleyTrack Catapult</Text>
+            <Text className="text-2xl font-extrabold text-foreground tracking-tight text-center">VolleyTrack</Text>
             <Text className="text-xs text-muted text-center leading-relaxed px-4">
-              ログインするデモアカウントを選択してください。
+              アカウントを選択し、パスワードを入力してください。
             </Text>
           </View>
 
-          <View className="w-full gap-3 mt-2">
-            <Text className="text-xs font-bold text-muted px-1">スタッフ（指導者）</Text>
+          <View className="w-full gap-3 mt-2 bg-surface p-5 rounded-3xl border border-border shadow-sm">
+            <Text className="text-xs font-bold text-muted px-1">1. アカウントを選択</Text>
+            
+            {/* スタッフ */}
             <TouchableOpacity 
-              onPress={() => handleDemoLogin("coach")}
-              className="w-full bg-primary py-3.5 rounded-2xl items-center shadow-sm active:opacity-90 flex-row justify-center gap-2"
+              onPress={() => {
+                setSelectedUserType("coach");
+                setSelectedAthleteIndex(null);
+                setLoginError(null);
+                setPassword("");
+              }}
+              className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "coach" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
             >
-              <IconSymbol size={16} name="person.fill" color="#FFFFFF" />
-              <Text className="text-white font-bold text-sm">コーチ (監督) としてログイン</Text>
+              <View className="flex-row items-center gap-3">
+                <IconSymbol size={18} name="person.fill" color={selectedUserType === "coach" ? "#FF6B35" : "#6B7280"} />
+                <Text className={`font-bold text-sm ${selectedUserType === "coach" ? "text-primary" : "text-foreground"}`}>スタッフ</Text>
+              </View>
+              {selectedUserType === "coach" && (
+                <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+              )}
             </TouchableOpacity>
 
-            <Text className="text-xs font-bold text-muted px-1 mt-2">選手（アスリート）</Text>
-            <TouchableOpacity 
-              onPress={() => handleDemoLogin("athlete", 0)}
-              className="w-full bg-surface border border-border py-3.5 rounded-2xl items-center active:bg-muted/10 flex-row justify-center gap-2"
-            >
-              <IconSymbol size={16} name="person" color="#FF6B35" />
-              <Text className="text-foreground font-bold text-sm">宮下 さくら としてログイン</Text>
-            </TouchableOpacity>
+            {/* 選手リスト */}
+            <Text className="text-xs font-bold text-muted px-1 mt-1">選手（アスリート）</Text>
+            {[
+              { name: "宮下 さくら", idx: 0 },
+              { name: "日向 ひなた", idx: 1 },
+              { name: "長谷川 みお", idx: 2 }
+            ].map((a) => (
+              <TouchableOpacity 
+                key={a.idx}
+                onPress={() => {
+                  setSelectedUserType("athlete");
+                  setSelectedAthleteIndex(a.idx);
+                  setLoginError(null);
+                  setPassword("");
+                }}
+                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "athlete" && selectedAthleteIndex === a.idx ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <IconSymbol size={18} name="person" color={selectedUserType === "athlete" && selectedAthleteIndex === a.idx ? "#FF6B35" : "#6B7280"} />
+                  <Text className={`font-bold text-sm ${selectedUserType === "athlete" && selectedAthleteIndex === a.idx ? "text-primary" : "text-foreground"}`}>{a.name}</Text>
+                </View>
+                {selectedUserType === "athlete" && selectedAthleteIndex === a.idx && (
+                  <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+                )}
+              </TouchableOpacity>
+            ))}
 
-            <TouchableOpacity 
-              onPress={() => handleDemoLogin("athlete", 1)}
-              className="w-full bg-surface border border-border py-3.5 rounded-2xl items-center active:bg-muted/10 flex-row justify-center gap-2"
-            >
-              <IconSymbol size={16} name="person" color="#FF6B35" />
-              <Text className="text-foreground font-bold text-sm">日向 ひなた としてログイン</Text>
-            </TouchableOpacity>
+            {/* パスワード入力 & ログインボタン */}
+            {selectedUserType && (
+              <View className="mt-3 pt-3 border-t border-border/60 gap-3">
+                <Text className="text-xs font-bold text-muted px-1">2. パスワードを入力</Text>
+                <TextInput
+                  value={password}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    setLoginError(null);
+                  }}
+                  placeholder={selectedUserType === "coach" ? "スタッフ用パスワード" : "選手用パスワード"}
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={true}
+                  className="bg-background border border-border/80 px-4 py-3 rounded-2xl text-foreground text-sm"
+                />
 
-            <TouchableOpacity 
-              onPress={() => handleDemoLogin("athlete", 2)}
-              className="w-full bg-surface border border-border py-3.5 rounded-2xl items-center active:bg-muted/10 flex-row justify-center gap-2"
-            >
-              <IconSymbol size={16} name="person" color="#FF6B35" />
-              <Text className="text-foreground font-bold text-sm">長谷川 みお としてログイン</Text>
-            </TouchableOpacity>
+                {loginError && (
+                  <Text className="text-xs font-semibold text-red-500 px-1">{loginError}</Text>
+                )}
+
+                <TouchableOpacity 
+                  onPress={() => handleDemoLogin(selectedUserType, selectedAthleteIndex ?? undefined)}
+                  className="w-full bg-primary py-3.5 rounded-2xl items-center shadow-sm active:opacity-95"
+                >
+                  <Text className="text-white font-bold text-sm">ログインする</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </ScreenContainer>

@@ -30,7 +30,7 @@ let mockUsers: User[] = [
   {
     id: 1,
     openId: "democoach",
-    name: "監督",
+    name: "スタッフ",
     email: "coach@example.com",
     loginMethod: "manus",
     teamId: 1,
