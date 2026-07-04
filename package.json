@@ -10,7 +10,7 @@
     "build:server": "npx esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:web": "npx expo export --platform web --output-dir dist/web --clear",
     "build": "npm run build:server && npm run build:web",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "npx drizzle-kit push && NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "lint": "expo lint",
     "format": "prettier --write .",
