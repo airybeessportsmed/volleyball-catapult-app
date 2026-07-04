@@ -191,7 +191,7 @@ export default function HomeScreen() {
   const [trendMetric, setTrendMetric] = useState<"load" | "jumps">("load");
   const mockTokenMutation = trpc.auth.getMockToken.useMutation();
 
-  const [selectedUserType, setSelectedUserType] = useState<"coach" | "athlete" | null>(null);
+  const [selectedUserType, setSelectedUserType] = useState<"coach" | "viewer" | "athlete" | null>(null);
   const [selectedAthleteIndex, setSelectedAthleteIndex] = useState<number | null>(null);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -214,10 +214,10 @@ export default function HomeScreen() {
     { enabled: !!athlete?.id }
   );
 
-  // Fetch team analytics for coach
+  // Fetch team analytics for coach/viewer
   const { data: teamAnalytics, isLoading: teamLoading, refetch: refetchTeam } = trpc.performance.getTeamAnalytics.useQuery(
     { teamId: user?.teamId || 1 },
-    { enabled: isAuthenticated && user?.role === "coach" }
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
   const saveAdviceMutation = trpc.performance.saveCoachAdvice.useMutation();
@@ -226,7 +226,7 @@ export default function HomeScreen() {
 
   const { data: teamSettings, refetch: refetchSettings } = trpc.team.getSettings.useQuery(
     { teamId: user?.teamId || 1 },
-    { enabled: isAuthenticated && user?.role === "coach" }
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
@@ -322,11 +322,16 @@ export default function HomeScreen() {
       return output;
     };
 
-    const handleDemoLogin = async (role: "coach" | "athlete", idx?: number) => {
+    const handleDemoLogin = async (role: "coach" | "viewer" | "athlete", idx?: number) => {
       // Validate password
       if (role === "coach") {
-        if (password !== "staff123") {
-          setLoginError("スタッフ用パスワードが正しくありません。");
+        if (password !== "admin123") {
+          setLoginError("管理者用パスワードが正しくありません。");
+          return;
+        }
+      } else if (role === "viewer") {
+        if (password !== "viewer123") {
+          setLoginError("閲覧用パスワードが正しくありません。");
           return;
         }
       } else {
@@ -345,10 +350,21 @@ export default function HomeScreen() {
         demoUser = {
           id: 1,
           openId: "democoach",
-          name: "スタッフ",
-          email: "coach@example.com",
+          name: "スタッフ (管理者)",
+          email: "admin@example.com",
           loginMethod: "manus",
           role: "coach",
+          teamId: 1,
+          lastSignedIn: new Date().toISOString()
+        };
+      } else if (role === "viewer") {
+        demoUser = {
+          id: 5,
+          openId: "demoviewer",
+          name: "スタッフ (閲覧用)",
+          email: "viewer@example.com",
+          loginMethod: "manus",
+          role: "viewer",
           teamId: 1,
           lastSignedIn: new Date().toISOString()
         };
@@ -400,6 +416,9 @@ export default function HomeScreen() {
             <Text className="text-xs font-bold text-muted px-1">1. アカウントを選択</Text>
             
             {/* スタッフ */}
+            <Text className="text-xs font-bold text-muted px-1">スタッフ（指導者・関係者）</Text>
+            
+            {/* スタッフ (管理者) */}
             <TouchableOpacity 
               onPress={() => {
                 setSelectedUserType("coach");
@@ -411,9 +430,28 @@ export default function HomeScreen() {
             >
               <View className="flex-row items-center gap-3">
                 <IconSymbol size={18} name="person.fill" color={selectedUserType === "coach" ? "#FF6B35" : "#6B7280"} />
-                <Text className={`font-bold text-sm ${selectedUserType === "coach" ? "text-primary" : "text-foreground"}`}>スタッフ</Text>
+                <Text className={`font-bold text-sm ${selectedUserType === "coach" ? "text-primary" : "text-foreground"}`}>スタッフ (管理者)</Text>
               </View>
               {selectedUserType === "coach" && (
+                <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+              )}
+            </TouchableOpacity>
+
+            {/* スタッフ (閲覧用) */}
+            <TouchableOpacity 
+              onPress={() => {
+                setSelectedUserType("viewer");
+                setSelectedAthleteIndex(null);
+                setLoginError(null);
+                setPassword("");
+              }}
+              className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+            >
+              <View className="flex-row items-center gap-3">
+                <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" ? "#FF6B35" : "#6B7280"} />
+                <Text className={`font-bold text-sm ${selectedUserType === "viewer" ? "text-primary" : "text-foreground"}`}>スタッフ (閲覧用)</Text>
+              </View>
+              {selectedUserType === "viewer" && (
                 <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
               )}
             </TouchableOpacity>
@@ -455,7 +493,7 @@ export default function HomeScreen() {
                     setPassword(val);
                     setLoginError(null);
                   }}
-                  placeholder={selectedUserType === "coach" ? "スタッフ用パスワード" : "選手用パスワード"}
+                  placeholder={selectedUserType === "coach" ? "管理者用パスワード" : selectedUserType === "viewer" ? "閲覧用パスワード" : "選手用パスワード"}
                   placeholderTextColor="#9CA3AF"
                   secureTextEntry={true}
                   className="bg-background border border-border/80 px-4 py-3 rounded-2xl text-foreground text-sm"
@@ -641,8 +679,8 @@ export default function HomeScreen() {
     );
   }
 
-  // Coach Dashboard
-  if (user?.role === "coach") {
+  // Coach Dashboard (accessible by coach and viewer roles)
+  if (user?.role === "coach" || user?.role === "viewer") {
     if (teamLoading) {
       return (
         <ScreenContainer className="flex items-center justify-center bg-background">
@@ -853,7 +891,9 @@ export default function HomeScreen() {
                 <Text style={{ fontSize: 12, fontWeight: "bold", color: "#475569" }}>✍️ 指導アドバイス</Text>
                 <TextInput
                   defaultValue={ath.coachAdvice || ""}
+                  editable={user?.role !== "viewer"}
                   onBlur={async (e) => {
+                    if (user?.role === "viewer") return;
                     const text = (e as any).nativeEvent.text;
                     try {
                       await saveAdviceMutation.mutateAsync({ athleteId: ath.athleteId, advice: text });
@@ -862,9 +902,9 @@ export default function HomeScreen() {
                       console.error("Advice save failed", err);
                     }
                   }}
-                  placeholder="練習制限や調整指示を入力 (フォーカスアウトで自動保存)..."
+                  placeholder={user?.role === "viewer" ? "閲覧専用アカウント（アドバイスの入力はできません）" : "練習制限や調整指示を入力 (フォーカスアウトで自動保存)..."}
                   placeholderTextColor="#94A3B8"
-                  style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, color: "#1E293B", backgroundColor: "#FFFFFF" }}
+                  style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, color: "#1E293B", backgroundColor: user?.role === "viewer" ? "#F1F5F9" : "#FFFFFF" }}
                 />
               </View>
 
@@ -901,7 +941,12 @@ export default function HomeScreen() {
 
         <View style={{ paddingHorizontal: 20, paddingTop: 16, backgroundColor: "#FFFFFF" }}>
           <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 4, borderRadius: 12 }}>
-            {(["summary", "dashboard", "raw", "settings"] as const).map(tab => {
+            {(["summary", "dashboard", "raw", "settings"] as const).filter(tab => {
+              if (user?.role === "viewer") {
+                return tab === "summary" || tab === "dashboard";
+              }
+              return true;
+            }).map(tab => {
               const tabLabels = { summary: "🚥 サマリー", dashboard: "📊 分析", raw: "📝 生データ", settings: "⚙️ 設定" };
               const isActive = activeTab === tab;
               return (

@@ -379,163 +379,179 @@ export default function CoachUploadScreen() {
               </View>
             </View>
 
-            <View className="gap-2">
-              <Text className="text-base font-bold text-foreground">CSVファイルをインポート</Text>
-              <Text className="text-xs text-muted font-normal font-sans">
-                Onetap Wellness / sRPE / Catapult / SOXAI などのCSVを同時にインポート可能です。
-              </Text>
-            </View>
-
-            {/* File Drop / Selection Area */}
-            <View 
-              // @ts-ignore
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`bg-surface rounded-3xl border-2 border-dashed p-8 shadow-sm justify-center items-center gap-4 transition-all duration-300 ${
-                isDragging ? "border-primary bg-primary/5 scale-[1.02]" : "border-border hover:border-primary/50"
-              }`}
-            >
-              <View className="w-14 h-14 bg-primary/10 rounded-2xl items-center justify-center shadow-inner">
-                <IconSymbol size={28} name="square.and.arrow.up.fill" color="#FF6B35" />
-              </View>
-              
-              <View className="items-center gap-1 px-4">
-                <Text className="text-sm font-bold text-foreground text-center">
-                  CSVファイルをここにドラッグ＆ドロップ（複数可）
-                </Text>
-                <Text className="text-xs text-muted text-center font-sans">
-                  またはファイルブラウザから選択してください
-                </Text>
-              </View>
-
-              <View className="flex-row gap-3 mt-2">
-                <TouchableOpacity 
-                  onPress={handleSelectFile}
-                  className="bg-primary px-6 py-2.5 rounded-xl active:bg-primary-dark shadow-md flex-row items-center gap-1.5"
-                >
-                  <IconSymbol size={16} name="doc.fill" color="#FFFFFF" />
-                  <Text className="text-white font-bold text-xs">ファイルを選択</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={loadSample}
-                  className="bg-muted/30 border border-border px-4 py-2.5 rounded-xl active:bg-muted/50 flex-row items-center gap-1.5"
-                >
-                  <IconSymbol size={16} name="doc.on.doc" color="#4B5563" />
-                  <Text className="text-foreground font-semibold text-xs">サンプルを読込</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Files Queue List */}
-            {filesToUpload.length > 0 && (
-              <View className="gap-3">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-sm font-bold text-foreground">
-                    アップロード対象 ({filesToUpload.length}件)
+            {user?.role === "viewer" ? (
+              <View className="bg-surface rounded-3xl border border-border p-8 shadow-sm justify-center items-center gap-4">
+                <View className="w-16 h-16 bg-muted rounded-2xl items-center justify-center">
+                  <IconSymbol size={28} name="lock.fill" color="#64748B" />
+                </View>
+                <View className="items-center gap-1">
+                  <Text className="text-base font-bold text-foreground text-center">閲覧専用アカウント</Text>
+                  <Text className="text-xs text-muted text-center font-sans">
+                    データのアップロードやインポート機能は管理者のみ利用可能です。
                   </Text>
-                  <TouchableOpacity onPress={handleClearAll} className="active:opacity-75">
-                    <Text className="text-xs text-red-500 font-bold">すべてクリア</Text>
-                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <>
+                <View className="gap-2">
+                  <Text className="text-base font-bold text-foreground">CSVファイルをインポート</Text>
+                  <Text className="text-xs text-muted font-normal font-sans">
+                    Onetap Wellness / sRPE / Catapult / SOXAI などのCSVを同時にインポート可能です。
+                  </Text>
                 </View>
 
-                <View className="gap-2.5">
-                  {filesToUpload.map((file) => (
-                    <View 
-                      key={file.id} 
-                      className="bg-surface rounded-2xl border border-border p-3 flex-row items-center justify-between shadow-sm"
+                {/* File Drop / Selection Area */}
+                <View 
+                  // @ts-ignore
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`bg-surface rounded-3xl border-2 border-dashed p-8 shadow-sm justify-center items-center gap-4 transition-all duration-300 ${
+                    isDragging ? "border-primary bg-primary/5 scale-[1.02]" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <View className="w-14 h-14 bg-primary/10 rounded-2xl items-center justify-center shadow-inner">
+                    <IconSymbol size={28} name="square.and.arrow.up.fill" color="#FF6B35" />
+                  </View>
+                  
+                  <View className="items-center gap-1 px-4">
+                    <Text className="text-sm font-bold text-foreground text-center">
+                      CSVファイルをここにドラッグ＆ドロップ（複数可）
+                    </Text>
+                    <Text className="text-xs text-muted text-center font-sans">
+                      またはファイルブラウザから選択してください
+                    </Text>
+                  </View>
+
+                  <View className="flex-row gap-3 mt-2">
+                    <TouchableOpacity 
+                      onPress={handleSelectFile}
+                      className="bg-primary px-6 py-2.5 rounded-xl active:bg-primary-dark shadow-md flex-row items-center gap-1.5"
                     >
-                      <View className="flex-row items-center gap-3 flex-1 pr-4">
-                        <View className={`w-10 h-10 rounded-xl items-center justify-center ${
-                          file.status === "success" ? "bg-emerald-500/10" : "bg-muted/20"
-                        }`}>
-                          <IconSymbol 
-                            size={18} 
-                            name={file.status === "success" ? "checkmark.circle.fill" : "doc.text.fill"} 
-                            color={file.status === "success" ? "#10B981" : "#FF6B35"} 
-                          />
-                        </View>
-                        <View className="flex-1 gap-0.5">
-                          <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
-                            {file.name}
-                          </Text>
-                          <View className="flex-row items-center gap-2">
-                            <Text className="text-[10px] text-muted font-mono font-medium">
-                              {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ""}
-                            </Text>
-                            <View className="bg-primary/10 px-2 py-0.5 rounded-full">
-                              <Text className="text-[8px] font-extrabold text-primary font-sans">{file.detectedFormat}</Text>
+                      <IconSymbol size={16} name="doc.fill" color="#FFFFFF" />
+                      <Text className="text-white font-bold text-xs">ファイルを選択</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      onPress={loadSample}
+                      className="bg-muted/30 border border-border px-4 py-2.5 rounded-xl active:bg-muted/50 flex-row items-center gap-1.5"
+                    >
+                      <IconSymbol size={16} name="doc.on.doc" color="#4B5563" />
+                      <Text className="text-foreground font-semibold text-xs">サンプルを読込</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Files Queue List */}
+                {filesToUpload.length > 0 && (
+                  <View className="gap-3">
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-sm font-bold text-foreground">
+                        アップロード対象 ({filesToUpload.length}件)
+                      </Text>
+                      <TouchableOpacity onPress={handleClearAll} className="active:opacity-75">
+                        <Text className="text-xs text-red-500 font-bold">すべてクリア</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View className="gap-2.5">
+                      {filesToUpload.map((file) => (
+                        <View 
+                          key={file.id} 
+                          className="bg-surface rounded-2xl border border-border p-3 flex-row items-center justify-between shadow-sm"
+                        >
+                          <View className="flex-row items-center gap-3 flex-1 pr-4">
+                            <View className={`w-10 h-10 rounded-xl items-center justify-center ${
+                              file.status === "success" ? "bg-emerald-500/10" : "bg-muted/20"
+                            }`}>
+                              <IconSymbol 
+                                size={18} 
+                                name={file.status === "success" ? "checkmark.circle.fill" : "doc.text.fill"} 
+                                color={file.status === "success" ? "#10B981" : "#FF6B35"} 
+                              />
+                            </View>
+                            <View className="flex-1 gap-0.5">
+                              <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                                {file.name}
+                              </Text>
+                              <View className="flex-row items-center gap-2">
+                                <Text className="text-[10px] text-muted font-mono font-medium">
+                                  {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ""}
+                                </Text>
+                                <View className="bg-primary/10 px-2 py-0.5 rounded-full">
+                                  <Text className="text-[8px] font-extrabold text-primary font-sans">{file.detectedFormat}</Text>
+                                </View>
+                              </View>
+                              {file.errorMessage && (
+                                <Text className="text-[10px] text-red-500" numberOfLines={1}>
+                                  エラー: {file.errorMessage}
+                                </Text>
+                              )}
                             </View>
                           </View>
-                          {file.errorMessage && (
-                            <Text className="text-[10px] text-red-500" numberOfLines={1}>
-                              エラー: {file.errorMessage}
-                            </Text>
-                          )}
+
+                          <View className="flex-row items-center gap-2">
+                            {file.status === "uploading" && (
+                              <ActivityIndicator size="small" color="#FF6B35" />
+                            )}
+                            {file.status === "success" && (
+                              <Text className="text-[10px] text-emerald-600 font-bold">成功</Text>
+                            )}
+                            {file.status === "error" && (
+                              <Text className="text-[10px] text-red-500 font-bold">失敗</Text>
+                            )}
+                            {file.status === "pending" && (
+                              <Text className="text-[10px] text-muted font-semibold">待機中</Text>
+                            )}
+                            
+                            <TouchableOpacity 
+                              disabled={file.status === "uploading"}
+                              onPress={() => handleRemoveFile(file.id)}
+                              className="w-8 h-8 rounded-full bg-muted/10 items-center justify-center active:bg-red-500/10"
+                            >
+                              <IconSymbol size={14} name="xmark" color="#6B7280" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                      </View>
-
-                      <View className="flex-row items-center gap-2">
-                        {file.status === "uploading" && (
-                          <ActivityIndicator size="small" color="#FF6B35" />
-                        )}
-                        {file.status === "success" && (
-                          <Text className="text-[10px] text-emerald-600 font-bold">成功</Text>
-                        )}
-                        {file.status === "error" && (
-                          <Text className="text-[10px] text-red-500 font-bold">失敗</Text>
-                        )}
-                        {file.status === "pending" && (
-                          <Text className="text-[10px] text-muted font-semibold">待機中</Text>
-                        )}
-                        
-                        <TouchableOpacity 
-                          disabled={file.status === "uploading"}
-                          onPress={() => handleRemoveFile(file.id)}
-                          className="w-8 h-8 rounded-full bg-muted/10 items-center justify-center active:bg-red-500/10"
-                        >
-                          <IconSymbol size={14} name="xmark" color="#6B7280" />
-                        </TouchableOpacity>
-                      </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
-              </View>
+                  </View>
+                )}
+
+                {/* Messages */}
+                {errorMsg ? (
+                  <View className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl flex-row items-center gap-3">
+                    <IconSymbol size={20} name="exclamationmark.triangle.fill" color="#EF4444" />
+                    <Text className="text-destructive text-sm flex-1 font-semibold font-sans">{errorMsg}</Text>
+                  </View>
+                ) : null}
+
+                {isSuccess ? (
+                  <View className="bg-success/15 border border-success/35 p-4 rounded-xl flex-row items-center gap-3">
+                    <IconSymbol size={20} name="checkmark.circle.fill" color="#22C55E" />
+                    <Text className="text-success text-sm flex-1 font-semibold font-sans">
+                      すべてのデータを正常にインポートしました！
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleImport}
+                  disabled={importMutation.isPending || isSuccess}
+                  className={`w-full py-4 rounded-2xl flex-row justify-center items-center gap-2 ${
+                    importMutation.isPending || isSuccess ? "bg-muted" : "bg-primary shadow-lg"
+                  }`}
+                >
+                  {importMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <IconSymbol size={18} name="arrow.up.doc.fill" color="#FFFFFF" />
+                  )}
+                  <Text className="text-white font-bold text-base">データをインポートする</Text>
+                </TouchableOpacity>
+              </>
             )}
-
-            {/* Messages */}
-            {errorMsg ? (
-              <View className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl flex-row items-center gap-3">
-                <IconSymbol size={20} name="exclamationmark.triangle.fill" color="#EF4444" />
-                <Text className="text-destructive text-sm flex-1 font-semibold font-sans">{errorMsg}</Text>
-              </View>
-            ) : null}
-
-            {isSuccess ? (
-              <View className="bg-success/15 border border-success/35 p-4 rounded-xl flex-row items-center gap-3">
-                <IconSymbol size={20} name="checkmark.circle.fill" color="#22C55E" />
-                <Text className="text-success text-sm flex-1 font-semibold font-sans">
-                  すべてのデータを正常にインポートしました！
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              onPress={handleImport}
-              disabled={importMutation.isPending || isSuccess}
-              className={`w-full py-4 rounded-2xl flex-row justify-center items-center gap-2 ${
-                importMutation.isPending || isSuccess ? "bg-muted" : "bg-primary shadow-lg"
-              }`}
-            >
-              {importMutation.isPending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <IconSymbol size={18} name="arrow.up.doc.fill" color="#FFFFFF" />
-              )}
-              <Text className="text-white font-bold text-base">データをインポートする</Text>
-            </TouchableOpacity>
 
             {/* Info Card */}
             <View className="bg-surface rounded-2xl border border-border p-5 gap-3">

@@ -27,7 +27,7 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // Add athleteRole to user role enum for easier role checking
-export type UserRole = "user" | "admin" | "coach" | "athlete";
+export type UserRole = "user" | "admin" | "coach" | "athlete" | "viewer";
 
 /**
  * Teams table - represents a volleyball team
