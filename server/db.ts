@@ -3282,4 +3282,67 @@ export async function seedDatabase() {
   }
 }
 
+export async function deleteCsvUpload(uploadId: number): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    const idx = mockCsvUploads.findIndex(c => c.id === uploadId);
+    if (idx !== -1) {
+      const upload = mockCsvUploads[idx];
+      mockCsvUploads.splice(idx, 1);
+      mockPerformanceData = mockPerformanceData.filter(p => {
+        try {
+          const raw = JSON.parse(p.rawCsvData || "{}");
+          return raw.fileName !== upload.fileName;
+        } catch {
+          return true;
+        }
+      });
+      return { success: true };
+    }
+    return { success: false, error: "Mock upload record not found" };
+  }
+
+  try {
+    const upload = await db.select().from(csvUploads).where(eq(csvUploads.id, uploadId)).limit(1);
+    if (upload.length === 0) {
+      return { success: false, error: "Upload record not found" };
+    }
+
+    const fileName = upload[0].fileName;
+
+    // Delete performance data records imported from this CSV file
+    await db.delete(performanceData)
+      .where(sql`rawCsvData->>'fileName' = ${fileName}`);
+
+    // Delete the CSV upload history record
+    await db.delete(csvUploads).where(eq(csvUploads.id, uploadId));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Database] Failed to delete CSV upload:", error);
+    return { success: false, error: error.message || "Database delete failure" };
+  }
+}
+
+export async function updateAthleteCsvNames(athleteId: number, csvNames: string): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    const a = mockAthletes.find(item => item.id === athleteId);
+    if (a) {
+      a.csvNames = csvNames;
+    }
+    return { success: true };
+  }
+
+  try {
+    await db.update(athletes)
+      .set({ csvNames })
+      .where(eq(athletes.id, athleteId));
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Database] Failed to update athlete csvNames:", error);
+    return { success: false, error: error.message || "Database update failure" };
+  }
+}
+
 

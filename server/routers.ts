@@ -260,6 +260,27 @@ export const appRouter = router({
         }
         return db.importPerformanceCsv(input.teamId, ctx.user.id, input.csvText, input.fileName);
       }),
+
+    deleteCsvUpload: protectedProcedure
+      .input(z.object({ uploadId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can delete CSV imports");
+        }
+        return db.deleteCsvUpload(input.uploadId);
+      }),
+
+    updateAthleteCsvNames: protectedProcedure
+      .input(z.object({
+        athleteId: z.number(),
+        csvNames: z.string()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can update mappings");
+        }
+        return db.updateAthleteCsvNames(input.athleteId, input.csvNames);
+      }),
     
     getAthleteAnalytics: protectedProcedure
       .input(z.object({ athleteId: z.number() }))

@@ -64,6 +64,7 @@ export default function CoachUploadScreen() {
   );
 
   const importMutation = trpc.performance.importCsv.useMutation();
+  const deleteUploadMutation = trpc.performance.deleteCsvUpload.useMutation();
 
   const addFiles = (newFiles: { name: string; size?: number; text: string }[]) => {
     const items: UploadFileItem[] = newFiles.map(f => ({
@@ -639,9 +640,40 @@ export default function CoachUploadScreen() {
                           </Text>
                         </View>
                         {upload.status === "completed" && upload.recordsImported !== null && (
-                          <Text className="text-xs text-muted font-bold">
-                            {upload.recordsImported}件登録
-                          </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+                            <Text className="text-xs text-muted font-bold">
+                              {upload.recordsImported}件登録
+                            </Text>
+                            <TouchableOpacity
+                              onPress={async () => {
+                                const confirm = typeof window !== "undefined" && window.confirm 
+                                  ? window.confirm(`${upload.fileName} のインポートを取り消しますか？\n(このファイルから取り込まれた選手データが削除されます)`) 
+                                  : true;
+                                if (confirm) {
+                                  try {
+                                    await deleteUploadMutation.mutateAsync({ uploadId: upload.id });
+                                    refetchUploads();
+                                    refetchStatus();
+                                    if (typeof window !== "undefined" && window.alert) {
+                                      window.alert("インポートを取り消しました。");
+                                    } else {
+                                      alert("インポートを取り消しました。");
+                                    }
+                                  } catch (err) {
+                                    console.error("Delete failed", err);
+                                    if (typeof window !== "undefined" && window.alert) {
+                                      window.alert("削除に失敗しました。");
+                                    } else {
+                                      alert("削除に失敗しました。");
+                                    }
+                                  }
+                                }
+                              }}
+                              style={{ padding: 2 }}
+                            >
+                              <IconSymbol size={13} name="trash" color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
                         )}
                       </View>
                     </View>

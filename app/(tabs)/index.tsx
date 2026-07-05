@@ -247,6 +247,7 @@ export default function HomeScreen() {
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, number | null>>({});
 
   const updateMetricsBatchMutation = trpc.performance.updateMetricsBatch.useMutation();
+  const updateAthleteCsvNamesMutation = trpc.performance.updateAthleteCsvNames.useMutation();
 
   useEffect(() => {
     if (latestPerformance) {
@@ -1729,6 +1730,59 @@ export default function HomeScreen() {
                       />
                     </View>
                   )}
+                </View>
+
+                {/* 3. 選手マッピング (名寄せ) 設定 */}
+                <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>選手マッピング (CSV名寄せ) 設定</Text>
+                  <Text style={{ fontSize: 11, color: "#64748B", lineHeight: 16 }}>
+                    CSVファイルに書かれている選手名（Catapult名、Onetap名など）と、アプリ上の選手を紐付けます。複数ある場合は半角カンマ「,」で区切って登録してください。
+                  </Text>
+
+                  <View style={{ gap: 10, marginTop: 8 }}>
+                    {allAthletes.map((ath) => {
+                      return (
+                        <View key={ath.athleteId} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 10, gap: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
+                            <Text style={{ fontSize: 10, color: "#64748B" }}>No.{ath.jerseyNumber || "-"} / {ath.position || "-"}</Text>
+                          </View>
+                          
+                          <View style={{ flex: 2 }}>
+                            <TextInput
+                              defaultValue={(ath as any).csvNames || ""}
+                              placeholder="例: Haruna, Yamashita, 1 Yamashita"
+                              placeholderTextColor="#94A3B8"
+                              onBlur={async (e) => {
+                                const text = (e as any).nativeEvent.text;
+                                try {
+                                  await updateAthleteCsvNamesMutation.mutateAsync({
+                                    athleteId: ath.athleteId,
+                                    csvNames: text
+                                  });
+                                  refetchTeam();
+                                  alert("マッピングを更新しました。");
+                                } catch (err) {
+                                  console.error("Failed to update mapping", err);
+                                  alert("マッピングの保存に失敗しました。");
+                                }
+                              }}
+                              style={{
+                                fontSize: 12,
+                                borderWidth: 1,
+                                borderColor: "#CBD5E1",
+                                borderRadius: 8,
+                                paddingVertical: 6,
+                                paddingHorizontal: 10,
+                                color: "#1E293B",
+                                backgroundColor: "#FFFFFF",
+                              }}
+                            />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
             )}
