@@ -3107,6 +3107,9 @@ export async function seedDatabase() {
         role: "coach",
         teamId: 1,
       });
+    } else if (existingCoach[0].teamId !== 1) {
+      console.log("[Database] Fixing coach user teamId...");
+      await db.update(users).set({ teamId: 1 }).where(eq(users.id, 1));
     }
 
     // 3. Seed viewer user

@@ -198,10 +198,20 @@ export default function CoachUploadScreen() {
   };
 
   const loadSample = () => {
+    // Dynamically replace original sample timestamps with today's timestamps
+    // to ensure the imported data displays in today's active dashboard summary.
+    const todayMs = Date.now();
+    let csvText = SAMPLE_CSV;
+    
+    csvText = csvText.replace(/1783339201000/g, String(todayMs - 10000));
+    csvText = csvText.replace(/1783339202000/g, String(todayMs - 5000));
+    csvText = csvText.replace(/1783339203000/g, String(todayMs));
+    csvText = csvText.replace(/1783339200000/g, String(todayMs - 20000));
+
     addFiles([{
       name: "sample_catapult_data.csv",
-      size: SAMPLE_CSV.length,
-      text: SAMPLE_CSV,
+      size: csvText.length,
+      text: csvText,
     }]);
     setErrorMsg("");
   };
