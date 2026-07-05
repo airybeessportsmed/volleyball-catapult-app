@@ -3309,7 +3309,7 @@ export async function deleteCsvUpload(uploadId: number): Promise<{ success: bool
 
     // Delete performance data records imported from this CSV file
     await db.delete(performanceData)
-      .where(sql`rawCsvData->>'fileName' = ${fileName}`);
+      .where(sql`${performanceData.rawCsvData} LIKE ${`%"fileName":"${fileName}"%`}`);
 
     // Delete the CSV upload history record
     await db.delete(csvUploads).where(eq(csvUploads.id, uploadId));
