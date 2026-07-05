@@ -37,6 +37,8 @@ export default function CoachTeamScreen() {
     { enabled: isAuthenticated && !!user?.teamId }
   );
 
+  const utils = trpc.useUtils();
+
   // Fetch all athletes in the team
   const { data: athletes, isLoading: athletesLoading, refetch } = trpc.athlete.getByTeam.useQuery(
     { teamId },
@@ -54,6 +56,7 @@ export default function CoachTeamScreen() {
       setIsEditMode(false);
       setErrorMessage(null);
       refetch();
+      utils.performance.getTeamAnalytics.invalidate();
     },
     onError: (err) => {
       setErrorMessage(err.message || "一括保存中にエラーが発生しました。");
