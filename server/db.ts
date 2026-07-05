@@ -1588,7 +1588,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       }
 
     } else if (isImaLog) {
-      const athleteCol = findHeaderIndex(["athlete", "選手", "名前", "athlete_id"]);
+      const athleteCol = findHeaderIndex(["athlete", "選手", "名前", "athlete_id", "name"]);
       const tagCol = findHeaderIndex(["tag", "移動", "of event"]);
       const heightCol = findHeaderIndex(["height", "高さ", "jump height"]);
       const intensityCol = findHeaderIndex(["intensity", "強度"]);
@@ -1694,7 +1694,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       }
 
     } else if (isEventLog) {
-      const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player"]);
+      const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "name"]);
       const startTimeIdx = findHeaderIndex(["start_time", "starttime", "開始時間"]);
       const epochIdx = findHeaderIndex(["epoch", "time", "時間"]);
       const durationIdx = findHeaderIndex(["duration", "時間(秒)", "秒"]);
@@ -1873,7 +1873,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       }
 
     } else if (isMenuLoadLog) {
-      const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "period", "activity", "menu", "メニュー"]);
+      const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "period", "activity", "menu", "メニュー", "name"]);
 
       if (categoryIdx === -1 || dateIdx === -1) {
         throw new Error("CSV is missing Athlete Name/Menu or Date columns");
