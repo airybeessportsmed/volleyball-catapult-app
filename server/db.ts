@@ -1257,43 +1257,50 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   const existing = await findExistingPerformanceData(db, data.athleteId, data.date);
   const defaultSessionType = data.date ? (new Date(data.date).getDay() === 0 || new Date(data.date).getDay() === 6 ? "match" as const : "practice" as const) : "practice" as const;
   
+  const mergeField = (newVal: any, existingVal: any, defaultVal: any = null) => {
+    if (newVal !== undefined && newVal !== null && newVal !== "") {
+      return newVal;
+    }
+    return existingVal !== undefined && existingVal !== null ? existingVal : defaultVal;
+  };
+
   const mergedData = {
     ...data,
-    sessionType: data.sessionType !== undefined ? data.sessionType : (existing ? existing.sessionType : defaultSessionType),
-    maxJumpHeight: data.maxJumpHeight !== undefined ? data.maxJumpHeight : (existing ? existing.maxJumpHeight : null),
-    avgJumpHeight: data.avgJumpHeight !== undefined ? data.avgJumpHeight : (existing ? existing.avgJumpHeight : null),
-    totalJumps: data.totalJumps !== undefined ? data.totalJumps : (existing ? existing.totalJumps : null),
-    jumpVolume: data.jumpVolume !== undefined ? data.jumpVolume : (existing ? existing.jumpVolume : null),
-    jumpsOver40cm: data.jumpsOver40cm !== undefined ? data.jumpsOver40cm : (existing ? existing.jumpsOver40cm : null),
-    jumpZone1Count: data.jumpZone1Count !== undefined ? data.jumpZone1Count : (existing ? existing.jumpZone1Count : null),
-    jumpZone2Count: data.jumpZone2Count !== undefined ? data.jumpZone2Count : (existing ? existing.jumpZone2Count : null),
-    jumpZone3Count: data.jumpZone3Count !== undefined ? data.jumpZone3Count : (existing ? existing.jumpZone3Count : null),
-    jumpZone4Count: data.jumpZone4Count !== undefined ? data.jumpZone4Count : (existing ? existing.jumpZone4Count : null),
-    jumpZone5Count: data.jumpZone5Count !== undefined ? data.jumpZone5Count : (existing ? existing.jumpZone5Count : null),
+    sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
+    maxJumpHeight: mergeField(data.maxJumpHeight, existing?.maxJumpHeight),
+    avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight),
+    totalJumps: mergeField(data.totalJumps, existing?.totalJumps),
+    jumpVolume: mergeField(data.jumpVolume, existing?.jumpVolume),
+    jumpsOver40cm: mergeField(data.jumpsOver40cm, existing?.jumpsOver40cm),
+    jumpZone1Count: mergeField(data.jumpZone1Count, existing?.jumpZone1Count),
+    jumpZone2Count: mergeField(data.jumpZone2Count, existing?.jumpZone2Count),
+    jumpZone3Count: mergeField(data.jumpZone3Count, existing?.jumpZone3Count),
+    jumpZone4Count: mergeField(data.jumpZone4Count, existing?.jumpZone4Count),
+    jumpZone5Count: mergeField(data.jumpZone5Count, existing?.jumpZone5Count),
     
-    avgAcceleration: data.avgAcceleration !== undefined ? data.avgAcceleration : (existing ? existing.avgAcceleration : null),
-    maxAcceleration: data.maxAcceleration !== undefined ? data.maxAcceleration : (existing ? existing.maxAcceleration : null),
-    accelVolume: data.accelVolume !== undefined ? data.accelVolume : (existing ? existing.accelVolume : null),
-    accelCount: data.accelCount !== undefined ? data.accelCount : (existing ? existing.accelCount : null),
+    avgAcceleration: mergeField(data.avgAcceleration, existing?.avgAcceleration),
+    maxAcceleration: mergeField(data.maxAcceleration, existing?.maxAcceleration),
+    accelVolume: mergeField(data.accelVolume, existing?.accelVolume),
+    accelCount: mergeField(data.accelCount, existing?.accelCount),
     
-    totalDistance: data.totalDistance !== undefined ? data.totalDistance : (existing ? existing.totalDistance : "0.00"),
-    avgSpeed: data.avgSpeed !== undefined ? data.avgSpeed : (existing ? existing.avgSpeed : "0.00"),
-    maxSpeed: data.maxSpeed !== undefined ? data.maxSpeed : (existing ? existing.maxSpeed : "0.00"),
-    totalLoad: data.totalLoad !== undefined ? data.totalLoad : (existing ? existing.totalLoad : null),
-    avgLoad: data.avgLoad !== undefined ? data.avgLoad : (existing ? existing.avgLoad : null),
-    duration: data.duration !== undefined ? data.duration : (existing ? existing.duration : 3600),
-    rawMenuData: data.rawMenuData !== undefined ? data.rawMenuData : (existing ? existing.rawMenuData : null),
-    sRPE: data.sRPE !== undefined ? data.sRPE : (existing ? existing.sRPE : null),
-    rpeValue: data.rpeValue !== undefined ? data.rpeValue : (existing ? existing.rpeValue : null),
-    wellnessSleep: data.wellnessSleep !== undefined ? data.wellnessSleep : (existing ? existing.wellnessSleep : null),
-    wellnessFatigue: data.wellnessFatigue !== undefined ? data.wellnessFatigue : (existing ? existing.wellnessFatigue : null),
-    wellnessSoreness: data.wellnessSoreness !== undefined ? data.wellnessSoreness : (existing ? existing.wellnessSoreness : null),
-    wellnessStress: data.wellnessStress !== undefined ? data.wellnessStress : (existing ? existing.wellnessStress : null),
-    hrv: data.hrv !== undefined ? data.hrv : (existing ? existing.hrv : null),
-    highIntensityDistance: data.highIntensityDistance !== undefined ? data.highIntensityDistance : (existing ? existing.highIntensityDistance : null),
-    avgHeartRate: data.avgHeartRate !== undefined ? data.avgHeartRate : (existing ? existing.avgHeartRate : null),
-    physiologicalMarker: data.physiologicalMarker !== undefined ? data.physiologicalMarker : (existing ? existing.physiologicalMarker : null),
-    coachAdvice: data.coachAdvice !== undefined ? data.coachAdvice : (existing ? existing.coachAdvice : null),
+    totalDistance: mergeField(data.totalDistance, existing?.totalDistance, "0.00"),
+    avgSpeed: mergeField(data.avgSpeed, existing?.avgSpeed, "0.00"),
+    maxSpeed: mergeField(data.maxSpeed, existing?.maxSpeed, "0.00"),
+    totalLoad: mergeField(data.totalLoad, existing?.totalLoad),
+    avgLoad: mergeField(data.avgLoad, existing?.avgLoad),
+    duration: mergeField(data.duration, existing?.duration, 3600),
+    rawMenuData: mergeField(data.rawMenuData, existing?.rawMenuData),
+    sRPE: mergeField(data.sRPE, existing?.sRPE),
+    rpeValue: mergeField(data.rpeValue, existing?.rpeValue),
+    wellnessSleep: mergeField(data.wellnessSleep, existing?.wellnessSleep),
+    wellnessFatigue: mergeField(data.wellnessFatigue, existing?.wellnessFatigue),
+    wellnessSoreness: mergeField(data.wellnessSoreness, existing?.wellnessSoreness),
+    wellnessStress: mergeField(data.wellnessStress, existing?.wellnessStress),
+    hrv: mergeField(data.hrv, existing?.hrv),
+    highIntensityDistance: mergeField(data.highIntensityDistance, existing?.highIntensityDistance),
+    avgHeartRate: mergeField(data.avgHeartRate, existing?.avgHeartRate),
+    physiologicalMarker: mergeField(data.physiologicalMarker, existing?.physiologicalMarker),
+    coachAdvice: mergeField(data.coachAdvice, existing?.coachAdvice),
     rawCsvData: data.rawCsvData,
   };
 
@@ -1332,6 +1339,25 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
   });
 
   try {
+    const getFallbackDate = (fName: string) => {
+      const p1 = fName.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (p1) {
+        const d = new Date(parseInt(p1[1], 10), parseInt(p1[2], 10) - 1, parseInt(p1[3], 10));
+        if (!isNaN(d.getTime())) return d;
+      }
+      const p2 = fName.match(/(\d{4})(\d{2})(\d{2})/);
+      if (p2) {
+        const d = new Date(parseInt(p2[1], 10), parseInt(p2[2], 10) - 1, parseInt(p2[3], 10));
+        if (!isNaN(d.getTime())) return d;
+      }
+      const p3 = fName.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (p3) {
+        const d = new Date(parseInt(p3[3], 10), parseInt(p3[1], 10) - 1, parseInt(p3[2], 10));
+        if (!isNaN(d.getTime())) return d;
+      }
+      return new Date();
+    };
+
     const lines = csvText.split(/\r?\n/);
     if (lines.length < 2) {
       throw new Error("CSV file is empty or missing headers");
@@ -1618,7 +1644,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
         const cleanName = rawAthlete.replace(/^[\d\s#]+/, "").trim();
 
-        let dateObj = new Date();
+        let dateObj = getFallbackDate(fileName);
         if (eventTimeCol !== -1 && vals[eventTimeCol]) {
           const timeMs = parseFloat(vals[eventTimeCol]);
           if (!isNaN(timeMs)) dateObj = new Date(timeMs);
@@ -1751,7 +1777,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           timeMs = parseFloat(values[startTimeIdx]);
         }
         
-        let dateObj = new Date();
+        let dateObj = getFallbackDate(fileName);
         if (!isNaN(timeMs)) dateObj = new Date(timeMs);
 
         const dateKey = formatDateKey(dateObj);
@@ -1925,7 +1951,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           continue;
         }
 
-        let dateObj = new Date();
+        let dateObj = getFallbackDate(fileName);
         if (dateIdx !== -1 && values[dateIdx]) {
           const parsed = new Date(values[dateIdx]);
           if (!isNaN(parsed.getTime())) dateObj = parsed;
@@ -1993,7 +2019,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           continue;
         }
 
-        let dateObj = new Date();
+        let dateObj = getFallbackDate(fileName);
         if (dateIdx !== -1 && values[dateIdx]) {
           const parsed = new Date(values[dateIdx]);
           if (!isNaN(parsed.getTime())) dateObj = parsed;
