@@ -1193,34 +1193,60 @@ async function findExistingPerformanceData(db: any, athleteId: number, dateObj: 
 }
 
 function findAthleteByCsvName(teamAthletes: any[], name: string, platform?: "onetap" | "catapult" | "soxai") {
-  const searchName = name.trim().toLowerCase();
+  const cleanName = (raw: string) => {
+    if (!raw) return "";
+    let cleaned = raw.trim();
+    // Remove W-up - or Individual - prefixes
+    cleaned = cleaned.replace(/^(Individual\s*-\s*|W-up\s*-\s*|individual\s*-\s*|w-up\s*-\s*)/i, "");
+    // Remove jersey number prefix (e.g. "15 Yanagi" -> "Yanagi")
+    cleaned = cleaned.replace(/^[\d\s#]+/, "");
+    // Remove all spaces and lowercase
+    return cleaned.replace(/\s+/g, "").toLowerCase();
+  };
+
+  const searchName = cleanName(name);
   if (!searchName) return null;
 
-  return teamAthletes.find(a => {
-    // 1. Check custom platform mappings first
+  // 1. Exact cleaned match first
+  const exactMatch = teamAthletes.find(a => {
     if (platform === "onetap" && a.onetapName) {
-      const oName = a.onetapName.trim().toLowerCase();
-      if (oName === searchName || oName.includes(searchName) || searchName.includes(oName)) return true;
+      if (cleanName(a.onetapName) === searchName) return true;
     }
     if (platform === "catapult" && a.catapultName) {
-      const cName = a.catapultName.trim().toLowerCase();
-      if (cName === searchName || cName.includes(searchName) || searchName.includes(cName)) return true;
+      if (cleanName(a.catapultName) === searchName) return true;
+    }
+    const dbName = a.user?.name || "";
+    if (cleanName(dbName) === searchName) return true;
+    return false;
+  });
+  if (exactMatch) return exactMatch;
+
+  // 2. Partial cleaned match fallback
+  return teamAthletes.find(a => {
+    // Check custom platform mappings
+    if (platform === "onetap" && a.onetapName) {
+      const oName = cleanName(a.onetapName);
+      if (oName.includes(searchName) || searchName.includes(oName)) return true;
+    }
+    if (platform === "catapult" && a.catapultName) {
+      const cName = cleanName(a.catapultName);
+      if (cName.includes(searchName) || searchName.includes(cName)) return true;
     }
     if (platform === "soxai" && a.soxaiEmail) {
       const sEmail = a.soxaiEmail.trim().toLowerCase();
-      if (sEmail === searchName) return true;
+      if (sEmail === name.trim().toLowerCase()) return true;
     }
 
-    // 2. Fallback to User name check
-    const dbName = (a.user?.name || "").toLowerCase();
-    if (dbName.includes(searchName) || searchName.includes(dbName)) {
+    // Fallback to User name check
+    const dbName = cleanName(a.user?.name || "");
+    if (dbName && (dbName.includes(searchName) || searchName.includes(dbName))) {
       return true;
     }
     
-    // 3. Fallback to csvNames alias check
+    // Fallback to csvNames alias check
     const csvNamesStr = a.csvNames || "";
     if (csvNamesStr) {
-      const aliases = csvNamesStr.split(",").map((n: string) => n.trim().toLowerCase());
+      const aliases = csvNamesStr.split(",").map((n: string) => cleanName(n));
       return aliases.some((alias: string) => alias === searchName || alias.includes(searchName) || searchName.includes(alias));
     }
     return false;
@@ -1311,12 +1337,22 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       throw new Error("CSV file is empty or missing headers");
     }
 
-    const headerLine = lines[0];
+    let headerLine = lines[0];
+    const isSoxaiType = csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数");
+    if (isSoxaiType) {
+      const foundHeader = lines.find(l => l.includes("タイムスタンプ"));
+      if (foundHeader) headerLine = foundHeader;
+    }
+
     let delimiter = ",";
-    if (headerLine.includes("\t")) {
-      delimiter = "\t";
-    } else if (headerLine.includes(";")) {
-      delimiter = ";";
+    for (const line of lines) {
+      if (line.includes("\t")) {
+        delimiter = "\t";
+        break;
+      } else if (line.includes(";")) {
+        delimiter = ";";
+        break;
+      }
     }
     const headers = headerLine.split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ""));
     
@@ -3127,41 +3163,71 @@ export async function seedDatabase() {
       });
     }
 
-    // 4. Seed athlete users & records
+    // 4. Seed athlete users & records (including real volleyball team players)
     const athletesToSeed = [
-      { id: 2, openId: "demoathlete1", name: "宮下 さくら", email: "sakura@example.com", jersey: 1, pos: "S" },
-      { id: 3, openId: "demoathlete2", name: "日向 ひなた", email: "hinata@example.com", jersey: 2, pos: "OH" },
-      { id: 4, openId: "demoathlete3", name: "長谷川 みお", email: "mio@example.com", jersey: 3, pos: "MB" },
+      { name: "山下 晴奈", openId: "athlete_yamashita", email: "airybees.sportsmed.2019+12@gmail.com", jersey: 1, pos: "OH", catapult: "Haruna Yamashita", onetap: "山下 晴奈", soxai: "airybees.sportsmed.2019+12@gmail.com" },
+      { name: "野田 祐希", openId: "athlete_noda", email: "0fb20756729306w@ezweb.ne.jp", jersey: 16, pos: "OH", catapult: "Yuki Noda", onetap: "野田 祐希", soxai: "0fb20756729306w@ezweb.ne.jp" },
+      { name: "福本 瞳", openId: "athlete_fukumoto", email: "fukumoto@example.com", jersey: 6, pos: "L", catapult: "Hitomi Fukumoto", onetap: "福本 瞳", soxai: "" },
+      { name: "和田 栞菜", openId: "athlete_wada", email: "airybees.sportsmed.2019+07@gmail.com", jersey: 20, pos: "MB", catapult: "Kanna Wada", onetap: "和田栞菜", soxai: "airybees.sportsmed.2019+07@gmail.com" },
+      { name: "中元 南", openId: "athlete_nakamoto", email: "nakamoto@example.com", jersey: 8, pos: "OH", catapult: "Minami Nakamoto", onetap: "中元 南", soxai: "" },
+      { name: "イェーモンミャ", openId: "athlete_yeemonmyat", email: "yeemonmyat@example.com", jersey: 17, pos: "OH", catapult: "Yee Mon Myat", onetap: "イェーモンミャ", soxai: "" },
+      { name: "川岸 友沙", openId: "athlete_kawagishi", email: "kawagishi@example.com", jersey: 19, pos: "OH", catapult: "Yusa Kawagishi", onetap: "川岸 友沙", soxai: "" },
+      { name: "柳 千嘉", openId: "athlete_yanagi", email: "yanagi@example.com", jersey: 15, pos: "S", catapult: "Chika Yanagi", onetap: "柳 千嘉", soxai: "" },
+      { name: "大崎 琴未", openId: "athlete_osaki", email: "osaki@example.com", jersey: 22, pos: "MB", catapult: "Kotomi Osaki", onetap: "大崎 琴未", soxai: "" },
+      { name: "石倉 沙姫", openId: "athlete_ishikura", email: "ishikura@example.com", jersey: 10, pos: "OH", catapult: "Saki Ishikura", onetap: "石倉 沙姫", soxai: "" },
+      { name: "山上 有紀", openId: "athlete_yamagami", email: "yamagami@example.com", jersey: 18, pos: "MB", catapult: "Yuki Yamagami", onetap: "山上 有紀", soxai: "" },
+      // Demo accounts
+      { name: "宮下 さくら", openId: "demoathlete1", email: "sakura@example.com", jersey: 1, pos: "S", catapult: "宮下 さくら", onetap: "宮下 さくら", soxai: "sakura@example.com" },
+      { name: "日向 ひなた", openId: "demoathlete2", email: "hinata@example.com", jersey: 2, pos: "OH", catapult: "日向 ひなた", onetap: "日向 ひなた", soxai: "hinata@example.com" },
+      { name: "長谷川 みお", openId: "demoathlete3", email: "mio@example.com", jersey: 3, pos: "MB", catapult: "長谷川 みお", onetap: "長谷川 みお", soxai: "mio@example.com" },
     ];
 
     for (const a of athletesToSeed) {
-      const existingUser = await db.select().from(users).where(eq(users.openId, a.openId)).limit(1);
+      let existingUser = await db.select().from(users).where(eq(users.openId, a.openId)).limit(1);
+      if (existingUser.length === 0) {
+        existingUser = await db.select().from(users).where(eq(users.name, a.name)).limit(1);
+      }
+      
+      let uId = 0;
       if (existingUser.length === 0) {
         console.log(`[Database] Seeding athlete user: ${a.name}`);
-        await db.insert(users).values({
-          id: a.id,
+        const insertedUser = await db.insert(users).values({
           openId: a.openId,
           name: a.name,
           email: a.email,
           loginMethod: "manus",
           role: "athlete",
           teamId: 1,
-        });
+        }).returning({ id: users.id });
+        uId = insertedUser[0].id;
+      } else {
+        uId = existingUser[0].id;
+        if (existingUser[0].teamId !== 1) {
+          await db.update(users).set({ teamId: 1 }).where(eq(users.id, uId));
+        }
       }
 
-      const existingAthlete = await db.select().from(athletes).where(eq(athletes.userId, a.id)).limit(1);
+      const existingAthlete = await db.select().from(athletes).where(eq(athletes.userId, uId)).limit(1);
       if (existingAthlete.length === 0) {
         console.log(`[Database] Seeding athlete record: ${a.name}`);
         await db.insert(athletes).values({
-          id: a.id,
-          userId: a.id,
+          userId: uId,
           teamId: 1,
           jerseyNumber: a.jersey,
           position: a.pos,
-          onetapName: a.name,
-          catapultName: a.name,
-          soxaiEmail: a.email,
+          onetapName: a.onetap,
+          catapultName: a.catapult,
+          soxaiEmail: a.soxai || null,
         });
+      } else {
+        await db.update(athletes).set({
+          jerseyNumber: a.jersey,
+          position: a.pos,
+          onetapName: a.onetap,
+          catapultName: a.catapult,
+          soxaiEmail: a.soxai || existingAthlete[0].soxaiEmail,
+          teamId: 1,
+        }).where(eq(athletes.userId, uId));
       }
     }
     console.log("[Database] Seeding completed successfully!");
