@@ -3119,6 +3119,16 @@ export async function seedDatabase() {
   }
 
   try {
+    // Fix auto-increment sequences in PostgreSQL if any manual IDs or tables were inserted
+    try {
+      await db.execute(sql`SELECT setval('athletes_id_seq', COALESCE((SELECT MAX(id)+1 FROM athletes), 1), false);`);
+      await db.execute(sql`SELECT setval('users_id_seq', COALESCE((SELECT MAX(id)+1 FROM users), 1), false);`);
+      await db.execute(sql`SELECT setval('teams_id_seq', COALESCE((SELECT MAX(id)+1 FROM teams), 1), false);`);
+      console.log("[Database] Sequences synchronized successfully");
+    } catch (seqError) {
+      console.warn("[Database] Sequence synchronization warning:", seqError);
+    }
+
     // 1. Seed initial team
     const existingTeams = await db.select().from(teams).limit(1);
     if (existingTeams.length === 0) {
@@ -3182,52 +3192,62 @@ export async function seedDatabase() {
       { name: "長谷川 みお", openId: "demoathlete3", email: "mio@example.com", jersey: 3, pos: "MB", catapult: "長谷川 みお", onetap: "長谷川 みお", soxai: "mio@example.com" },
     ];
 
-    for (const a of athletesToSeed) {
-      let existingUser = await db.select().from(users).where(eq(users.openId, a.openId)).limit(1);
-      if (existingUser.length === 0) {
-        existingUser = await db.select().from(users).where(eq(users.name, a.name)).limit(1);
-      }
-      
-      let uId = 0;
-      if (existingUser.length === 0) {
-        console.log(`[Database] Seeding athlete user: ${a.name}`);
-        const insertedUser = await db.insert(users).values({
-          openId: a.openId,
-          name: a.name,
-          email: a.email,
-          loginMethod: "manus",
-          role: "athlete",
-          teamId: 1,
-        }).returning({ id: users.id });
-        uId = insertedUser[0].id;
-      } else {
-        uId = existingUser[0].id;
-        if (existingUser[0].teamId !== 1) {
-          await db.update(users).set({ teamId: 1 }).where(eq(users.id, uId));
-        }
-      }
+    const allUsers = await db.select().from(users);
 
-      const existingAthlete = await db.select().from(athletes).where(eq(athletes.userId, uId)).limit(1);
-      if (existingAthlete.length === 0) {
-        console.log(`[Database] Seeding athlete record: ${a.name}`);
-        await db.insert(athletes).values({
-          userId: uId,
-          teamId: 1,
-          jerseyNumber: a.jersey,
-          position: a.pos,
-          onetapName: a.onetap,
-          catapultName: a.catapult,
-          soxaiEmail: a.soxai || null,
-        });
-      } else {
-        await db.update(athletes).set({
-          jerseyNumber: a.jersey,
-          position: a.pos,
-          onetapName: a.onetap,
-          catapultName: a.catapult,
-          soxaiEmail: a.soxai || existingAthlete[0].soxaiEmail,
-          teamId: 1,
-        }).where(eq(athletes.userId, uId));
+    for (const a of athletesToSeed) {
+      try {
+        let existingUser = await db.select().from(users).where(eq(users.openId, a.openId)).limit(1);
+        if (existingUser.length === 0) {
+          const cleanString = (s: string | null) => (s || "").replace(/\s+/g, "");
+          const matched = allUsers.find(u => cleanString(u.name) === cleanString(a.name) && u.role === "athlete");
+          if (matched) {
+            existingUser = [matched];
+          }
+        }
+        
+        let uId = 0;
+        if (existingUser.length === 0) {
+          console.log(`[Database] Seeding athlete user: ${a.name}`);
+          const insertedUser = await db.insert(users).values({
+            openId: a.openId,
+            name: a.name,
+            email: a.email,
+            loginMethod: "manus",
+            role: "athlete",
+            teamId: 1,
+          }).returning({ id: users.id });
+          uId = insertedUser[0].id;
+        } else {
+          uId = existingUser[0].id;
+          if (existingUser[0].teamId !== 1) {
+            await db.update(users).set({ teamId: 1 }).where(eq(users.id, uId));
+          }
+        }
+
+        const existingAthlete = await db.select().from(athletes).where(eq(athletes.userId, uId)).limit(1);
+        if (existingAthlete.length === 0) {
+          console.log(`[Database] Seeding athlete record: ${a.name}`);
+          await db.insert(athletes).values({
+            userId: uId,
+            teamId: 1,
+            jerseyNumber: a.jersey,
+            position: a.pos,
+            onetapName: a.onetap,
+            catapultName: a.catapult,
+            soxaiEmail: a.soxai || null,
+          });
+        } else {
+          await db.update(athletes).set({
+            jerseyNumber: a.jersey,
+            position: a.pos,
+            onetapName: a.onetap,
+            catapultName: a.catapult,
+            soxaiEmail: a.soxai || existingAthlete[0].soxaiEmail,
+            teamId: 1,
+          }).where(eq(athletes.userId, uId));
+        }
+      } catch (itemError) {
+        console.error(`[Database] Failed to seed player ${a.name}:`, itemError);
       }
     }
     console.log("[Database] Seeding completed successfully!");
