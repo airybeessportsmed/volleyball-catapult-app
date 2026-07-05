@@ -2792,6 +2792,7 @@ export async function getTeamAnalytics(teamId: number) {
       name: athlete.user?.name || `選手${athlete.jerseyNumber}`,
       jerseyNumber: athlete.jerseyNumber,
       position: athlete.position,
+      csvNames: athlete.csvNames,
       acwr: Number(acwr.toFixed(2)),
       acute: Number(acuteAvg.toFixed(1)),
       chronic: Number(chronicAvg.toFixed(1)),
@@ -3212,10 +3213,6 @@ export async function seedDatabase() {
       { name: "大崎 琴未", openId: "athlete_osaki", email: "osaki@example.com", jersey: 22, pos: "MB", catapult: "Kotomi Osaki", onetap: "大崎 琴未", soxai: "" },
       { name: "石倉 沙姫", openId: "athlete_ishikura", email: "ishikura@example.com", jersey: 10, pos: "OH", catapult: "Saki Ishikura", onetap: "石倉 沙姫", soxai: "" },
       { name: "山上 有紀", openId: "athlete_yamagami", email: "yamagami@example.com", jersey: 18, pos: "MB", catapult: "Yuki Yamagami", onetap: "山上 有紀", soxai: "" },
-      // Demo accounts
-      { name: "宮下 さくら", openId: "demoathlete1", email: "sakura@example.com", jersey: 1, pos: "S", catapult: "宮下 さくら", onetap: "宮下 さくら", soxai: "sakura@example.com" },
-      { name: "日向 ひなた", openId: "demoathlete2", email: "hinata@example.com", jersey: 2, pos: "OH", catapult: "日向 ひなた", onetap: "日向 ひなた", soxai: "hinata@example.com" },
-      { name: "長谷川 みお", openId: "demoathlete3", email: "mio@example.com", jersey: 3, pos: "MB", catapult: "長谷川 みお", onetap: "長谷川 みお", soxai: "mio@example.com" },
     ];
 
     const allUsers = await db.select().from(users);
