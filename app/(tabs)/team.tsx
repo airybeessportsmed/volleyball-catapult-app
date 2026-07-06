@@ -47,7 +47,7 @@ export default function CoachTeamScreen() {
 
   // Fetch all performance data for latest values
   const { data: allPerfData } = trpc.performance.getByTeam.useQuery(
-    { teamId },
+    { teamId, limit: 10000 },
     { enabled: isAuthenticated && !!user?.teamId }
   );
 

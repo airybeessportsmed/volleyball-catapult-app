@@ -224,7 +224,7 @@ export default function HomeScreen() {
   );
 
   const { data: allPerfData, refetch: refetchAllPerf } = trpc.performance.getByTeam.useQuery(
-    { teamId: user?.teamId || 1 },
+    { teamId: user?.teamId || 1, limit: 10000 },
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
