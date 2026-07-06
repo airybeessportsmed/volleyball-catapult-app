@@ -161,8 +161,9 @@ export async function getTeamSettings(teamId: number): Promise<any> {
         teamId,
         baselineDays: 28,
         enabledMetrics: JSON.stringify([
-          "totalJumps", "sRPE", "hrv", "wellnessSoreness", "wellnessSleep", 
-          "wellnessFatigue", "totalDistance", "highIntensityDistance", "avgHeartRate", "physiologicalMarker"
+          "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
+          "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
+          "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
         ]),
         baseDateMode: "rolling",
         baseFixedDate: null,
@@ -182,8 +183,9 @@ export async function getTeamSettings(teamId: number): Promise<any> {
     teamId,
     baselineDays: 28,
     enabledMetrics: JSON.stringify([
-      "totalJumps", "sRPE", "hrv", "wellnessSoreness", "wellnessSleep", 
-      "wellnessFatigue", "totalDistance", "highIntensityDistance", "avgHeartRate", "physiologicalMarker"
+      "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
+      "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
+      "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
     ]),
     baseDateMode: "rolling",
     baseFixedDate: null
@@ -3165,6 +3167,27 @@ export async function seedDatabase() {
         name: "VolleyTrack Team",
         coachId: 1,
       });
+    }
+
+    // 1.5. Seed/Update default team settings with updated metrics keys
+    const metricsToEnable = JSON.stringify([
+      "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
+      "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
+      "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
+    ]);
+    const existingSettings = await db.select().from(teamSettings).where(eq(teamSettings.teamId, 1)).limit(1);
+    if (existingSettings.length === 0) {
+      console.log("[Database] Seeding initial team settings...");
+      await db.insert(teamSettings).values({
+        teamId: 1,
+        baselineDays: 28,
+        enabledMetrics: metricsToEnable,
+        baseDateMode: "rolling",
+        baseFixedDate: null
+      });
+    } else {
+      console.log("[Database] Updating team settings to match new CSV schema keys...");
+      await db.update(teamSettings).set({ enabledMetrics: metricsToEnable }).where(eq(teamSettings.teamId, 1));
     }
 
     // 2. Seed coach/admin user

@@ -17,16 +17,20 @@ interface PerformanceMetrics {
 }
 
 export const METRICS_MAP = [
-  { key: "totalJumps", label: "ジャンプ量", desc: "外的負荷: ジャンプ回数", unit: "回", polarity: "positive", category: "load_ext" },
-  { key: "sRPE", label: "sRPE(全体)", desc: "内の負荷: 練習強度×時間", unit: "AU", polarity: "positive", category: "load_int" },
-  { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "negative", category: "state_obj" },
-  { key: "wellnessSoreness", label: "筋肉痛 (DOMS)", desc: "主観状態: 筋肉の張りや痛み", unit: "1-7", polarity: "negative", category: "state_subj" },
-  { key: "wellnessSleep", label: "睡眠の質", desc: "主観状態: 睡眠休養度", unit: "1-5", polarity: "negative", category: "state_subj" },
-  { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: 全身疲労", unit: "1-7", polarity: "negative", category: "state_subj" },
-  { key: "totalDistance", label: "総走行距離", desc: "外的負荷: 移動距離", unit: "m", polarity: "positive", category: "load_ext" },
-  { key: "highIntensityDistance", label: "高速走行距離", desc: "外的負荷: 高速移動距離", unit: "m", polarity: "positive", category: "load_ext" },
-  { key: "avgHeartRate", label: "平均心拍数", desc: "客観負荷: 循環器系負荷", unit: "bpm", polarity: "positive", category: "load_int" },
-  { key: "physiologicalMarker", label: "生理学マーカー(CK)", desc: "客観状態: 血液生化学(筋肉損傷)", unit: "U/L", polarity: "positive", category: "state_obj" },
+  { key: "totalJumps", label: "総ジャンプ数", desc: "外的負荷: ジャンプの合計回数", unit: "回", polarity: "positive", category: "load_ext" },
+  { key: "maxJumpHeight", label: "最高ジャンプ高", desc: "外的負荷: 最高跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
+  { key: "avgJumpHeight", label: "平均ジャンプ高", desc: "外的負荷: 平均跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
+  { key: "jumpVolume", label: "ジャンプボリューム", desc: "外的負荷: ジャンプの総高さ", unit: "m", polarity: "positive", category: "load_ext" },
+  { key: "totalLoad", label: "Player Load", desc: "外的負荷: 運動による総物理負荷", unit: "PL", polarity: "positive", category: "load_ext" },
+  { key: "accelCount", label: "加速回数", desc: "外的負荷: 急加速の発生回数", unit: "回", polarity: "positive", category: "load_ext" },
+  { key: "maxAcceleration", label: "最高加速度", desc: "外的負荷: 最大の加速強度", unit: "m/s²", polarity: "positive", category: "load_ext" },
+  { key: "sRPE", label: "sRPE", desc: "内的負荷: 主観的強度×練習時間", unit: "AU", polarity: "positive", category: "load_int" },
+  { key: "rpeValue", label: "主観強度 (RPE)", desc: "内の負荷: 練習の主観的きつさ(1-10)", unit: "強度", polarity: "positive", category: "load_int" },
+  { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
+  { key: "wellnessSleep", label: "睡眠状態", desc: "主観状態: 睡眠休養度スコア", unit: "スコア", polarity: "positive", category: "state_subj" },
+  { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度", unit: "スコア", polarity: "negative", category: "state_subj" },
+  { key: "wellnessSoreness", label: "筋肉の張り", desc: "主観状態: 筋肉の違和感・張り", unit: "スコア", polarity: "negative", category: "state_subj" },
+  { key: "wellnessStress", label: "ストレス", desc: "主観状態: 精神的ストレス", unit: "スコア", polarity: "negative", category: "state_subj" },
 ] as const;
 
 interface ZScoreBarProps {
@@ -1453,7 +1457,7 @@ export default function HomeScreen() {
                 {/* 状態インジケータ */}
                 <View style={{ backgroundColor: "#E8F0FE", borderColor: "#B5D1F6", borderWidth: 1, borderRadius: 12, padding: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1C4587" }}>
-                    ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "totalDistance", "highIntensityDistance", "avgHeartRate", "physiologicalMarker"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessSoreness"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
+                    ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessSoreness"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
                   </Text>
                 </View>
 
