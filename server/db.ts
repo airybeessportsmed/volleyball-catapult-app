@@ -1445,8 +1445,10 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         athleteName: string;
         dateObj: Date;
         fatigue?: number;
+        sleep?: number;
+        soreness?: number;
+        stress?: number;
         motivation?: number;
-        appetite?: number;
       }
       const wellnessGroups = new Map<string, WellnessGroup>();
 
@@ -1473,9 +1475,11 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessGroups.set(groupKey, { athleteName: nameStr, dateObj });
         }
         const g = wellnessGroups.get(groupKey)!;
-        if (itemStr.includes("疲労感")) g.fatigue = valNum;
+        if (itemStr.includes("疲労感") || itemStr.includes("疲労")) g.fatigue = valNum;
+        if (itemStr.includes("睡眠")) g.sleep = valNum;
+        if (itemStr.includes("張り") || itemStr.includes("筋肉")) g.soreness = valNum;
+        if (itemStr.includes("ストレス")) g.stress = valNum;
         if (itemStr.includes("気分") || itemStr.includes("モチベーション")) g.motivation = valNum;
-        if (itemStr.includes("食欲")) g.appetite = valNum;
       }
 
       for (const wg of wellnessGroups.values()) {
@@ -1486,8 +1490,9 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
 
         const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue / 10) : undefined;
-        const sleepVal = wg.appetite !== undefined ? Math.round(wg.appetite / 10) : undefined;
-        const stressVal = wg.motivation !== undefined ? Math.round(wg.motivation / 10) : undefined;
+        const sleepVal = wg.sleep !== undefined ? Math.round(wg.sleep / 10) : undefined;
+        const sorenessVal = wg.soreness !== undefined ? Math.round(wg.soreness / 10) : undefined;
+        const stressVal = wg.stress !== undefined ? Math.round(wg.stress / 10) : undefined;
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
@@ -1495,6 +1500,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           date: wg.dateObj,
           wellnessFatigue: fatigueVal,
           wellnessSleep: sleepVal,
+          wellnessSoreness: sorenessVal,
           wellnessStress: stressVal,
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName })
         });
@@ -2037,6 +2043,12 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const durationMin = parseInt(values[sessionTimeIdx], 10);
         if (isNaN(rpeVal)) continue;
 
+        const sleepVal = sleepIdx !== -1 && values[sleepIdx] ? parseInt(values[sleepIdx], 10) : undefined;
+        const fatigueVal = fatigueIdx !== -1 && values[fatigueIdx] ? parseInt(values[fatigueIdx], 10) : undefined;
+        const sorenessVal = sorenessIdx !== -1 && values[sorenessIdx] ? parseInt(values[sorenessIdx], 10) : undefined;
+        const stressVal = stressIdx !== -1 && values[stressIdx] ? parseInt(values[stressIdx], 10) : undefined;
+        const hrvVal = hrvIdx !== -1 && values[hrvIdx] ? parseInt(values[hrvIdx], 10) : undefined;
+
         const calculatedSrpe = isNaN(durationMin) ? 0 : rpeVal * durationMin;
 
         await mergePerformanceData(db, teamId, {
@@ -2046,6 +2058,11 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           duration: isNaN(durationMin) ? undefined : durationMin * 60,
           sRPE: calculatedSrpe,
           rpeValue: rpeVal,
+          wellnessSleep: sleepVal !== undefined && !isNaN(sleepVal) ? sleepVal : undefined,
+          wellnessFatigue: fatigueVal !== undefined && !isNaN(fatigueVal) ? fatigueVal : undefined,
+          wellnessSoreness: sorenessVal !== undefined && !isNaN(sorenessVal) ? sorenessVal : undefined,
+          wellnessStress: stressVal !== undefined && !isNaN(stressVal) ? stressVal : undefined,
+          hrv: hrvVal !== undefined && !isNaN(hrvVal) ? hrvVal : undefined,
           rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName })
         });
         importedCount++;

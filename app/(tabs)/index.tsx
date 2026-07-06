@@ -224,6 +224,11 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
+  const { data: allPerfData, refetch: refetchAllPerf } = trpc.performance.getByTeam.useQuery(
+    { teamId: user?.teamId || 1 },
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
+  );
+
   const saveAdviceMutation = trpc.performance.saveCoachAdvice.useMutation();
   const updateSettingsMutation = trpc.team.updateSettings.useMutation();
   const updateMetricMutation = trpc.performance.updateMetric.useMutation();
@@ -1350,8 +1355,12 @@ export default function HomeScreen() {
 
                             {METRICS_MAP.filter(m => enabledMetricsKeys.includes(m.key)).map(m => {
                               const pendingKey = `${ath.athleteId}_${m.key}`;
+                              const rawRecord = allPerfData?.find(p => 
+                                p.athleteId === ath.athleteId && 
+                                new Date(p.date).toLocaleDateString("sv-SE") === rawDate
+                              );
+                              const dbVal = rawRecord ? (rawRecord as any)[m.key] : null;
                               const base = ath.baselines?.[m.key];
-                              const dbVal = base ? base.val : null;
                               
                               // Use pending update if exists, otherwise dbVal
                               const liveVal = pendingUpdates[pendingKey] !== undefined ? pendingUpdates[pendingKey] : dbVal;
@@ -1428,6 +1437,7 @@ export default function HomeScreen() {
                         });
                         setPendingUpdates({});
                         refetchTeam();
+                        refetchAllPerf();
                         alert("変更を保存しました。");
                       } catch (err) {
                         console.error("Batch save failed", err);
