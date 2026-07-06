@@ -179,8 +179,19 @@ export default function CoachUploadScreen() {
 
         const text = await new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onload = (evt) => resolve(evt.target?.result as string);
-          reader.readAsText(file);
+          reader.onload = (evt) => {
+            const arrayBuffer = evt.target?.result as ArrayBuffer;
+            try {
+              // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
+              const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+              resolve(utf8Decoder.decode(arrayBuffer));
+            } catch (err) {
+              // Fallback to Shift-JIS for Excel-generated Japanese CSVs
+              const sjisDecoder = new TextDecoder("shift-jis");
+              resolve(sjisDecoder.decode(arrayBuffer));
+            }
+          };
+          reader.readAsArrayBuffer(file);
         });
 
         newFiles.push({

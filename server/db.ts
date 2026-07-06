@@ -1178,6 +1178,27 @@ export async function updateCsvUploadStatus(uploadId: number, status: "pending" 
 // CSV PARSING & IMPORT LOGIC
 // ==========================================
 
+const parseDateFlexible = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  const cleaned = dateStr.trim().replace(/^["']|["']$/g, "");
+  
+  // 1. Try standard JS Date parsing
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) return d;
+
+  // 2. Try extraction using regex for format like YYYY/MM/DD, YY/MM/DD or YYYY年MM月DD日
+  const match = cleaned.match(/(\d{4}|\d{2})[-/年\s](\d{1,2})[-/月\s](\d{1,2})[日]?/);
+  if (match) {
+    let year = parseInt(match[1], 10);
+    if (year < 100) year += 2000; // Correct 2-digit years
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+};
+
 const formatDateKey = (date: Date | string) => {
   const d = new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1490,8 +1511,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
         if (!dateStr || !nameStr || isNaN(valNum)) continue;
 
-        const dateObj = new Date(dateStr);
-        if (isNaN(dateObj.getTime())) continue;
+        const dateObj = parseDateFlexible(dateStr);
+        if (!dateObj) continue;
 
         const dateKey = formatDateKey(dateObj);
         const groupKey = `${nameStr}_${dateKey}`;
@@ -1565,8 +1586,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
         if (!dateStr || !nameStr) continue;
 
-        const dateObj = new Date(dateStr);
-        if (isNaN(dateObj.getTime())) continue;
+        const dateObj = parseDateFlexible(dateStr);
+        if (!dateObj) continue;
 
         const dateKey = formatDateKey(dateObj);
         const groupKey = `${nameStr}_${dateKey}`;
@@ -2115,8 +2136,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
         let dateObj = getFallbackDate(fileName);
         if (dateIdx !== -1 && values[dateIdx]) {
-          const parsed = new Date(values[dateIdx]);
-          if (!isNaN(parsed.getTime())) dateObj = parsed;
+          const parsed = parseDateFlexible(values[dateIdx]);
+          if (parsed) dateObj = parsed;
         }
 
         const rpeVal = parseInt(values[rpeIdx], 10);
