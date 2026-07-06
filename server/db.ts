@@ -1449,6 +1449,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         soreness?: number;
         stress?: number;
         motivation?: number;
+        appetite?: number;
       }
       const wellnessGroups = new Map<string, WellnessGroup>();
 
@@ -1476,10 +1477,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
         const g = wellnessGroups.get(groupKey)!;
         if (itemStr.includes("疲労感") || itemStr.includes("疲労")) g.fatigue = valNum;
-        if (itemStr.includes("睡眠")) g.sleep = valNum;
-        if (itemStr.includes("張り") || itemStr.includes("筋肉")) g.soreness = valNum;
-        if (itemStr.includes("ストレス")) g.stress = valNum;
         if (itemStr.includes("気分") || itemStr.includes("モチベーション")) g.motivation = valNum;
+        if (itemStr.includes("食欲")) g.appetite = valNum;
       }
 
       for (const wg of wellnessGroups.values()) {
@@ -1489,10 +1488,9 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           continue;
         }
 
-        const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue / 10) : undefined;
-        const sleepVal = wg.sleep !== undefined ? Math.round(wg.sleep / 10) : undefined;
-        const sorenessVal = wg.soreness !== undefined ? Math.round(wg.soreness / 10) : undefined;
-        const stressVal = wg.stress !== undefined ? Math.round(wg.stress / 10) : undefined;
+        const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue) : undefined;
+        const sleepVal = wg.appetite !== undefined ? Math.round(wg.appetite) : undefined;
+        const stressVal = wg.motivation !== undefined ? Math.round(wg.motivation) : undefined;
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
@@ -1500,8 +1498,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           date: wg.dateObj,
           wellnessFatigue: fatigueVal,
           wellnessSleep: sleepVal,
-          wellnessSoreness: sorenessVal,
           wellnessStress: stressVal,
+          wellnessSoreness: null,
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName })
         });
         importedCount++;
@@ -3190,7 +3188,7 @@ export async function seedDatabase() {
     const metricsToEnable = JSON.stringify([
       "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
       "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
-      "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
+      "wellnessSleep", "wellnessFatigue", "wellnessStress"
     ]);
     const existingSettings = await db.select().from(teamSettings).where(eq(teamSettings.teamId, 1)).limit(1);
     if (existingSettings.length === 0) {

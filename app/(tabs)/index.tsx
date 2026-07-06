@@ -27,10 +27,9 @@ export const METRICS_MAP = [
   { key: "sRPE", label: "sRPE", desc: "内的負荷: 主観的強度×練習時間", unit: "AU", polarity: "positive", category: "load_int" },
   { key: "rpeValue", label: "主観強度 (RPE)", desc: "内の負荷: 練習の主観的きつさ(1-10)", unit: "強度", polarity: "positive", category: "load_int" },
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
-  { key: "wellnessSleep", label: "睡眠状態", desc: "主観状態: 睡眠休養度スコア", unit: "スコア", polarity: "positive", category: "state_subj" },
-  { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度", unit: "スコア", polarity: "negative", category: "state_subj" },
-  { key: "wellnessSoreness", label: "筋肉の張り", desc: "主観状態: 筋肉の違和感・張り", unit: "スコア", polarity: "negative", category: "state_subj" },
-  { key: "wellnessStress", label: "ストレス", desc: "主観状態: 精神的ストレス", unit: "スコア", polarity: "negative", category: "state_subj" },
+  { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度(低スコア推奨)", unit: "点", polarity: "negative", category: "state_subj" },
+  { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "点", polarity: "positive", category: "state_subj" },
+  { key: "wellnessSleep", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "点", polarity: "positive", category: "state_subj" },
 ] as const;
 
 interface ZScoreBarProps {
@@ -1467,7 +1466,7 @@ export default function HomeScreen() {
                 {/* 状態インジケータ */}
                 <View style={{ backgroundColor: "#E8F0FE", borderColor: "#B5D1F6", borderWidth: 1, borderRadius: 12, padding: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1C4587" }}>
-                    ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessSoreness"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
+                    ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessStress"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
                   </Text>
                 </View>
 
@@ -1585,7 +1584,7 @@ export default function HomeScreen() {
                                   let reliabilityColor = "#1D4ED8";
                                   let reliabilityBg = "#DBEAFE";
                                   
-                                  if (m.key === "wellnessSoreness" || m.key === "hrv") {
+                                  if (m.key === "hrv") {
                                     reliabilityText = "信頼性 中";
                                     reliabilityColor = "#D97706";
                                     reliabilityBg = "#FEF3C7";
