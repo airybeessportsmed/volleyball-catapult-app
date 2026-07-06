@@ -1360,6 +1360,17 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       return new Date();
     };
 
+    const runInParallelBatches = async <T>(
+      items: T[], 
+      batchSize: number, 
+      processor: (item: T) => Promise<void>
+    ) => {
+      for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        await Promise.all(batch.map(processor));
+      }
+    };
+
     const lines = csvText.split(/\r?\n/);
     if (lines.length < 2) {
       throw new Error("CSV file is empty or missing headers");
@@ -1481,11 +1492,12 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         if (itemStr.includes("食欲")) g.appetite = valNum;
       }
 
-      for (const wg of wellnessGroups.values()) {
+      const wellnessList = Array.from(wellnessGroups.values());
+      await runInParallelBatches(wellnessList, 15, async (wg) => {
         const matchedAthlete = findAthleteByCsvName(teamAthletes, wg.athleteName, "onetap");
         if (!matchedAthlete) {
           unregisteredSet.add(wg.athleteName);
-          continue;
+          return;
         }
 
         const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue) : undefined;
@@ -1503,7 +1515,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isSRPE) {
       const dateCol = findHeaderIndex(["トレーニング実施日"]);
@@ -1550,11 +1562,12 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         if (!isNaN(srpeVal)) g.srpeValues.push(srpeVal);
       }
 
-      for (const sg of srpeGroups.values()) {
+      const srpeList = Array.from(srpeGroups.values());
+      await runInParallelBatches(srpeList, 15, async (sg) => {
         const matchedAthlete = findAthleteByCsvName(teamAthletes, sg.athleteName, "onetap");
         if (!matchedAthlete) {
           unregisteredSet.add(sg.athleteName);
-          continue;
+          return;
         }
 
         const sumSrpe = sg.srpeValues.reduce((a, b) => a + b, 0);
@@ -1569,10 +1582,19 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           rawCsvData: JSON.stringify({ note: "sRPE log", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isSoxai) {
       let currentEmail = "";
+      interface SoxaiRecord {
+        email: string;
+        dateObj: Date;
+        sleepScore: number;
+        rhr: number;
+        hrvVal: number;
+      }
+      const soxaiRecords: SoxaiRecord[] = [];
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -1596,28 +1618,32 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const dateObj = new Date(dateStr);
         if (isNaN(dateObj.getTime())) continue;
 
+        soxaiRecords.push({ email: currentEmail, dateObj, sleepScore, rhr, hrvVal });
+      }
+
+      await runInParallelBatches(soxaiRecords, 15, async (rec) => {
         const matchedAthlete = teamAthletes.find(a => 
-          (a.soxaiEmail && a.soxaiEmail.toLowerCase() === currentEmail.toLowerCase()) ||
-          (a.user?.email?.toLowerCase() === currentEmail.toLowerCase())
+          (a.soxaiEmail && a.soxaiEmail.toLowerCase() === rec.email.toLowerCase()) ||
+          (a.user?.email?.toLowerCase() === rec.email.toLowerCase())
         );
         if (!matchedAthlete) {
-          unregisteredSet.add(currentEmail);
-          continue;
+          unregisteredSet.add(rec.email);
+          return;
         }
 
-        const sleepVal = isNaN(sleepScore) ? undefined : Math.round(sleepScore / 10);
+        const sleepVal = isNaN(rec.sleepScore) ? undefined : Math.round(rec.sleepScore);
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
-          date: dateObj,
+          date: rec.dateObj,
           wellnessSleep: sleepVal,
-          hrv: isNaN(hrvVal) ? undefined : hrvVal.toFixed(2),
-          avgHeartRate: isNaN(rhr) ? undefined : rhr,
+          hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
+          avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
           rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isImaLog) {
       const athleteCol = findHeaderIndex(["athlete", "選手", "名前", "athlete_id", "name"]);
@@ -1680,11 +1706,12 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
       }
 
-      for (const ig of imaGroups.values()) {
+      const imaList = Array.from(imaGroups.values());
+      await runInParallelBatches(imaList, 15, async (ig) => {
         const matchedAthlete = findAthleteByCsvName(teamAthletes, ig.athleteName, "catapult");
         if (!matchedAthlete) {
           unregisteredSet.add(ig.athleteName);
-          continue;
+          return;
         }
 
         const maxJumpHeight = ig.jumps.length > 0 ? Math.max(...ig.jumps) : undefined;
@@ -1723,7 +1750,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isEventLog) {
       const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "name"]);
@@ -1838,7 +1865,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
       }
 
-      for (const agg of aggregations.values()) {
+      const eventList = Array.from(aggregations.values());
+      await runInParallelBatches(eventList, 15, async (agg) => {
         let matchedAthlete = null;
         if (agg.jerseyNumber !== null) {
           matchedAthlete = teamAthletes.find(a => a.jerseyNumber === agg.jerseyNumber);
@@ -1853,7 +1881,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           } else {
             unregisteredSet.add(agg.athleteName);
           }
-          continue;
+          return;
         }
 
         const maxJumpHeight = agg.jumps.length > 0 ? Math.max(...agg.jumps) : undefined;
@@ -1902,7 +1930,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isMenuLoadLog) {
       const categoryIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "period", "activity", "menu", "メニュー", "name"]);
@@ -1987,7 +2015,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         group.menuLoads[menuName] = (group.menuLoads[menuName] || 0) + loadVal;
       }
 
-      for (const agg of loadAggregations.values()) {
+      const menuList = Array.from(loadAggregations.values());
+      await runInParallelBatches(menuList, 15, async (agg) => {
         const totalLoad = agg.loads.reduce((a, b) => a + b, 0);
 
         await mergePerformanceData(db, teamId, {
@@ -1999,7 +2028,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else if (isRpeLog) {
       const athleteNameIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "name"]);
@@ -2012,6 +2041,19 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       const sorenessIdx = findHeaderIndex(["soreness", "張り", "筋肉の張り"]);
       const stressIdx = findHeaderIndex(["stress", "ストレス"]);
       const hrvIdx = findHeaderIndex(["hrv", "心拍変動"]);
+
+      interface RpeRecord {
+        athleteName: string;
+        dateObj: Date;
+        rpeVal: number;
+        durationMin: number;
+        sleepVal?: number;
+        fatigueVal?: number;
+        sorenessVal?: number;
+        stressVal?: number;
+        hrvVal?: number;
+      }
+      const rpeRecords: RpeRecord[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -2031,12 +2073,6 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           if (!isNaN(parsed.getTime())) dateObj = parsed;
         }
 
-        const matchedAthlete = findAthleteByCsvName(teamAthletes, athleteName, "onetap");
-        if (!matchedAthlete) {
-          unregisteredSet.add(athleteName);
-          continue;
-        }
-
         const rpeVal = parseInt(values[rpeIdx], 10);
         const durationMin = parseInt(values[sessionTimeIdx], 10);
         if (isNaN(rpeVal)) continue;
@@ -2047,24 +2083,44 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const stressVal = stressIdx !== -1 && values[stressIdx] ? parseInt(values[stressIdx], 10) : undefined;
         const hrvVal = hrvIdx !== -1 && values[hrvIdx] ? parseInt(values[hrvIdx], 10) : undefined;
 
-        const calculatedSrpe = isNaN(durationMin) ? 0 : rpeVal * durationMin;
+        rpeRecords.push({
+          athleteName,
+          dateObj,
+          rpeVal,
+          durationMin,
+          sleepVal,
+          fatigueVal,
+          sorenessVal,
+          stressVal,
+          hrvVal
+        });
+      }
+
+      await runInParallelBatches(rpeRecords, 15, async (rec) => {
+        const matchedAthlete = findAthleteByCsvName(teamAthletes, rec.athleteName, "onetap");
+        if (!matchedAthlete) {
+          unregisteredSet.add(rec.athleteName);
+          return;
+        }
+
+        const calculatedSrpe = isNaN(rec.durationMin) ? 0 : rec.rpeVal * rec.durationMin;
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
-          date: dateObj,
-          duration: isNaN(durationMin) ? undefined : durationMin * 60,
+          date: rec.dateObj,
+          duration: isNaN(rec.durationMin) ? undefined : rec.durationMin * 60,
           sRPE: calculatedSrpe,
-          rpeValue: rpeVal,
-          wellnessSleep: sleepVal !== undefined && !isNaN(sleepVal) ? sleepVal : undefined,
-          wellnessFatigue: fatigueVal !== undefined && !isNaN(fatigueVal) ? fatigueVal : undefined,
-          wellnessSoreness: sorenessVal !== undefined && !isNaN(sorenessVal) ? sorenessVal : undefined,
-          wellnessStress: stressVal !== undefined && !isNaN(stressVal) ? stressVal : undefined,
-          hrv: hrvVal !== undefined && !isNaN(hrvVal) ? hrvVal : undefined,
+          rpeValue: rec.rpeVal,
+          wellnessSleep: rec.sleepVal !== undefined && !isNaN(rec.sleepVal) ? rec.sleepVal : undefined,
+          wellnessFatigue: rec.fatigueVal !== undefined && !isNaN(rec.fatigueVal) ? rec.fatigueVal : undefined,
+          wellnessSoreness: rec.sorenessVal !== undefined && !isNaN(rec.sorenessVal) ? rec.sorenessVal : undefined,
+          wellnessStress: rec.stressVal !== undefined && !isNaN(rec.stressVal) ? rec.stressVal : undefined,
+          hrv: rec.hrvVal !== undefined && !isNaN(rec.hrvVal) ? rec.hrvVal : undefined,
           rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName })
         });
         importedCount++;
-      }
+      });
 
     } else {
       throw new Error(`Could not recognize CSV format. Detected headers: ${JSON.stringify(headers)}. Expected event log format, menu-based Player Load format, or sRPE format (RPE, Duration/Time, Category).`);
