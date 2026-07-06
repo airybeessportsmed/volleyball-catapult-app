@@ -1522,6 +1522,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       const nameCol = findHeaderIndex(["選手"]);
       const rpeCol = findHeaderIndex(["RPE"]);
       const srpeCol = findHeaderIndex(["Session RPE"]);
+      const categoryCol = findHeaderIndex(["分類", "セッション", "メニュー", "カテゴリ", "カテゴリー", "type", "session", "menu", "category"]);
 
       if (dateCol === -1 || nameCol === -1 || rpeCol === -1 || srpeCol === -1) {
         throw new Error("sRPE CSV headers are missing.");
@@ -1532,6 +1533,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         dateObj: Date;
         rpeValues: number[];
         srpeValues: number[];
+        ballSrpeValues: number[];
+        sandCSrpeValues: number[];
       }
       const srpeGroups = new Map<string, SrpeGroup>();
 
@@ -1545,6 +1548,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const nameStr = vals[nameCol];
         const rpeVal = parseInt(vals[rpeCol], 10);
         const srpeVal = parseInt(vals[srpeCol], 10);
+        const catStr = categoryCol !== -1 && vals[categoryCol] ? vals[categoryCol].trim() : "";
 
         if (!dateStr || !nameStr) continue;
 
@@ -1555,11 +1559,26 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const groupKey = `${nameStr}_${dateKey}`;
 
         if (!srpeGroups.has(groupKey)) {
-          srpeGroups.set(groupKey, { athleteName: nameStr, dateObj, rpeValues: [], srpeValues: [] });
+          srpeGroups.set(groupKey, { 
+            athleteName: nameStr, 
+            dateObj, 
+            rpeValues: [], 
+            srpeValues: [],
+            ballSrpeValues: [],
+            sandCSrpeValues: []
+          });
         }
         const g = srpeGroups.get(groupKey)!;
         if (!isNaN(rpeVal)) g.rpeValues.push(rpeVal);
-        if (!isNaN(srpeVal)) g.srpeValues.push(srpeVal);
+        if (!isNaN(srpeVal)) {
+          g.srpeValues.push(srpeVal);
+          const catLower = catStr.toLowerCase();
+          if (catLower === "skill" || catLower === "game" || catLower.includes("バレー") || catLower.includes("ボール")) {
+            g.ballSrpeValues.push(srpeVal);
+          } else {
+            g.sandCSrpeValues.push(srpeVal);
+          }
+        }
       }
 
       const srpeList = Array.from(srpeGroups.values());
@@ -1571,6 +1590,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
 
         const sumSrpe = sg.srpeValues.reduce((a, b) => a + b, 0);
+        const ballSrpe = sg.ballSrpeValues.reduce((a, b) => a + b, 0);
+        const sandCSrpe = sg.sandCSrpeValues.reduce((a, b) => a + b, 0);
         const maxRpe = sg.rpeValues.length > 0 ? Math.max(...sg.rpeValues) : 0;
 
         await mergePerformanceData(db, teamId, {
@@ -1579,6 +1600,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           date: sg.dateObj,
           sRPE: sumSrpe,
           rpeValue: maxRpe,
+          rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
           rawCsvData: JSON.stringify({ note: "sRPE log", fileName })
         });
         importedCount++;
@@ -2031,8 +2053,18 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
       });
 
     } else if (isRpeLog) {
-      const athleteNameIdx = findHeaderIndex(["category", "選手", "名前", "athlete", "player", "name"]);
-      if (athleteNameIdx === -1) {
+      const athleteNameIdx = findHeaderIndex(["選手", "名前", "athlete", "player", "name"]);
+      const categoryCol = findHeaderIndex(["分類", "セッション", "メニュー", "カテゴリ", "カテゴリー", "category", "type", "session", "menu"]);
+
+      let finalAthleteNameIdx = athleteNameIdx;
+      let finalCategoryCol = categoryCol;
+
+      if (finalAthleteNameIdx === -1 && finalCategoryCol !== -1) {
+        finalAthleteNameIdx = finalCategoryCol;
+        finalCategoryCol = -1;
+      }
+
+      if (finalAthleteNameIdx === -1) {
         throw new Error("CSV is missing Athlete Name column for sRPE Log");
       }
 
@@ -2047,6 +2079,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         dateObj: Date;
         rpeVal: number;
         durationMin: number;
+        categoryStr?: string;
         sleepVal?: number;
         fatigueVal?: number;
         sorenessVal?: number;
@@ -2062,7 +2095,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const values = parseCsvLine(line);
         if (values.length < headers.length) continue;
 
-        const athleteName = values[athleteNameIdx].replace(/^[\d\s#]+/, "").trim();
+        const athleteName = values[finalAthleteNameIdx].replace(/^[\d\s#]+/, "").trim();
         if (athleteName.toLowerCase() === "athlete" || athleteName.toLowerCase() === "player" || athleteName === "選手名") {
           continue;
         }
@@ -2082,12 +2115,14 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const sorenessVal = sorenessIdx !== -1 && values[sorenessIdx] ? parseInt(values[sorenessIdx], 10) : undefined;
         const stressVal = stressIdx !== -1 && values[stressIdx] ? parseInt(values[stressIdx], 10) : undefined;
         const hrvVal = hrvIdx !== -1 && values[hrvIdx] ? parseInt(values[hrvIdx], 10) : undefined;
+        const categoryStr = finalCategoryCol !== -1 && values[finalCategoryCol] ? values[finalCategoryCol].trim() : "";
 
         rpeRecords.push({
           athleteName,
           dateObj,
           rpeVal,
           durationMin,
+          categoryStr,
           sleepVal,
           fatigueVal,
           sorenessVal,
@@ -2104,6 +2139,20 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
 
         const calculatedSrpe = isNaN(rec.durationMin) ? 0 : rec.rpeVal * rec.durationMin;
+        
+        let ballSrpe = 0;
+        let sandCSrpe = 0;
+        
+        if (rec.categoryStr) {
+          const catLower = rec.categoryStr.toLowerCase();
+          if (catLower === "skill" || catLower === "game" || catLower.includes("バレー") || catLower.includes("ボール")) {
+            ballSrpe = calculatedSrpe;
+          } else {
+            sandCSrpe = calculatedSrpe;
+          }
+        } else {
+          ballSrpe = calculatedSrpe;
+        }
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
@@ -2117,6 +2166,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessSoreness: rec.sorenessVal !== undefined && !isNaN(rec.sorenessVal) ? rec.sorenessVal : undefined,
           wellnessStress: rec.stressVal !== undefined && !isNaN(rec.stressVal) ? rec.stressVal : undefined,
           hrv: rec.hrvVal !== undefined && !isNaN(rec.hrvVal) ? rec.hrvVal : undefined,
+          rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
           rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName })
         });
         importedCount++;
@@ -2444,10 +2494,12 @@ export async function getAthleteAnalytics(athleteId: number) {
       pastSessions = allPerf.slice(1, 1 + baselineDays);
     }
     
-    // 全10指標の定義
+    // 全指標の定義
     const metricDefinitions = [
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
       { key: "sRPE", name: "sRPE", type: "load" as const },
+      { key: "sRpeBall", name: "sRPE(Ball)", type: "load" as const },
+      { key: "sRpeSandC", name: "sRPE(S&C)", type: "load" as const },
       { key: "hrv", name: "HRV", type: "state" as const },
       { key: "wellnessSoreness", name: "筋肉痛(DOMS)", type: "state" as const },
       { key: "wellnessSleep", name: "睡眠の質", type: "state" as const },
@@ -2460,6 +2512,14 @@ export async function getAthleteAnalytics(athleteId: number) {
 
     const getVal = (p: any, key: string): number => {
       if (!p) return 0;
+      if (key === "sRpeBall" || key === "sRpeSandC") {
+        try {
+          const menuData = p.rawMenuData ? JSON.parse(p.rawMenuData) : {};
+          return menuData[key] ? Number(menuData[key]) : 0;
+        } catch (e) {
+          return 0;
+        }
+      }
       return p[key] ? Number(p[key]) : 0;
     };
 
@@ -2776,6 +2836,8 @@ export async function getTeamAnalytics(teamId: number) {
     const metricDefinitions = [
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
       { key: "sRPE", name: "sRPE", type: "load" as const },
+      { key: "sRpeBall", name: "sRPE(Ball)", type: "load" as const },
+      { key: "sRpeSandC", name: "sRPE(S&C)", type: "load" as const },
       { key: "hrv", name: "HRV", type: "state" as const },
       { key: "wellnessSoreness", name: "筋肉痛(DOMS)", type: "state" as const },
       { key: "wellnessSleep", name: "睡眠の質", type: "state" as const },
@@ -2788,6 +2850,14 @@ export async function getTeamAnalytics(teamId: number) {
 
     const getVal = (p: any, key: string): number => {
       if (!p) return 0;
+      if (key === "sRpeBall" || key === "sRpeSandC") {
+        try {
+          const menuData = p.rawMenuData ? JSON.parse(p.rawMenuData) : {};
+          return menuData[key] ? Number(menuData[key]) : 0;
+        } catch (e) {
+          return 0;
+        }
+      }
       return p[key] ? Number(p[key]) : 0;
     };
 
@@ -3158,6 +3228,27 @@ export async function updatePerformanceMetric(
   else if (metricKey === "highIntensityDistance") updateFields.highIntensityDistance = getMappedValue(value, false, true);
   else if (metricKey === "avgHeartRate") updateFields.avgHeartRate = getMappedValue(value, true, false);
   else if (metricKey === "physiologicalMarker") updateFields.physiologicalMarker = getMappedValue(value, false, true);
+  else if (metricKey === "sRpeBall" || metricKey === "sRpeSandC") {
+    let menuData: Record<string, number> = {};
+    if (existing && existing.rawMenuData) {
+      try {
+        menuData = JSON.parse(existing.rawMenuData);
+      } catch (e) {
+        menuData = {};
+      }
+    }
+    if (value === null) {
+      delete menuData[metricKey];
+    } else {
+      menuData[metricKey] = value;
+    }
+    updateFields.rawMenuData = JSON.stringify(menuData);
+    
+    // Automatically recalculate sum sRPE
+    const ballVal = menuData["sRpeBall"] || 0;
+    const sandCVal = menuData["sRpeSandC"] || 0;
+    updateFields.sRPE = ballVal + sandCVal;
+  }
 
   if (metricKey === "totalJumps") {
     updateFields.jumpVolume = value !== null ? String(((value * 40) / 100).toFixed(2)) : null;

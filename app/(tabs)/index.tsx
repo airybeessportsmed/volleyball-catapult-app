@@ -24,7 +24,9 @@ export const METRICS_MAP = [
   { key: "totalLoad", label: "Player Load", desc: "外的負荷: 運動による総物理負荷", unit: "PL", polarity: "positive", category: "load_ext" },
   { key: "accelCount", label: "加速回数", desc: "外的負荷: 急加速の発生回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "maxAcceleration", label: "最高加速度", desc: "外的負荷: 最大の加速強度", unit: "m/s²", polarity: "positive", category: "load_ext" },
-  { key: "sRPE", label: "sRPE", desc: "内的負荷: 主観的強度×練習時間", unit: "AU", polarity: "positive", category: "load_int" },
+  { key: "sRPE", label: "sRPE (Total)", desc: "内的負荷: 1日の総 sRPE 合計", unit: "AU", polarity: "positive", category: "load_int" },
+  { key: "sRpeBall", label: "sRPE (Ball)", desc: "内的負荷: バレーボール練習の sRPE", unit: "AU", polarity: "positive", category: "load_int" },
+  { key: "sRpeSandC", label: "sRPE (S&C)", desc: "内的負荷: フィジカル・S&Cの sRPE", unit: "AU", polarity: "positive", category: "load_int" },
   { key: "rpeValue", label: "主観強度 (RPE)", desc: "内の負荷: 練習の主観的きつさ(1-10)", unit: "強度", polarity: "positive", category: "load_int" },
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
   { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度(低スコア推奨)", unit: "点", polarity: "negative", category: "state_subj" },
@@ -1358,7 +1360,19 @@ export default function HomeScreen() {
                                 p.athleteId === ath.athleteId && 
                                 new Date(p.date).toLocaleDateString("sv-SE") === rawDate
                               );
-                              const dbVal = rawRecord ? (rawRecord as any)[m.key] : null;
+                              let dbVal = null;
+                              if (rawRecord) {
+                                if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
+                                  try {
+                                    const menuData = rawRecord.rawMenuData ? JSON.parse(rawRecord.rawMenuData) : {};
+                                    dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
+                                  } catch (e) {
+                                    dbVal = null;
+                                  }
+                                } else {
+                                  dbVal = (rawRecord as any)[m.key];
+                                }
+                              }
                               const base = ath.baselines?.[m.key];
                               
                               // Use pending update if exists, otherwise dbVal
