@@ -729,6 +729,11 @@ export async function getAthletesByTeamId(teamId: number) {
           ...a,
           user: user ? { name: user.name, email: user.email } : null
         };
+      })
+      .sort((a, b) => {
+        const numA = a.jerseyNumber !== null && a.jerseyNumber !== undefined ? a.jerseyNumber : 9999;
+        const numB = b.jerseyNumber !== null && b.jerseyNumber !== undefined ? b.jerseyNumber : 9999;
+        return numA - numB;
       });
   }
   
@@ -744,6 +749,14 @@ export async function getAthletesByTeamId(teamId: number) {
       user: user.length > 0 ? user[0] : null
     });
   }
+
+  // Sort by jerseyNumber ascending (nulls last)
+  result.sort((a, b) => {
+    const numA = a.jerseyNumber !== null && a.jerseyNumber !== undefined ? a.jerseyNumber : 9999;
+    const numB = b.jerseyNumber !== null && b.jerseyNumber !== undefined ? b.jerseyNumber : 9999;
+    return numA - numB;
+  });
+
   return result;
 }
 
@@ -2977,7 +2990,11 @@ export async function getTeamAnalytics(teamId: number) {
       status
     };
   });
-  alertAthletes.sort((a, b) => b.acwr - a.acwr);
+  alertAthletes.sort((a, b) => {
+    const numA = a.jerseyNumber !== null && a.jerseyNumber !== undefined ? a.jerseyNumber : 9999;
+    const numB = b.jerseyNumber !== null && b.jerseyNumber !== undefined ? b.jerseyNumber : 9999;
+    return numA - numB;
+  });
 
   // 4. Chronological Trend (Past 30 days)
   const teamTrend = [];
@@ -3077,7 +3094,11 @@ export async function getTeamAnalytics(teamId: number) {
       guidanceLevel: metric ? (metric.acwr >= 1.5 || metric.wellnessFatigue <= 2 ? "danger" : metric.acwr >= 1.2 ? "warning" : metric.acwr < 0.8 ? "underwork" : "normal") : "normal"
     };
   });
-  individualPractice.sort((a, b) => b.individualLoad - a.individualLoad);
+  individualPractice.sort((a, b) => {
+    const numA = a.jerseyNumber !== null && a.jerseyNumber !== undefined ? a.jerseyNumber : 9999;
+    const numB = b.jerseyNumber !== null && b.jerseyNumber !== undefined ? b.jerseyNumber : 9999;
+    return numA - numB;
+  });
 
   // 7. Menu averages (Past 28 days) with jump count mapping
   const menuMap: Record<string, { sumLoad: number; sumJumps: number; count: number }> = {};
