@@ -46,6 +46,7 @@ export default function AthleteAnalyticsScreen() {
           </Text>
           <TouchableOpacity 
             onPress={async () => {
+              router.replace("/(tabs)");
               await logout();
             }}
             className="mt-4 px-6 py-2.5 bg-red-500 rounded-xl active:opacity-90 w-full"
@@ -69,6 +70,7 @@ export default function AthleteAnalyticsScreen() {
           </View>
           <TouchableOpacity 
             onPress={async () => {
+              router.replace("/(tabs)");
               await logout();
             }}
             className="p-2.5 bg-red-500/10 rounded-full active:opacity-90"
@@ -1000,6 +1002,7 @@ export default function AthleteAnalyticsScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={async () => {
+              router.replace("/(tabs)");
               await logout();
             }}
             className="p-2.5 bg-red-500/10 rounded-full active:opacity-90"
