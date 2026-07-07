@@ -1435,25 +1435,35 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   const mergeMaxField = (newVal: any, existingVal: any) => {
     const valA = newVal !== undefined && newVal !== null && newVal !== "" ? parseFloat(newVal) : null;
     const valB = existingVal !== undefined && existingVal !== null && existingVal !== "" ? parseFloat(existingVal) : null;
-    if (valA !== null && valB !== null) {
-      return Math.max(valA, valB).toFixed(2);
+    
+    const safeA = valA !== null && !isNaN(valA) ? valA : null;
+    const safeB = valB !== null && !isNaN(valB) ? valB : null;
+
+    if (safeA !== null && safeB !== null) {
+      return Math.max(safeA, safeB).toFixed(2);
     }
-    return valA !== null ? valA.toFixed(2) : (valB !== null ? valB.toFixed(2) : null);
+    return safeA !== null ? safeA.toFixed(2) : (safeB !== null ? safeB.toFixed(2) : null);
   };
 
   const mergeField = (newVal: any, existingVal: any, defaultVal: any = "practice") => {
     if (newVal !== undefined && newVal !== null && newVal !== "") {
-      return newVal;
+      const parsed = parseFloat(newVal);
+      if (isNaN(parsed) && (typeof newVal === "string" && (newVal.toLowerCase() === "nan" || newVal === ""))) {
+        // Skip and default
+      } else {
+        return newVal;
+      }
     }
     return existingVal !== undefined && existingVal !== null && existingVal !== "" ? existingVal : defaultVal;
   };
 
   const mergeAdditiveField = (newVal: any, existingVal: any, calculatedVal: any) => {
-    if (calculatedVal !== undefined && calculatedVal !== null) {
+    if (calculatedVal !== undefined && calculatedVal !== null && !isNaN(parseFloat(calculatedVal))) {
       return calculatedVal;
     }
     if (newVal !== undefined && newVal !== null && newVal !== "") {
-      return newVal;
+      const parsed = parseFloat(newVal);
+      if (!isNaN(parsed)) return newVal;
     }
     return existingVal !== undefined && existingVal !== null ? existingVal : null;
   };
@@ -1569,10 +1579,11 @@ export async function importPerformanceCsv(
   teamId: number,
   uploadedBy: number,
   csvText: string,
-  fileName = "catapult_import.csv",
+  rawFileName?: string | null,
   targetSessionType: "practice" | "individual" | "match" | "auto" = "auto"
 ) {
   const db = await getDb();
+  const fileName = rawFileName || "catapult_import.csv";
   
   // Create history record
   const uploadId = await createCsvUpload({
