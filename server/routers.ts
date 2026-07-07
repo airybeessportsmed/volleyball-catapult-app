@@ -18,6 +18,11 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    getPublicAthletes: publicProcedure
+      .query(async () => {
+        // Return active athletes for team 1 (default team)
+        return db.getAthletesByTeamId(1);
+      }),
     getMockToken: publicProcedure
       .input(z.object({
         openId: z.string(),
@@ -39,9 +44,17 @@ export const appRouter = router({
           email = "viewer@example.com";
         } else {
           role = "athlete";
-          if (input.openId === "demoathlete1") email = "sakura@example.com";
-          else if (input.openId === "demoathlete2") email = "hinata@example.com";
-          else if (input.openId === "demoathlete3") email = "mio@example.com";
+          // Try to look up existing registered user by openId to reuse their email
+          const existingUser = await db.getUserByOpenId(input.openId);
+          if (existingUser && existingUser.email) {
+            email = existingUser.email;
+          } else {
+            // Fallback for default demo athletes
+            if (input.openId === "demoathlete1") email = "sakura@example.com";
+            else if (input.openId === "demoathlete2") email = "hinata@example.com";
+            else if (input.openId === "demoathlete3") email = "mio@example.com";
+            else email = `${input.openId}@example.com`;
+          }
         }
 
         await db.upsertUser({

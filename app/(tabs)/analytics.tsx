@@ -10,7 +10,7 @@ import Svg, { Circle, Rect, Line, Text as SvgText, Path } from "react-native-svg
 export default function AthleteAnalyticsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"summary" | "jumps" | "menu" | "comparison">("summary");
 
   // Fetch logged in athlete profile
@@ -44,6 +44,14 @@ export default function AthleteAnalyticsScreen() {
           <Text className="text-sm text-muted text-center leading-relaxed">
             選手としてのプロフィールがまだ登録されていません。指導者に連絡して、このアカウント（{user?.email}）を選手登録してもらってください。
           </Text>
+          <TouchableOpacity 
+            onPress={async () => {
+              await logout();
+            }}
+            className="mt-4 px-6 py-2.5 bg-red-500 rounded-xl active:opacity-90 w-full"
+          >
+            <Text className="text-white font-bold text-xs text-center">ログアウト</Text>
+          </TouchableOpacity>
         </View>
       </ScreenContainer>
     );
@@ -52,11 +60,21 @@ export default function AthleteAnalyticsScreen() {
   if (!analytics || !analytics.latestSession) {
     return (
       <ScreenContainer className="bg-background">
-        <View className="px-6 py-4 border-b border-border bg-surface">
-          <Text className="text-xl font-bold text-foreground">トレンド分析</Text>
-          <Text className="text-xs text-muted">
-            {(athlete as any).user?.name || user?.name} | {athlete.position || "ポジション未設定"} #{athlete.jerseyNumber || ""}
-          </Text>
+        <View className="px-6 py-4 border-b border-border bg-surface flex-row justify-between items-center">
+          <View className="flex-1 pr-2">
+            <Text className="text-xl font-bold text-foreground">トレンド分析</Text>
+            <Text className="text-xs text-muted">
+              {(athlete as any).user?.name || user?.name} | {athlete.position || "ポジション未設定"} #{athlete.jerseyNumber || ""}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            onPress={async () => {
+              await logout();
+            }}
+            className="p-2.5 bg-red-500/10 rounded-full active:opacity-90"
+          >
+            <IconSymbol size={14} name="rectangle.portrait.and.arrow.right" color="#EF4444" />
+          </TouchableOpacity>
         </View>
         <View className="flex-1 items-center justify-center p-6 gap-4">
           <View className="w-16 h-16 bg-muted/20 rounded-full items-center justify-center">
@@ -973,12 +991,22 @@ export default function AthleteAnalyticsScreen() {
             {(athlete as any).user?.name || user?.name} | {athlete.position || "ポジション未設定"} #{athlete.jerseyNumber || ""}
           </Text>
         </View>
-        <TouchableOpacity 
-          onPress={() => refetch()}
-          className="p-2.5 bg-muted/20 rounded-full active:bg-muted/30"
-        >
-          <IconSymbol size={14} name="arrow.clockwise" color="#4B5563" />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity 
+            onPress={() => refetch()}
+            className="p-2.5 bg-muted/20 rounded-full active:bg-muted/30"
+          >
+            <IconSymbol size={14} name="arrow.clockwise" color="#4B5563" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={async () => {
+              await logout();
+            }}
+            className="p-2.5 bg-red-500/10 rounded-full active:opacity-90"
+          >
+            <IconSymbol size={14} name="rectangle.portrait.and.arrow.right" color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}
