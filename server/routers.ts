@@ -242,8 +242,12 @@ export const appRouter = router({
       .query(({ input }) => db.getPerformanceDataByAthleteId(input.athleteId, input.limit)),
     
     getByTeam: protectedProcedure
-      .input(z.object({ teamId: z.number(), limit: z.number().optional() }))
-      .query(({ input }) => db.getPerformanceDataByTeamId(input.teamId, input.limit)),
+      .input(z.object({ 
+        teamId: z.number(), 
+        date: z.string().optional(),
+        limit: z.number().optional() 
+      }))
+      .query(({ input }) => db.getPerformanceDataByTeamId(input.teamId, input.date, input.limit)),
     
     getImportStatusByMonth: protectedProcedure
       .input(z.object({

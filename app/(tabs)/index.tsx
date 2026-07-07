@@ -231,11 +231,6 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
-  const { data: allPerfData, refetch: refetchAllPerf } = trpc.performance.getByTeam.useQuery(
-    { teamId: user?.teamId || 1, limit: 10000 },
-    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
-  );
-
   const saveAdviceMutation = trpc.performance.saveCoachAdvice.useMutation();
   const updateSettingsMutation = trpc.team.updateSettings.useMutation();
   const updateMetricMutation = trpc.performance.updateMetric.useMutation();
@@ -253,6 +248,11 @@ export default function HomeScreen() {
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+
+  const { data: allPerfData, refetch: refetchAllPerf } = trpc.performance.getByTeam.useQuery(
+    { teamId: user?.teamId || 1, date: rawDate, limit: 1500 },
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
+  );
 
   // Filters for raw data tab
   const [filterTeam, setFilterTeam] = useState<string>("all");

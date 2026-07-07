@@ -1005,13 +1005,33 @@ export async function getPerformanceDataByAthleteId(athleteId: number, limit: nu
     .limit(limit);
 }
 
-export async function getPerformanceDataByTeamId(teamId: number, limit: number = 100) {
+export async function getPerformanceDataByTeamId(teamId: number, dateStr?: string, limit: number = 1500) {
   const db = await getDb();
   if (!db) {
-    return mockPerformanceData
-      .filter(p => p.teamId === teamId)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(-limit);
+    let list = mockPerformanceData.filter(p => p.teamId === teamId);
+    if (dateStr) {
+      list = list.filter(p => {
+        const d = new Date(p.date);
+        return formatDateKey(d) === dateStr;
+      });
+    }
+    return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(-limit);
+  }
+  
+  if (dateStr) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+    const endDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+    return db.select().from(performanceData)
+      .where(
+        and(
+          eq(performanceData.teamId, teamId),
+          gte(performanceData.date, startDate),
+          lte(performanceData.date, endDate)
+        )
+      )
+      .orderBy((table) => table.date)
+      .limit(limit);
   }
   
   return db.select().from(performanceData)
