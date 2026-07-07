@@ -1458,6 +1458,44 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     return existingVal !== undefined && existingVal !== null ? existingVal : null;
   };
 
+  // Merge rawMenuData structures safely (playerLoads, jumpVolumes, accelVolumes)
+  let mergedMenuObj: any = {};
+  if (existing && existing.rawMenuData) {
+    try {
+      const parsed = JSON.parse(existing.rawMenuData);
+      if (parsed && typeof parsed === "object") {
+        mergedMenuObj = { ...parsed };
+      }
+    } catch (e) {}
+  }
+  let newMenuObj: any = {};
+  if (data.rawMenuData) {
+    try {
+      const parsed = JSON.parse(data.rawMenuData);
+      if (parsed && typeof parsed === "object") {
+        newMenuObj = parsed;
+      }
+    } catch (e) {}
+  }
+  const keysToMerge = ["playerLoads", "jumpVolumes", "accelVolumes"];
+  for (const key of keysToMerge) {
+    if (newMenuObj[key]) {
+      mergedMenuObj[key] = mergedMenuObj[key] || {};
+      for (const mName of Object.keys(newMenuObj[key])) {
+        const val = parseFloat(newMenuObj[key][mName]);
+        if (!isNaN(val)) {
+          mergedMenuObj[key][mName] = val;
+        }
+      }
+    }
+  }
+  for (const key of Object.keys(newMenuObj)) {
+    if (!keysToMerge.includes(key)) {
+      mergedMenuObj[key] = newMenuObj[key];
+    }
+  }
+  const finalRawMenuData = Object.keys(mergedMenuObj).length > 0 ? JSON.stringify(mergedMenuObj) : null;
+
   const mergedData = {
     ...data,
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
@@ -1483,7 +1521,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     totalLoad: mergeAdditiveField(data.totalLoad, existing?.totalLoad, calculatedSums.totalLoad),
     avgLoad: mergeField(data.avgLoad, existing?.avgLoad),
     duration: mergeField(data.duration, existing?.duration, 3600),
-    rawMenuData: mergeField(data.rawMenuData, existing?.rawMenuData),
+    rawMenuData: finalRawMenuData,
     sRPE: mergeField(data.sRPE, existing?.sRPE),
     rpeValue: mergeField(data.rpeValue, existing?.rpeValue),
     wellnessSleep: mergeField(data.wellnessSleep, existing?.wellnessSleep),
@@ -1894,6 +1932,8 @@ export async function importPerformanceCsv(
         dateObj: Date;
         jumps: number[];
         accelerations: number[];
+        menuJumps: Record<string, number[]>;
+        menuAccelerations: Record<string, number[]>;
       }
       const imaGroups = new Map<string, ImaGroup>();
 
@@ -1932,9 +1972,19 @@ export async function importPerformanceCsv(
         const groupKey = `${rawAthlete.trim()}_${rowSessionType}_${dateKey}`;
 
         if (!imaGroups.has(groupKey)) {
-          imaGroups.set(groupKey, { athleteName: rawAthlete.trim(), jerseyNumber: jNum, sessionType: rowSessionType, dateObj, jumps: [], accelerations: [] });
+          imaGroups.set(groupKey, {
+            athleteName: rawAthlete.trim(),
+            jerseyNumber: jNum,
+            sessionType: rowSessionType,
+            dateObj,
+            jumps: [],
+            accelerations: [],
+            menuJumps: {},
+            menuAccelerations: {}
+          });
         }
         const g = imaGroups.get(groupKey)!;
+        const periodName = periodCol !== -1 && vals[periodCol] ? vals[periodCol].trim() : "全体";
 
         if (tag.includes("Jump") || tag.includes("Jumping")) {
           if (heightCol !== -1 && vals[heightCol]) {
@@ -1942,12 +1992,18 @@ export async function importPerformanceCsv(
             if (!isNaN(hVal) && hVal > 0) {
               const heightCm = hVal < 2.5 ? hVal * 100 : hVal;
               g.jumps.push(heightCm);
+              g.menuJumps[periodName] = g.menuJumps[periodName] || [];
+              g.menuJumps[periodName].push(heightCm);
             }
           }
         } else if (tag.includes("Acceleration")) {
           if (intensityCol !== -1 && vals[intensityCol]) {
             const intVal = parseFloat(vals[intensityCol]);
-            if (!isNaN(intVal)) g.accelerations.push(intVal);
+            if (!isNaN(intVal)) {
+              g.accelerations.push(intVal);
+              g.menuAccelerations[periodName] = g.menuAccelerations[periodName] || [];
+              g.menuAccelerations[periodName].push(intVal);
+            }
           }
         }
       }
@@ -1987,6 +2043,18 @@ export async function importPerformanceCsv(
         const avgAcceleration = ig.accelerations.length > 0 ? ig.accelerations.reduce((a, b) => a + b, 0) / ig.accelerations.length : undefined;
         const accelCount = ig.accelerations.length;
 
+        const jumpVolumes: Record<string, number> = {};
+        for (const mName of Object.keys(ig.menuJumps)) {
+          const sum = ig.menuJumps[mName].reduce((a, b) => a + b, 0);
+          jumpVolumes[mName] = parseFloat(sum.toFixed(2));
+        }
+
+        const accelVolumes: Record<string, number> = {};
+        for (const mName of Object.keys(ig.menuAccelerations)) {
+          const sum = ig.menuAccelerations[mName].reduce((a, b) => a + b, 0);
+          accelVolumes[mName] = parseFloat(sum.toFixed(2));
+        }
+
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
@@ -2005,6 +2073,7 @@ export async function importPerformanceCsv(
           avgAcceleration: avgAcceleration ? avgAcceleration.toFixed(2) : undefined,
           accelCount,
           sessionType: ig.sessionType,
+          rawMenuData: JSON.stringify({ jumpVolumes, accelVolumes }),
           rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName, sessionType: ig.sessionType })
         });
         importedCount++;
@@ -2295,7 +2364,7 @@ export async function importPerformanceCsv(
           teamId,
           date: agg.dateObj,
           totalLoad: totalLoad.toFixed(2),
-          rawMenuData: JSON.stringify(agg.menuLoads),
+          rawMenuData: JSON.stringify({ playerLoads: agg.menuLoads }),
           sessionType: agg.sessionType,
           rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName, sessionType: agg.sessionType })
         });

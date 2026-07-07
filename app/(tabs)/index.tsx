@@ -9,6 +9,75 @@ import Svg, { Path, Circle, Rect, G, Text as SvgText, Line, Polyline } from "rea
 
 const MINI_CHART_HEIGHT = 80;
 
+const DoughnutChart = ({ data, colors }: { data: { label: string, value: number }[], colors: string[] }) => {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  if (total === 0) {
+    return <Text style={{ color: "#64748B", fontStyle: "italic", fontSize: 11, textAlign: "center", marginVertical: 20 }}>対象のメニューデータがありません</Text>;
+  }
+
+  let accumulatedPercent = 0;
+  const radius = 35;
+  const circumference = 2 * Math.PI * radius; // 219.91
+
+  return (
+    <View style={{ alignItems: "center", gap: 14, width: "100%" }}>
+      <View style={{ width: 120, height: 120, position: "relative", alignItems: "center", justifyContent: "center" }}>
+        <Svg width="120" height="120" viewBox="0 0 100 100">
+          <G rotation="-90" origin="50, 50">
+            {/* Base circle path background */}
+            <Circle cx="50" cy="50" r={radius} fill="transparent" stroke="#F1F5F9" strokeWidth="12" />
+            
+            {data.map((item, idx) => {
+              const percent = item.value / total;
+              const strokeLength = circumference * percent;
+              const rotation = accumulatedPercent * 360;
+              accumulatedPercent += percent;
+
+              return (
+                <Circle
+                  key={idx}
+                  cx="50"
+                  cy="50"
+                  r={radius}
+                  fill="transparent"
+                  stroke={colors[idx % colors.length]}
+                  strokeWidth="12"
+                  strokeDasharray={`${strokeLength} ${circumference - strokeLength}`}
+                  strokeDashoffset={0}
+                  transform={`rotate(${rotation} 50 50)`}
+                />
+              );
+            })}
+          </G>
+        </Svg>
+        <View style={{ position: "absolute", alignItems: "center" }}>
+          <Text style={{ fontSize: 9, color: "#64748B", fontWeight: "bold" }}>TOTAL</Text>
+          <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A" }}>
+            {total >= 1000 ? Math.round(total).toLocaleString() : total.toFixed(1)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ width: "100%", gap: 6, paddingHorizontal: 10 }}>
+        {data.map((item, idx) => {
+          const percent = (item.value / total) * 100;
+          return (
+            <View key={idx} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 2.5, backgroundColor: colors[idx % colors.length] }} />
+                <Text style={{ fontSize: 11, color: "#475569" }} numberOfLines={1}>{item.label}</Text>
+              </View>
+              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>
+                {percent.toFixed(1)}% ({item.value >= 1000 ? Math.round(item.value).toLocaleString() : item.value.toFixed(1)})
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 interface PerformanceMetrics {
   maxJumpHeight?: number;
   totalLoad?: number;
@@ -242,7 +311,7 @@ export default function HomeScreen() {
 
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [adviceText, setAdviceText] = useState("");
-  const [activeTab, setActiveTab] = useState<"summary" | "dashboard" | "raw" | "settings">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings">("summary");
   const [expandedAthlete, setExpandedAthlete] = useState<number | null>(null);
   const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
@@ -253,6 +322,160 @@ export default function HomeScreen() {
     { teamId: user?.teamId || 1, date: rawDate, limit: 1500 },
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
+
+  const catapultData = useMemo(() => {
+    if (!allPerfData || allPerfData.length === 0) {
+      return { athletes: [], menus: [], teamAverages: {}, positionAverages: {}, charts: { jump: [], accel: [], load: [] } };
+    }
+
+    const allAthletes = teamAnalytics?.athletes || [];
+    const menuSet = new Set<string>();
+    const parsedRecords = allPerfData.map(p => {
+      const matchedAthlete = allAthletes.find((a: any) => a.athleteId === p.athleteId);
+      
+      let menuObj: any = {};
+      if (p.rawMenuData) {
+        try {
+          menuObj = JSON.parse(p.rawMenuData) || {};
+        } catch (e) {}
+      }
+      
+      const playerLoads = menuObj.playerLoads || {};
+      const jumpVolumes = menuObj.jumpVolumes || {};
+      const accelVolumes = menuObj.accelVolumes || {};
+
+      Object.keys(playerLoads).forEach(m => menuSet.add(m));
+      Object.keys(jumpVolumes).forEach(m => menuSet.add(m));
+      Object.keys(accelVolumes).forEach(m => menuSet.add(m));
+
+      return {
+        id: p.id,
+        athleteId: p.athleteId,
+        athleteName: matchedAthlete?.name || "Unknown",
+        jerseyNumber: matchedAthlete?.jerseyNumber ?? null,
+        position: matchedAthlete?.position || "OH",
+        playerLoads,
+        jumpVolumes,
+        accelVolumes
+      };
+    });
+
+    const orderScore = (name: string) => {
+      const lower = name.toLowerCase();
+      if (lower.includes("individual") || lower.includes("自主")) return 0;
+      if (lower.includes("w-up") || lower.includes("up")) return 1;
+      if (lower.includes("ball") || lower.includes("game")) return 2;
+      if (lower.includes("serve")) return 3;
+      if (lower.includes("def")) return 4;
+      if (lower.includes("recep")) return 5;
+      if (lower.includes("attack") || lower.includes("rally")) return 6;
+      if (lower.includes("set")) return 7;
+      return 100;
+    };
+    
+    const menus = Array.from(menuSet).sort((a, b) => {
+      const scoreA = orderScore(a);
+      const scoreB = orderScore(b);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      return a.localeCompare(b);
+    });
+
+    const teamSums: Record<string, { load: number, loadCount: number, jump: number, jumpCount: number, accel: number, accelCount: number }> = {};
+    const posSums: Record<string, Record<string, { load: number, loadCount: number, jump: number, jumpCount: number, accel: number, accelCount: number }>> = {};
+
+    const positions = ["S", "OH", "MB", "L"];
+    positions.forEach(pos => {
+      posSums[pos] = {};
+      menus.forEach(m => {
+        posSums[pos][m] = { load: 0, loadCount: 0, jump: 0, jumpCount: 0, accel: 0, accelCount: 0 };
+      });
+    });
+
+    menus.forEach(m => {
+      teamSums[m] = { load: 0, loadCount: 0, jump: 0, jumpCount: 0, accel: 0, accelCount: 0 };
+    });
+
+    parsedRecords.forEach(rec => {
+      menus.forEach(m => {
+        const loadVal = rec.playerLoads[m];
+        const jumpVal = rec.jumpVolumes[m];
+        const accelVal = rec.accelVolumes[m];
+
+        if (loadVal !== undefined && loadVal !== null) {
+          teamSums[m].load += loadVal;
+          teamSums[m].loadCount++;
+        }
+        if (jumpVal !== undefined && jumpVal !== null) {
+          teamSums[m].jump += jumpVal;
+          teamSums[m].jumpCount++;
+        }
+        if (accelVal !== undefined && accelVal !== null) {
+          teamSums[m].accel += accelVal;
+          teamSums[m].accelCount++;
+        }
+
+        const pos = rec.position ? rec.position.toUpperCase() : "OH";
+        if (posSums[pos] && posSums[pos][m]) {
+          if (loadVal !== undefined && loadVal !== null) {
+            posSums[pos][m].load += loadVal;
+            posSums[pos][m].loadCount++;
+          }
+          if (jumpVal !== undefined && jumpVal !== null) {
+            posSums[pos][m].jump += jumpVal;
+            posSums[pos][m].jumpCount++;
+          }
+          if (accelVal !== undefined && accelVal !== null) {
+            posSums[pos][m].accel += accelVal;
+            posSums[pos][m].accelCount++;
+          }
+        }
+      });
+    });
+
+    const teamAverages: Record<string, { load: number | null, jump: number | null, accel: number | null }> = {};
+    menus.forEach(m => {
+      teamAverages[m] = {
+        load: teamSums[m].loadCount > 0 ? parseFloat((teamSums[m].load / teamSums[m].loadCount).toFixed(1)) : null,
+        jump: teamSums[m].jumpCount > 0 ? parseFloat((teamSums[m].jump / teamSums[m].jumpCount).toFixed(1)) : null,
+        accel: teamSums[m].accelCount > 0 ? parseFloat((teamSums[m].accel / teamSums[m].accelCount).toFixed(1)) : null,
+      };
+    });
+
+    const positionAverages: Record<string, Record<string, { load: number | null, jump: number | null, accel: number | null }>> = {};
+    positions.forEach(pos => {
+      positionAverages[pos] = {};
+      menus.forEach(m => {
+        const s = posSums[pos][m];
+        positionAverages[pos][m] = {
+          load: s.loadCount > 0 ? parseFloat((s.load / s.loadCount).toFixed(1)) : null,
+          jump: s.jumpCount > 0 ? parseFloat((s.jump / s.jumpCount).toFixed(1)) : null,
+          accel: s.accelCount > 0 ? parseFloat((s.accel / s.accelCount).toFixed(1)) : null,
+        };
+      });
+    });
+
+    const jumpChartData: { label: string, value: number }[] = [];
+    const accelChartData: { label: string, value: number }[] = [];
+    const loadChartData: { label: string, value: number }[] = [];
+
+    menus.forEach(m => {
+      if (teamSums[m].jump > 0) jumpChartData.push({ label: m, value: parseFloat(teamSums[m].jump.toFixed(1)) });
+      if (teamSums[m].accel > 0) accelChartData.push({ label: m, value: parseFloat(teamSums[m].accel.toFixed(1)) });
+      if (teamSums[m].load > 0) loadChartData.push({ label: m, value: parseFloat(teamSums[m].load.toFixed(1)) });
+    });
+
+    return {
+      athletes: parsedRecords,
+      menus,
+      teamAverages,
+      positionAverages,
+      charts: {
+        jump: jumpChartData,
+        accel: accelChartData,
+        load: loadChartData
+      }
+    };
+  }, [allPerfData, teamAnalytics]);
 
   // Filters for raw data tab
   const [filterTeam, setFilterTeam] = useState<string>("all");
@@ -986,13 +1209,13 @@ export default function HomeScreen() {
 
         <View style={{ paddingHorizontal: 20, paddingTop: 16, backgroundColor: "#FFFFFF" }}>
           <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 4, borderRadius: 12 }}>
-            {(["summary", "dashboard", "raw", "settings"] as const).filter(tab => {
+            {(["summary", "dashboard", "raw", "catapult", "settings"] as const).filter(tab => {
               if (user?.role === "viewer") {
-                return tab === "summary" || tab === "dashboard";
+                return tab === "summary" || tab === "dashboard" || tab === "catapult";
               }
               return true;
             }).map(tab => {
-              const tabLabels = { summary: "🚥 サマリー", dashboard: "📊 分析", raw: "📝 生データ", settings: "⚙️ 設定" };
+              const tabLabels = { summary: "🚥 サマリー", dashboard: "📊 分析", raw: "📝 生データ", catapult: "🛰️ Catapult", settings: "⚙️ 設定" };
               const isActive = activeTab === tab;
               return (
                 <TouchableOpacity
@@ -1570,6 +1793,287 @@ export default function HomeScreen() {
                     <Text style={{ color: "#475569", fontWeight: "bold", fontSize: 13 }}>編集を破棄</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            )}
+
+            {/* CATAPULT ANALYSIS TAB */}
+            {activeTab === "catapult" && (
+              <View style={{ gap: 20 }}>
+                {/* ヘッダーエリア */}
+                <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                    <View>
+                      <TouchableOpacity 
+                        onPress={() => setCalendarModalOpen(true)}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" }}
+                      >
+                        <IconSymbol size={16} name="calendar" color="#0F172A" />
+                        <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>
+                          {rawDate.replace(/-/g, "/")}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: "bold", color: "#475569" }}>
+                      Menu別 運動量の比較 (Jump Vol / Accel Vol / Player Load)
+                    </Text>
+                  </View>
+                </View>
+
+                {/* スプレッドシートテーブル */}
+                {catapultData.athletes.length > 0 ? (
+                  <View style={{ backgroundColor: "#FFFFFF", borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                      <View style={{ flexDirection: "column" }}>
+                        {/* ヘッダー行1 (大グループ) */}
+                        <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" }}>
+                          {/* 左端固定エリアプレースホルダー */}
+                          <View style={{ width: 240, height: 32, justifyContent: "center", paddingLeft: 12 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#64748B" }}>選手属性</Text>
+                          </View>
+                          {/* Jump Volume 大ヘッダー */}
+                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#E0F2FE", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#BAE6FD" }}>
+                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0369A1" }}>Jump Volume (総ジャンプ高 cm)</Text>
+                          </View>
+                          {/* Accel Volume 大ヘッダー */}
+                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FCA5A5" }}>
+                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#B91C1C" }}>Acc Vol (加速の総量)</Text>
+                          </View>
+                          {/* Player Load 大ヘッダー */}
+                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#D1FAE5", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#86EFAC" }}>
+                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#15803D" }}>Player Load (総合的運動量)</Text>
+                          </View>
+                        </View>
+
+                        {/* ヘッダー行2 (メニュー名リスト) */}
+                        <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F1F5F9" }}>
+                          {/* 左側属性列のヘッダー */}
+                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>部分</Text>
+                          </View>
+                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>No.</Text>
+                          </View>
+                          <View style={{ width: 120, height: 36, justifyContent: "center", paddingLeft: 8 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>選手名</Text>
+                          </View>
+                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>Pos</Text>
+                          </View>
+
+                          {/* Jump Volume のメニュー名ヘッダー */}
+                          {catapultData.menus.map((m, idx) => (
+                            <View key={`j_h_${idx}`} style={{ width: 75, height: 36, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                              <Text style={{ fontSize: 9, color: "#0369A1", fontWeight: "bold", textAlign: "center" }} numberOfLines={2}>
+                                {idx + 1} {m}
+                              </Text>
+                            </View>
+                          ))}
+                          {/* Accel Volume のメニュー名ヘッダー */}
+                          {catapultData.menus.map((m, idx) => (
+                            <View key={`a_h_${idx}`} style={{ width: 75, height: 36, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                              <Text style={{ fontSize: 9, color: "#B91C1C", fontWeight: "bold", textAlign: "center" }} numberOfLines={2}>
+                                {idx + 1} {m}
+                              </Text>
+                            </View>
+                          ))}
+                          {/* Player Load のメニュー名ヘッダー */}
+                          {catapultData.menus.map((m, idx) => (
+                            <View key={`p_h_${idx}`} style={{ width: 75, height: 36, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                              <Text style={{ fontSize: 9, color: "#15803D", fontWeight: "bold", textAlign: "center" }} numberOfLines={2}>
+                                {idx + 1} {m}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        {/* 選手データ行 */}
+                        {catapultData.athletes.map((ath, idx) => (
+                          <View key={ath.athleteId} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC" }}>
+                            {/* 属性セル */}
+                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                              {/* 部分参加チェックマーク (スクリーンショット準拠の□) */}
+                              <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: "#94A3B8", borderRadius: 2 }} />
+                            </View>
+                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 11, color: "#475569" }}>{ath.jerseyNumber ?? "-"}</Text>
+                            </View>
+                            <View style={{ width: 120, height: 32, justifyContent: "center", paddingLeft: 8 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>{ath.athleteName}</Text>
+                            </View>
+                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "bold" }}>{ath.position}</Text>
+                            </View>
+
+                            {/* Jump Volume 値 */}
+                            {catapultData.menus.map(m => {
+                              const val = ath.jumpVolumes[m];
+                              return (
+                                <View key={`j_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                  <Text style={{ fontSize: 11, color: val ? "#0284C7" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                    {val !== undefined ? Math.round(val) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {/* Accel Volume 値 */}
+                            {catapultData.menus.map(m => {
+                              const val = ath.accelVolumes[m];
+                              return (
+                                <View key={`a_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                  <Text style={{ fontSize: 11, color: val ? "#DC2626" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                    {val !== undefined ? val.toFixed(1) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {/* Player Load 値 */}
+                            {catapultData.menus.map(m => {
+                              const val = ath.playerLoads[m];
+                              return (
+                                <View key={`p_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                  <Text style={{ fontSize: 11, color: val ? "#16A34A" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                    {val !== undefined ? val.toFixed(1) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        ))}
+
+                        {/* Team 平均行 */}
+                        <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC" }}>
+                          <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>Team平均</Text>
+                          </View>
+                          <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 9, color: "#64748B", fontWeight: "bold" }}>Team</Text>
+                          </View>
+
+                          {/* Jump Volume 平均 */}
+                          {catapultData.menus.map(m => {
+                            const val = catapultData.teamAverages[m]?.jump;
+                            return (
+                              <View key={`j_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                                <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0369A1" }}>
+                                  {val !== null ? Math.round(val) : "-"}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                          {/* Accel Volume 平均 */}
+                          {catapultData.menus.map(m => {
+                            const val = catapultData.teamAverages[m]?.accel;
+                            return (
+                              <View key={`a_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                                <Text style={{ fontSize: 11, fontWeight: "bold", color: "#B91C1C" }}>
+                                  {val !== null ? val.toFixed(1) : "-"}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                          {/* Player Load 平均 */}
+                          {catapultData.menus.map(m => {
+                            const val = catapultData.teamAverages[m]?.load;
+                            return (
+                              <View key={`p_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
+                                <Text style={{ fontSize: 11, fontWeight: "bold", color: "#15803D" }}>
+                                  {val !== null ? val.toFixed(1) : "-"}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+
+                        {/* ポジション別平均行 */}
+                        {["S", "OH", "MB", "L"].map(pos => (
+                          <View key={`pos_row_${pos}`} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FFEDD5" }}>
+                            <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
+                              <Text style={{ fontSize: 10, fontWeight: "bold", color: "#9A3412" }}>{pos}平均</Text>
+                            </View>
+                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 10, color: "#9A3412", fontWeight: "bold" }}>{pos}</Text>
+                            </View>
+
+                            {/* Jump Volume */}
+                            {catapultData.menus.map(m => {
+                              const val = catapultData.positionAverages[pos]?.[m]?.jump;
+                              return (
+                                <View key={`j_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
+                                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
+                                    {val !== null ? Math.round(val) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {/* Accel Volume */}
+                            {catapultData.menus.map(m => {
+                              const val = catapultData.positionAverages[pos]?.[m]?.accel;
+                              return (
+                                <View key={`a_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
+                                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
+                                    {val !== null ? val.toFixed(1) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {/* Player Load */}
+                            {catapultData.menus.map(m => {
+                              const val = catapultData.positionAverages[pos]?.[m]?.load;
+                              return (
+                                <View key={`p_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
+                                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
+                                    {val !== null ? val.toFixed(1) : "-"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: "#FFFFFF", padding: 40, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "bold", textAlign: "center", marginBottom: 6 }}>
+                      本日分のCatapultデータ（IMA/メニュー別）がありません。
+                    </Text>
+                    <Text style={{ color: "#94A3B8", fontSize: 11, textAlign: "center" }}>
+                      アップロード画面からCSVファイルを読み込ませてください。
+                    </Text>
+                  </View>
+                )}
+
+                {/* チーム平均のメニュー別円グラフ（ドーナツ）エリア */}
+                {catapultData.athletes.length > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
+                    {/* Jump Volume */}
+                    <View style={{ flex: 1, minWidth: 260, backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A", marginBottom: 16, alignSelf: "flex-start" }}>Jump Volume (総ジャンプ高比率)</Text>
+                      <DoughnutChart 
+                        data={catapultData.charts.jump} 
+                        colors={["#0284C7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd", "#e0f2fe", "#0369a1", "#075985", "#0c4a6e"]} 
+                      />
+                    </View>
+
+                    {/* Accel Volume */}
+                    <View style={{ flex: 1, minWidth: 260, backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A", marginBottom: 16, alignSelf: "flex-start" }}>Accel Volume (加速の総量比率)</Text>
+                      <DoughnutChart 
+                        data={catapultData.charts.accel} 
+                        colors={["#DC2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca", "#fee2e2", "#b91c1c", "#991b1b", "#7f1d1d"]} 
+                      />
+                    </View>
+
+                    {/* Player Load */}
+                    <View style={{ flex: 1, minWidth: 260, backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A", marginBottom: 16, alignSelf: "flex-start" }}>Player Load (総合的運動量比率)</Text>
+                      <DoughnutChart 
+                        data={catapultData.charts.load} 
+                        colors={["#16A34A", "#22c55e", "#4ade80", "#86efac", "#bbf7d0", "#d1fae5", "#15803d", "#166534", "#14532d"]} 
+                      />
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
