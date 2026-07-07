@@ -340,9 +340,15 @@ export default function HomeScreen() {
         } catch (e) {}
       }
       
-      const playerLoads = menuObj.playerLoads || {};
-      const jumpVolumes = menuObj.jumpVolumes || {};
-      const accelVolumes = menuObj.accelVolumes || {};
+      let playerLoads = menuObj.playerLoads || {};
+      let jumpVolumes = menuObj.jumpVolumes || {};
+      let accelVolumes = menuObj.accelVolumes || {};
+
+      if (!menuObj.playerLoads && !menuObj.jumpVolumes && !menuObj.accelVolumes && Object.keys(menuObj).length > 0) {
+        if (!menuObj.sRpeBall && !menuObj.sRpeSandC) {
+          playerLoads = menuObj;
+        }
+      }
 
       Object.keys(playerLoads).forEach(m => menuSet.add(m));
       Object.keys(jumpVolumes).forEach(m => menuSet.add(m));
@@ -1822,8 +1828,12 @@ export default function HomeScreen() {
                 {/* スプレッドシートテーブル */}
                 {catapultData.athletes.length > 0 ? (
                   <View style={{ backgroundColor: "#FFFFFF", borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
-                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                      <View style={{ flexDirection: "column", width: 240 + (catapultData.menus.length * 225) }}>
+                    <ScrollView 
+                      horizontal={true} 
+                      showsHorizontalScrollIndicator={true}
+                      contentContainerStyle={{ minWidth: 240 + (catapultData.menus.length * 225) }}
+                    >
+                      <View style={{ flexDirection: "column", width: "100%", minWidth: 240 + (catapultData.menus.length * 225) }}>
                         {/* ヘッダー行1 (大グループ) */}
                         <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" }}>
                           {/* 左端固定エリアプレースホルダー */}
@@ -1831,17 +1841,23 @@ export default function HomeScreen() {
                             <Text style={{ fontSize: 11, fontWeight: "bold", color: "#64748B" }}>選手属性</Text>
                           </View>
                           {/* Jump Volume 大ヘッダー */}
-                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#E0F2FE", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#BAE6FD" }}>
-                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0369A1" }}>Jump Volume (総ジャンプ高 cm)</Text>
-                          </View>
+                          {catapultData.menus.length > 0 && (
+                            <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#E0F2FE", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#BAE6FD" }}>
+                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0369A1" }} numberOfLines={1}>Jump Volume (総ジャンプ高 cm)</Text>
+                            </View>
+                          )}
                           {/* Accel Volume 大ヘッダー */}
-                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FCA5A5" }}>
-                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#B91C1C" }}>Acc Vol (加速の総量)</Text>
-                          </View>
+                          {catapultData.menus.length > 0 && (
+                            <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FCA5A5" }}>
+                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#B91C1C" }} numberOfLines={1}>Acc Vol (加速の総量)</Text>
+                            </View>
+                          )}
                           {/* Player Load 大ヘッダー */}
-                          <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#D1FAE5", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#86EFAC" }}>
-                            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#15803D" }}>Player Load (総合的運動量)</Text>
-                          </View>
+                          {catapultData.menus.length > 0 && (
+                            <View style={{ width: catapultData.menus.length * 75, height: 32, backgroundColor: "#D1FAE5", justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#86EFAC" }}>
+                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#15803D" }} numberOfLines={1}>Player Load (総合的運動量)</Text>
+                            </View>
+                          )}
                         </View>
 
                         {/* ヘッダー行2 (メニュー名リスト) */}
