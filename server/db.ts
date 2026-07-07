@@ -1787,6 +1787,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
       interface ImaGroup {
         athleteName: string;
+        jerseyNumber: number | null;
         dateObj: Date;
         jumps: number[];
         accelerations: number[];
@@ -1803,7 +1804,11 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const tag = vals[tagCol] || "";
         if (!rawAthlete) continue;
 
-        const cleanName = rawAthlete.replace(/^[\d\s#]+/, "").trim();
+        let jNum: number | null = null;
+        const numMatch = rawAthlete.match(/^\s*(\d+)/) || rawAthlete.match(/\b\d+\b/);
+        if (numMatch) {
+          jNum = parseInt(numMatch[1] || numMatch[0], 10);
+        }
 
         let dateObj = getFallbackDate(fileName);
         if (eventTimeCol !== -1 && vals[eventTimeCol]) {
@@ -1812,10 +1817,10 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         }
 
         const dateKey = formatDateKey(dateObj);
-        const groupKey = `${cleanName}_${dateKey}`;
+        const groupKey = `${rawAthlete.trim()}_${dateKey}`;
 
         if (!imaGroups.has(groupKey)) {
-          imaGroups.set(groupKey, { athleteName: cleanName, dateObj, jumps: [], accelerations: [] });
+          imaGroups.set(groupKey, { athleteName: rawAthlete.trim(), jerseyNumber: jNum, dateObj, jumps: [], accelerations: [] });
         }
         const g = imaGroups.get(groupKey)!;
 
@@ -1837,9 +1842,20 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
 
       const imaList = Array.from(imaGroups.values());
       await runInParallelBatches(imaList, 15, async (ig) => {
-        const matchedAthlete = findAthleteByCsvName(teamAthletes, ig.athleteName, "catapult");
+        let matchedAthlete = null;
+        if (ig.jerseyNumber !== null) {
+          matchedAthlete = teamAthletes.find(a => a.jerseyNumber === ig.jerseyNumber);
+        }
         if (!matchedAthlete) {
-          unregisteredSet.add(ig.athleteName);
+          matchedAthlete = findAthleteByCsvName(teamAthletes, ig.athleteName, "catapult");
+        }
+
+        if (!matchedAthlete) {
+          if (ig.jerseyNumber !== null) {
+            unregisteredSet.add(`${ig.athleteName} (No.${ig.jerseyNumber})`);
+          } else {
+            unregisteredSet.add(ig.athleteName);
+          }
           return;
         }
 
