@@ -20,7 +20,7 @@ export const METRICS_MAP = [
   { key: "totalJumps", label: "総ジャンプ数", desc: "外的負荷: ジャンプの合計回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "maxJumpHeight", label: "最高ジャンプ高", desc: "外的負荷: 最高跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
   { key: "avgJumpHeight", label: "平均ジャンプ高", desc: "外的負荷: 平均跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
-  { key: "jumpVolume", label: "ジャンプボリューム", desc: "外的負荷: ジャンプの総高さ", unit: "m", polarity: "positive", category: "load_ext" },
+  { key: "jumpVolume", label: "ジャンプボリューム", desc: "外的負荷: ジャンプの総高さ", unit: "cm", polarity: "positive", category: "load_ext" },
   { key: "totalLoad", label: "Player Load", desc: "外的負荷: 運動による総物理負荷", unit: "PL", polarity: "positive", category: "load_ext" },
   { key: "accelCount", label: "加速回数", desc: "外的負荷: 急加速の発生回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "maxAcceleration", label: "最高加速度", desc: "外的負荷: 最大の加速強度", unit: "m/s²", polarity: "positive", category: "load_ext" },

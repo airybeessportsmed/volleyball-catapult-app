@@ -1284,6 +1284,17 @@ async function findExistingPerformanceData(db: any, athleteId: number, dateObj: 
 }
 
 function findAthleteByCsvName(teamAthletes: any[], name: string, platform?: "onetap" | "catapult" | "soxai") {
+  if (name) {
+    const numMatch = name.match(/\b\d+\b/) || name.match(/\d+/);
+    if (numMatch) {
+      const jerseyNum = parseInt(numMatch[0], 10);
+      const matchedByJersey = teamAthletes.find(a => a.jerseyNumber === jerseyNum);
+      if (matchedByJersey) {
+        return matchedByJersey;
+      }
+    }
+  }
+
   const cleanName = (raw: string) => {
     if (!raw) return "";
     let cleaned = raw.trim();
@@ -1836,7 +1847,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
         const avgJumpHeight = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) / ig.jumps.length : undefined;
         const totalJumps = ig.jumps.length;
 
-        const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) / 100 : 0;
+        const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) : 0;
         const jumpsOver40cm = ig.jumps.filter(j => j >= 40).length;
         const jumpZone1Count = ig.jumps.filter(j => j < 20).length;
         const jumpZone2Count = ig.jumps.filter(j => j >= 20 && j < 30).length;
