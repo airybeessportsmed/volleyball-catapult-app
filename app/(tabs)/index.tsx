@@ -1823,7 +1823,7 @@ export default function HomeScreen() {
                 {catapultData.athletes.length > 0 ? (
                   <View style={{ backgroundColor: "#FFFFFF", borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
                     <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                      <View style={{ flexDirection: "column" }}>
+                      <View style={{ flexDirection: "column", width: 240 + (catapultData.menus.length * 225) }}>
                         {/* ヘッダー行1 (大グループ) */}
                         <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" }}>
                           {/* 左端固定エリアプレースホルダー */}
