@@ -1370,7 +1370,10 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   let existingRawCsvObj: any = {};
   if (existing && existing.rawCsvData) {
     try {
-      existingRawCsvObj = JSON.parse(existing.rawCsvData);
+      const parsed = JSON.parse(existing.rawCsvData);
+      if (parsed && typeof parsed === "object") {
+        existingRawCsvObj = parsed;
+      }
     } catch (e) {}
   }
 
@@ -1429,11 +1432,11 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     fileData: fileDataMap
   });
 
-  const mergeField = (newVal: any, existingVal: any, defaultVal: any = null) => {
+  const mergeField = (newVal: any, existingVal: any, defaultVal: any = "practice") => {
     if (newVal !== undefined && newVal !== null && newVal !== "") {
       return newVal;
     }
-    return existingVal !== undefined && existingVal !== null ? existingVal : defaultVal;
+    return existingVal !== undefined && existingVal !== null && existingVal !== "" ? existingVal : defaultVal;
   };
 
   const mergeAdditiveField = (newVal: any, existingVal: any, calculatedVal: any) => {
@@ -1705,8 +1708,8 @@ export async function importPerformanceCsv(
           wellnessSleep: sleepVal,
           wellnessStress: stressVal,
           wellnessSoreness: null,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
         importedCount++;
       });
@@ -1795,8 +1798,8 @@ export async function importPerformanceCsv(
           sRPE: sumSrpe,
           rpeValue: maxRpe,
           rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "sRPE log", fileName, sessionType: targetSessionType })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+          rawCsvData: JSON.stringify({ note: "sRPE log", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
         importedCount++;
       });
@@ -1857,8 +1860,8 @@ export async function importPerformanceCsv(
           wellnessSleep: sleepVal,
           hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
           avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+          rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
         importedCount++;
       });
@@ -2173,8 +2176,8 @@ export async function importPerformanceCsv(
           accelCount,
           totalLoad: agg.loads.length > 0 ? agg.loads.reduce((a, b) => a + b, 0).toFixed(2) : undefined,
           duration,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName, sessionType: targetSessionType })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
         importedCount++;
       });
@@ -2189,6 +2192,7 @@ export async function importPerformanceCsv(
       interface LoadGroup {
         athleteId: number;
         athleteName: string;
+        sessionType: "practice" | "individual";
         dateObj: Date;
         loads: number[];
         menuLoads: Record<string, number>;
@@ -2238,20 +2242,31 @@ export async function importPerformanceCsv(
           if (!isNaN(parsed.getTime())) dateObj = parsed;
         }
 
-        const dateKey = formatDateKey(dateObj);
-        const groupKey = `${matchedAthlete.id}_${dateKey}`;
-        const loadVal = parseFloat(values[loadIdx]);
-        if (isNaN(loadVal)) continue;
-
         let menuName = "全体";
         if (values[categoryIdx] && values[categoryIdx].includes("-")) {
           menuName = values[categoryIdx].split("-")[0].trim();
         }
 
+        let rowSessionType: "practice" | "individual" = "practice";
+        if (targetSessionType !== "auto") {
+          rowSessionType = targetSessionType === "match" ? "practice" : targetSessionType;
+        } else {
+          const lowerMenu = menuName.toLowerCase();
+          if (lowerMenu.includes("individual") || lowerMenu.includes("自主") || lowerMenu.includes("自主練")) {
+            rowSessionType = "individual";
+          }
+        }
+
+        const dateKey = formatDateKey(dateObj);
+        const groupKey = `${matchedAthlete.id}_${rowSessionType}_${dateKey}`;
+        const loadVal = parseFloat(values[loadIdx]);
+        if (isNaN(loadVal)) continue;
+
         if (!loadAggregations.has(groupKey)) {
           loadAggregations.set(groupKey, {
             athleteId: matchedAthlete.id,
             athleteName: matchedAthlete.user?.name || "Unknown",
+            sessionType: rowSessionType,
             dateObj,
             loads: [],
             menuLoads: {}
@@ -2272,8 +2287,8 @@ export async function importPerformanceCsv(
           date: agg.dateObj,
           totalLoad: totalLoad.toFixed(2),
           rawMenuData: JSON.stringify(agg.menuLoads),
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName, sessionType: targetSessionType })
+          sessionType: agg.sessionType,
+          rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName, sessionType: agg.sessionType })
         });
         importedCount++;
       });
@@ -2393,8 +2408,8 @@ export async function importPerformanceCsv(
           wellnessStress: rec.stressVal !== undefined && !isNaN(rec.stressVal) ? rec.stressVal : undefined,
           hrv: rec.hrvVal !== undefined && !isNaN(rec.hrvVal) ? rec.hrvVal : undefined,
           rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName, sessionType: targetSessionType })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+          rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
         importedCount++;
       });
