@@ -1639,7 +1639,11 @@ export async function importPerformanceCsv(
     const isWellnessOnetap = findHeaderIndex(["項目名", "項目"]) !== -1 && findHeaderIndex(["値", "スコア", "回答", "value"]) !== -1 && (findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name"]) !== -1 || findHeaderIndex(["内訳"]) !== -1);
     const isSRPE = findHeaderIndex(["トレーニング実施日"]) !== -1 && findHeaderIndex(["Session RPE"]) !== -1;
     const isSoxai = csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数");
-    const isImaLog = findHeaderIndex(["OF Event"]) !== -1 && findHeaderIndex(["Jump Attribute"]) !== -1;
+    
+    // Enhanced IMA Log detection to prevent misclassification as isMenuLoadLog
+    const isImaLog = 
+      (findHeaderIndex(["OF Event"]) !== -1 || findHeaderIndex(["OFEvent"]) !== -1) &&
+      (findHeaderIndex(["Jump Attribute"]) !== -1 || findHeaderIndex(["Intensity (m/s)"]) !== -1 || findHeaderIndex(["Direction"]) !== -1 || findHeaderIndex(["Height (m)"]) !== -1);
 
     // Fallbacks to standard types
     const tagIdx = findHeaderIndex(["tag", "タグ"]);
@@ -1654,6 +1658,12 @@ export async function importPerformanceCsv(
     const isEventLog = !isImaLog && (tagIdx !== -1 || intensityIdx !== -1 || dfEventIdx !== -1);
     const isRpeLog = !isSRPE && (rpeIdx !== -1 && sessionTimeIdx !== -1 && !isEventLog);
     const isMenuLoadLog = !isWellnessOnetap && !isSRPE && !isSoxai && !isImaLog && loadIdx !== -1 && !isEventLog && !isRpeLog;
+
+    // Logging import flags for backend diagnosis
+    console.log(`[CSV Import] fileName: ${fileName}, fileSize: ${csvText.length} bytes, delimiter: "${delimiter}"`);
+    console.log(`[CSV Import] headers: ${JSON.stringify(headers)}`);
+    console.log(`[CSV Import] Flags -> isWellnessOnetap: ${isWellnessOnetap}, isSRPE: ${isSRPE}, isSoxai: ${isSoxai}, isImaLog: ${isImaLog}`);
+    console.log(`[CSV Import] Flags -> isEventLog: ${isEventLog}, isRpeLog: ${isRpeLog}, isMenuLoadLog: ${isMenuLoadLog}`);
 
     const teamAthletes = await getAthletesByTeamId(teamId);
     let importedCount = 0;
