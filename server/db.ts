@@ -1468,6 +1468,10 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
       }
     } catch (e) {}
   }
+  if (!mergedMenuObj || typeof mergedMenuObj !== "object") {
+    mergedMenuObj = {};
+  }
+
   let newMenuObj: any = {};
   if (data.rawMenuData) {
     try {
@@ -1476,6 +1480,9 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
         newMenuObj = parsed;
       }
     } catch (e) {}
+  }
+  if (!newMenuObj || typeof newMenuObj !== "object") {
+    newMenuObj = {};
   }
   const keysToMerge = ["playerLoads", "jumpVolumes", "accelVolumes"];
   for (const key of keysToMerge) {
@@ -1632,7 +1639,7 @@ export async function importPerformanceCsv(
     const headers = headerLine.split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ""));
     
     const findHeaderIndex = (keys: string[]) => {
-      return headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k.toLowerCase())));
+      return headers.findIndex(h => h && keys.some(k => h.toLowerCase().includes(k.toLowerCase())));
     };
 
     // Detection flags for 7 user formats
