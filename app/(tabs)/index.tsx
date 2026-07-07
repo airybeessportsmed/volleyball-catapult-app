@@ -202,6 +202,12 @@ export default function HomeScreen() {
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Fetch athlete info
+  // Fetch public athletes list for login screen
+  const { data: publicAthletes } = trpc.auth.getPublicAthletes.useQuery(
+    undefined,
+    { enabled: !isAuthenticated }
+  );
+
   const { data: athlete, isLoading: athleteLoading } = trpc.athlete.getByUser.useQuery(
     undefined,
     { enabled: isAuthenticated && user?.role === "athlete" }
@@ -332,8 +338,6 @@ export default function HomeScreen() {
       }
       return output;
     };
-
-    const { data: publicAthletes } = trpc.auth.getPublicAthletes.useQuery();
 
     const handleDemoLogin = async (role: "coach" | "viewer" | "athlete", athleteId?: number) => {
       // Validate password
