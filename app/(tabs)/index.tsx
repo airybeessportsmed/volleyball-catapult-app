@@ -422,121 +422,139 @@ export default function HomeScreen() {
     };
 
     return (
-      <ScreenContainer className="flex items-center justify-center p-6 bg-background">
-        <View className="gap-6 items-center w-full max-w-sm">
-          <View className="w-16 h-16 bg-primary/10 rounded-3xl items-center justify-center shadow-inner">
-            <IconSymbol size={36} name="figure.volleyball" color="#FF6B35" />
-          </View>
-          <View className="gap-2 items-center">
-            <Text className="text-2xl font-extrabold text-foreground tracking-tight text-center">VolleyTrack</Text>
-            <Text className="text-xs text-muted text-center leading-relaxed px-4">
-              アカウントを選択し、パスワードを入力してください。
-            </Text>
-          </View>
+      <ScreenContainer className="bg-background flex-1">
+        <ScrollView 
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            justifyContent: "center", 
+            alignItems: "center",
+            paddingVertical: 40,
+            paddingHorizontal: 24
+          }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="gap-6 items-center w-full max-w-sm">
+            <View className="w-16 h-16 bg-primary/10 rounded-3xl items-center justify-center shadow-inner">
+              <IconSymbol size={36} name="figure.volleyball" color="#FF6B35" />
+            </View>
+            <View className="gap-2 items-center">
+              <Text className="text-2xl font-extrabold text-foreground tracking-tight text-center">VolleyTrack</Text>
+              <Text className="text-xs text-muted text-center leading-relaxed px-4">
+                アカウントを選択し、パスワードを入力してください。
+              </Text>
+            </View>
 
-          <View className="w-full gap-3 mt-2 bg-surface p-5 rounded-3xl border border-border shadow-sm">
-            <Text className="text-xs font-bold text-muted px-1">1. アカウントを選択</Text>
-            
-            {/* スタッフ */}
-            <Text className="text-xs font-bold text-muted px-1">スタッフ（指導者・関係者）</Text>
-            
-            {/* スタッフ (管理者) */}
-            <TouchableOpacity 
-              onPress={() => {
-                setSelectedUserType("coach");
-                setSelectedAthleteId(null);
-                setLoginError(null);
-                setPassword("");
-              }}
-              className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "coach" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
-            >
-              <View className="flex-row items-center gap-3">
-                <IconSymbol size={18} name="person.fill" color={selectedUserType === "coach" ? "#FF6B35" : "#6B7280"} />
-                <Text className={`font-bold text-sm ${selectedUserType === "coach" ? "text-primary" : "text-foreground"}`}>スタッフ (管理者)</Text>
-              </View>
-              {selectedUserType === "coach" && (
-                <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
-              )}
-            </TouchableOpacity>
-
-            {/* スタッフ (閲覧用) */}
-            <TouchableOpacity 
-              onPress={() => {
-                setSelectedUserType("viewer");
-                setSelectedAthleteId(null);
-                setLoginError(null);
-                setPassword("");
-              }}
-              className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
-            >
-              <View className="flex-row items-center gap-3">
-                <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" ? "#FF6B35" : "#6B7280"} />
-                <Text className={`font-bold text-sm ${selectedUserType === "viewer" ? "text-primary" : "text-foreground"}`}>スタッフ (閲覧用)</Text>
-              </View>
-              {selectedUserType === "viewer" && (
-                <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
-              )}
-            </TouchableOpacity>
-
-             {/* 選手リスト */}
-            <Text className="text-xs font-bold text-muted px-1 mt-1">選手（アスリート）</Text>
-            {publicAthletes && publicAthletes.length > 0 ? (
-              publicAthletes.map((a) => (
-                <TouchableOpacity 
-                  key={a.id}
-                  onPress={() => {
-                    setSelectedUserType("athlete");
-                    setSelectedAthleteId(a.id);
-                    setLoginError(null);
-                    setPassword("");
-                  }}
-                  className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "athlete" && selectedAthleteId === a.id ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
-                >
-                  <View className="flex-row items-center gap-3">
-                    <IconSymbol size={18} name="person" color={selectedUserType === "athlete" && selectedAthleteId === a.id ? "#FF6B35" : "#6B7280"} />
-                    <Text className={`font-bold text-sm ${selectedUserType === "athlete" && selectedAthleteId === a.id ? "text-primary" : "text-foreground"}`}>
-                      {a.user?.name || `選手${a.jerseyNumber}`} {a.jerseyNumber !== null && a.jerseyNumber !== undefined ? `#${a.jerseyNumber}` : ""}
-                    </Text>
-                  </View>
-                  {selectedUserType === "athlete" && selectedAthleteId === a.id && (
-                    <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
-                  )}
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text className="text-xs text-muted italic px-2 py-1">登録されている選手がいません</Text>
-            )}
-
-            {/* パスワード入力 & ログインボタン */}
-            {selectedUserType && (
-              <View className="mt-3 pt-3 border-t border-border/60 gap-3">
-                <Text className="text-xs font-bold text-muted px-1">2. パスワードを入力</Text>
-                <TextInput
-                  value={password}
-                  onChangeText={(val) => {
-                    setPassword(val);
-                    setLoginError(null);
-                  }}
-                  placeholder={selectedUserType === "coach" ? "管理者用パスワード" : selectedUserType === "viewer" ? "閲覧用パスワード" : "選手用パスワード"}
-                  placeholderTextColor="#9CA3AF"
-                  secureTextEntry={true}
-                  className="bg-background border border-border/80 px-4 py-3 rounded-2xl text-foreground text-sm"
-                />
-
-                {loginError && (
-                  <Text className="text-xs font-semibold text-red-500 px-1">{loginError}</Text>
+            <View className="w-full gap-3 mt-2 bg-surface p-5 rounded-3xl border border-border shadow-sm">
+              <Text className="text-xs font-bold text-muted px-1">1. アカウントを選択</Text>
+              
+              {/* スタッフ */}
+              <Text className="text-xs font-bold text-muted px-1">スタッフ（指導者・関係者）</Text>
+              
+              {/* スタッフ (管理者) */}
+              <TouchableOpacity 
+                onPress={() => {
+                  setSelectedUserType("coach");
+                  setSelectedAthleteId(null);
+                  setLoginError(null);
+                  setPassword("");
+                }}
+                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "coach" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <IconSymbol size={18} name="person.fill" color={selectedUserType === "coach" ? "#FF6B35" : "#6B7280"} />
+                  <Text className={`font-bold text-sm ${selectedUserType === "coach" ? "text-primary" : "text-foreground"}`}>スタッフ (管理者)</Text>
+                </View>
+                {selectedUserType === "coach" && (
+                  <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
                 )}
+              </TouchableOpacity>
 
-                <TouchableOpacity 
-                  onPress={() => handleDemoLogin(selectedUserType, selectedAthleteId ?? undefined)}
-                  className="w-full bg-primary py-3.5 rounded-2xl items-center shadow-sm active:opacity-95"
-                >
-                  <Text className="text-white font-bold text-sm">ログインする</Text>
-                </TouchableOpacity>
+              {/* スタッフ (閲覧用) */}
+              <TouchableOpacity 
+                onPress={() => {
+                  setSelectedUserType("viewer");
+                  setSelectedAthleteId(null);
+                  setLoginError(null);
+                  setPassword("");
+                }}
+                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" ? "#FF6B35" : "#6B7280"} />
+                  <Text className={`font-bold text-sm ${selectedUserType === "viewer" ? "text-primary" : "text-foreground"}`}>スタッフ (閲覧用)</Text>
+                </View>
+                {selectedUserType === "viewer" && (
+                  <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+                )}
+              </TouchableOpacity>
+
+              {/* 選手リスト */}
+              <Text className="text-xs font-bold text-muted px-1 mt-1">選手（アスリート）</Text>
+              <View style={{ maxHeight: 220 }} className="w-full">
+                <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={true} className="w-full pr-1">
+                  <View className="gap-2">
+                    {publicAthletes && publicAthletes.length > 0 ? (
+                      publicAthletes.map((a) => (
+                        <TouchableOpacity 
+                          key={a.id}
+                          onPress={() => {
+                            setSelectedUserType("athlete");
+                            setSelectedAthleteId(a.id);
+                            setLoginError(null);
+                            setPassword("");
+                          }}
+                          className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "athlete" && selectedAthleteId === a.id ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+                        >
+                          <View className="flex-row items-center gap-3">
+                            <IconSymbol size={18} name="person" color={selectedUserType === "athlete" && selectedAthleteId === a.id ? "#FF6B35" : "#6B7280"} />
+                            <Text className={`font-bold text-sm ${selectedUserType === "athlete" && selectedAthleteId === a.id ? "text-primary" : "text-foreground"}`}>
+                              {a.user?.name || `選手${a.jerseyNumber}`} {a.jerseyNumber !== null && a.jerseyNumber !== undefined ? `#${a.jerseyNumber}` : ""}
+                            </Text>
+                          </View>
+                          {selectedUserType === "athlete" && selectedAthleteId === a.id && (
+                            <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+                          )}
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text className="text-xs text-muted italic px-2 py-1">登録されている選手がいません</Text>
+                    )}
+                  </View>
+                </ScrollView>
               </View>
-            )}
+
+              {/* パスワード入力 & ログインボタン */}
+              {selectedUserType && (
+                <View className="mt-3 pt-3 border-t border-border/60 gap-3">
+                  <Text className="text-xs font-bold text-muted px-1">2. パスワードを入力</Text>
+                  <TextInput
+                    value={password}
+                    onChangeText={(val) => {
+                      setPassword(val);
+                      setLoginError(null);
+                    }}
+                    placeholder={selectedUserType === "coach" ? "管理者用パスワード" : selectedUserType === "viewer" ? "閲覧用パスワード" : "選手用パスワード"}
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={true}
+                    className="bg-background border border-border/80 px-4 py-3 rounded-2xl text-foreground text-sm"
+                  />
+
+                  {loginError && (
+                    <Text className="text-xs font-semibold text-red-500 px-1">{loginError}</Text>
+                  )}
+
+                  <TouchableOpacity 
+                    onPress={() => handleDemoLogin(selectedUserType, selectedAthleteId ?? undefined)}
+                    className="w-full bg-primary py-3.5 rounded-2xl items-center shadow-sm active:opacity-95"
+                  >
+                    <Text className="text-white font-bold text-sm">ログインする</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </ScreenContainer>
     );
   }
