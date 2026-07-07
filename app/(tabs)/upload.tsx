@@ -63,6 +63,13 @@ export default function CoachUploadScreen() {
     { enabled: isAuthenticated && !!user?.teamId }
   );
 
+  const [unmatchedList, setUnmatchedList] = useState<{ csvName: string; fileId: string; fileName: string }[]>([]);
+  const { data: athletesData, refetch: refetchAthletes } = trpc.athlete.getByTeam.useQuery(
+    { teamId },
+    { enabled: isAuthenticated && !!user?.teamId }
+  );
+  const updateAthleteCsvNamesMutation = trpc.performance.updateAthleteCsvNames.useMutation();
+  
   const importMutation = trpc.performance.importCsv.useMutation();
   const deleteUploadMutation = trpc.performance.deleteCsvUpload.useMutation();
 
@@ -84,22 +91,34 @@ export default function CoachUploadScreen() {
       return;
     }
     setErrorMsg("");
+    setUnmatchedList([]);
     
     // Set all pending/error files to uploading state
     setFilesToUpload(prev => prev.map(f => f.status === "pending" || f.status === "error" ? { ...f, status: "uploading" } : f));
 
     let successCount = 0;
     let failCount = 0;
+    const tempUnmatched: typeof unmatchedList = [];
 
     for (const file of filesToUpload) {
       if (file.status !== "pending" && file.status !== "error" && file.status !== "uploading") continue;
 
       try {
-        await importMutation.mutateAsync({
+        const res = await importMutation.mutateAsync({
           teamId,
           csvText: file.text,
           fileName: file.name,
         });
+        
+        if (res && res.unregisteredAthletes && res.unregisteredAthletes.length > 0) {
+          res.unregisteredAthletes.forEach(name => {
+            tempUnmatched.push({
+              csvName: name,
+              fileId: file.id,
+              fileName: file.name
+            });
+          });
+        }
         
         setFilesToUpload(prev => prev.map(f => f.id === file.id ? { ...f, status: "success" } : f));
         successCount++;
@@ -107,6 +126,10 @@ export default function CoachUploadScreen() {
         setFilesToUpload(prev => prev.map(f => f.id === file.id ? { ...f, status: "error", errorMessage: err.message || "アップロード失敗" } : f));
         failCount++;
       }
+    }
+
+    if (tempUnmatched.length > 0) {
+      setUnmatchedList(tempUnmatched);
     }
 
     refetchUploads();
@@ -579,6 +602,70 @@ export default function CoachUploadScreen() {
                     </Text>
                   </View>
                 ) : null}
+
+                {/* 選手マッピング (CSV名寄せ) 支援ウィジェット */}
+                {unmatchedList.length > 0 && (
+                  <View className="bg-surface border border-amber-300 rounded-3xl p-5 shadow-sm gap-4">
+                    <View className="flex-row items-center gap-2 pb-2 border-b border-border/80">
+                      <IconSymbol size={18} name="person.crop.circle.badge.exclamationmark" color="#D97706" />
+                      <View className="flex-1">
+                        <Text className="text-sm font-bold text-foreground">不一致選手の名寄せ設定</Text>
+                        <Text className="text-[10px] text-muted">CSV内の選手名とアプリの登録選手を結びつけます</Text>
+                      </View>
+                    </View>
+
+                    <View className="gap-3.5">
+                      {unmatchedList.map((item, idx) => {
+                        return (
+                          <View key={idx} className="flex-row items-center justify-between border-b border-border/40 pb-3 gap-3">
+                            <View className="flex-1">
+                              <Text className="text-xs font-bold text-foreground">CSV上の名前: "{item.csvName}"</Text>
+                              <Text className="text-[9px] text-muted" numberOfLines={1}>ファイル: {item.fileName}</Text>
+                            </View>
+
+                            <View className="flex-1 max-w-[160px]">
+                              {/* 選手選択ドロップダウン */}
+                              <ScrollView style={{ maxHeight: 110 }} className="border border-border/80 rounded-xl bg-background p-1.5">
+                                {athletesData && athletesData.length > 0 ? (
+                                  athletesData.map((ath: any) => (
+                                    <TouchableOpacity
+                                      key={ath.id}
+                                      onPress={async () => {
+                                        const currentAliases = ath.csvNames ? ath.csvNames.split(",").map((s: string) => s.trim()) : [];
+                                        if (!currentAliases.includes(item.csvName)) {
+                                          currentAliases.push(item.csvName);
+                                          const updatedCsvNames = currentAliases.join(",");
+                                          try {
+                                            await updateAthleteCsvNamesMutation.mutateAsync({
+                                              athleteId: ath.id,
+                                              csvNames: updatedCsvNames
+                                            });
+                                            refetchAthletes();
+                                            setUnmatchedList(prev => prev.filter(u => u.csvName !== item.csvName));
+                                            alert(`「${ath.user?.name}」に「${item.csvName}」を紐付けました。次回から自動マッピングされます。`);
+                                          } catch (e) {
+                                            alert("マッピングの保存に失敗しました。");
+                                          }
+                                        }
+                                      }}
+                                      className="py-1.5 px-2 hover:bg-muted/10 active:bg-muted/20 border-b border-border/20"
+                                    >
+                                      <Text className="text-[10px] font-bold text-foreground">
+                                        {ath.user?.name || `選手${ath.jerseyNumber}`} #{ath.jerseyNumber || "-"}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))
+                                ) : (
+                                  <Text className="text-[10px] text-muted italic">選手がいません</Text>
+                                )}
+                              </ScrollView>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
 
                 {/* Submit Button */}
                 <TouchableOpacity
