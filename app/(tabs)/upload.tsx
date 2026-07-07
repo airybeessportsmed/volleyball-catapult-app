@@ -22,6 +22,7 @@ interface UploadFileItem {
   status: "pending" | "uploading" | "success" | "error";
   detectedFormat: string;
   errorMessage?: string;
+  sessionType?: "practice" | "individual" | "match" | "auto";
 }
 
 const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
@@ -81,6 +82,7 @@ export default function CoachUploadScreen() {
       text: f.text,
       status: "pending",
       detectedFormat: detectFormatOnFrontend(f.text, f.name),
+      sessionType: "auto",
     }));
     setFilesToUpload(prev => [...prev, ...items]);
   };
@@ -108,6 +110,7 @@ export default function CoachUploadScreen() {
           teamId,
           csvText: file.text,
           fileName: file.name,
+          sessionType: file.sessionType || "auto",
         });
         
         if (res && res.unregisteredAthletes && res.unregisteredAthletes.length > 0) {
@@ -548,6 +551,33 @@ export default function CoachUploadScreen() {
                                 </Text>
                                 <View className="bg-primary/10 px-2 py-0.5 rounded-full">
                                   <Text className="text-[8px] font-extrabold text-primary font-sans">{file.detectedFormat}</Text>
+                                </View>
+                              </View>
+                              
+                              <View className="flex-row items-center gap-1.5 mt-1.5">
+                                <Text className="text-[9px] text-muted font-bold">タイプ:</Text>
+                                <View className="flex-row bg-muted/20 p-0.5 rounded-lg border border-border/40">
+                                  {(["auto", "practice", "individual"] as const).map((type) => {
+                                    const labels = { auto: "自動", practice: "全体", individual: "自主" };
+                                    const isSelected = (file.sessionType || "auto") === type;
+                                    return (
+                                      <TouchableOpacity
+                                        key={type}
+                                        onPress={() => {
+                                          setFilesToUpload(prev => prev.map(f => f.id === file.id ? { ...f, sessionType: type } : f));
+                                        }}
+                                        className={`px-2 py-0.5 rounded-md ${
+                                          isSelected ? "bg-primary shadow-xs" : "bg-transparent"
+                                        }`}
+                                      >
+                                        <Text className={`text-[8px] font-bold ${
+                                          isSelected ? "text-white" : "text-muted"
+                                        }`}>
+                                          {labels[type]}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    );
+                                  })}
                                 </View>
                               </View>
                               {file.errorMessage && (

@@ -270,12 +270,13 @@ export const appRouter = router({
         teamId: z.number(),
         csvText: z.string(),
         fileName: z.string().optional(),
+        sessionType: z.enum(["practice", "individual", "match", "auto"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
           throw new Error("Only coaches can import CSV files");
         }
-        return db.importPerformanceCsv(input.teamId, ctx.user.id, input.csvText, input.fileName);
+        return db.importPerformanceCsv(input.teamId, ctx.user.id, input.csvText, input.fileName, input.sessionType);
       }),
 
     deleteCsvUpload: protectedProcedure

@@ -259,6 +259,7 @@ export default function HomeScreen() {
   const [filterGrade, setFilterGrade] = useState<string>("all");
   const [filterPosition, setFilterPosition] = useState<string>("all");
   const [rawPeriod, setRawPeriod] = useState<"1" | "7" | "14" | "28">("1");
+  const [displayMode, setDisplayMode] = useState<"all" | "practice" | "individual">("all");
 
   // Pending updates for raw data batch save
   // Format: { [athleteId_metricKey]: number | null }
@@ -1370,6 +1371,32 @@ export default function HomeScreen() {
                       ))}
                     </View>
                   </View>
+
+                  {/* 表示モード（全体練習 / 自主練習 / 合算）切り替えトグル */}
+                  <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 3, borderRadius: 8, gap: 4, marginTop: 10, alignSelf: "flex-start" }}>
+                    {(["all", "practice", "individual"] as const).map(mode => {
+                      const labels = { all: "全体＋自主（合算）", practice: "全体練習のみ", individual: "自主練習のみ" };
+                      return (
+                        <TouchableOpacity
+                          key={mode}
+                          onPress={() => setDisplayMode(mode)}
+                          style={{
+                            paddingHorizontal: 12, paddingVertical: 5,
+                            backgroundColor: displayMode === mode ? "#FFFFFF" : "transparent",
+                            borderRadius: 6,
+                            shadowColor: displayMode === mode ? "#0F172A" : "transparent",
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: displayMode === mode ? 0.05 : 0,
+                            shadowRadius: 1
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: "bold", color: displayMode === mode ? "#FF6B35" : "#64748B" }}>
+                            {labels[mode]}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 {/* 2. 生データ スプレッドシートテーブル */}
@@ -1406,15 +1433,43 @@ export default function HomeScreen() {
                               );
                               let dbVal = null;
                               if (rawRecord) {
-                                if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
+                                const additiveFields = [
+                                  "totalLoad", "totalJumps", "jumpVolume", "jumpsOver40cm",
+                                  "jumpZone1Count", "jumpZone2Count", "jumpZone3Count", "jumpZone4Count", "jumpZone5Count", "accelCount"
+                                ];
+                                
+                                if (displayMode !== "all" && additiveFields.includes(m.key)) {
                                   try {
-                                    const menuData = rawRecord.rawMenuData ? JSON.parse(rawRecord.rawMenuData) : {};
-                                    dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
+                                    const csvObj = rawRecord.rawCsvData ? JSON.parse(rawRecord.rawCsvData) : {};
+                                    const fileData = csvObj.fileData || {};
+                                    let modeSum = 0;
+                                    let hasModeValue = false;
+                                    
+                                    for (const key of Object.keys(fileData)) {
+                                      const keyType = key.split("_").pop() || "auto";
+                                      if (keyType === displayMode) {
+                                        const val = fileData[key][m.key];
+                                        if (val !== undefined && val !== null) {
+                                          modeSum += val;
+                                          hasModeValue = true;
+                                        }
+                                      }
+                                    }
+                                    dbVal = hasModeValue ? modeSum : null;
                                   } catch (e) {
                                     dbVal = null;
                                   }
                                 } else {
-                                  dbVal = (rawRecord as any)[m.key];
+                                  if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
+                                    try {
+                                      const menuData = rawRecord.rawMenuData ? JSON.parse(rawRecord.rawMenuData) : {};
+                                      dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
+                                    } catch (e) {
+                                      dbVal = null;
+                                    }
+                                  } else {
+                                    dbVal = (rawRecord as any)[m.key];
+                                  }
                                 }
                               }
                               const base = ath.baselines?.[m.key];

@@ -1358,7 +1358,77 @@ function findAthleteByCsvName(teamAthletes: any[], name: string, platform?: "one
 async function mergePerformanceData(db: any, teamId: number, data: any) {
   const existing = await findExistingPerformanceData(db, data.athleteId, data.date);
   const defaultSessionType = data.date ? (new Date(data.date).getDay() === 0 || new Date(data.date).getDay() === 6 ? "match" as const : "practice" as const) : "practice" as const;
+
+  let rawCsvObj: any = {};
+  if (data.rawCsvData) {
+    try {
+      rawCsvObj = JSON.parse(data.rawCsvData);
+    } catch (e) {}
+  }
+  const currentKey = `${rawCsvObj.fileName || "unknown_file.csv"}_${rawCsvObj.sessionType || "auto"}`;
+
+  let existingRawCsvObj: any = {};
+  if (existing && existing.rawCsvData) {
+    try {
+      existingRawCsvObj = JSON.parse(existing.rawCsvData);
+    } catch (e) {}
+  }
+
+  const fileDataMap = existingRawCsvObj.fileData || {};
+
+  const additiveFields = [
+    "totalLoad",
+    "totalJumps",
+    "jumpVolume",
+    "jumpsOver40cm",
+    "jumpZone1Count",
+    "jumpZone2Count",
+    "jumpZone3Count",
+    "jumpZone4Count",
+    "jumpZone5Count",
+    "accelCount"
+  ];
+
+  const currentFileData: any = {};
+  let hasNewAdditiveData = false;
   
+  for (const field of additiveFields) {
+    if (data[field] !== undefined && data[field] !== null && data[field] !== "") {
+      currentFileData[field] = parseFloat(data[field]);
+      hasNewAdditiveData = true;
+    }
+  }
+
+  if (hasNewAdditiveData) {
+    fileDataMap[currentKey] = currentFileData;
+  }
+
+  const calculatedSums: any = {};
+  if (Object.keys(fileDataMap).length > 0) {
+    for (const field of additiveFields) {
+      let sum = 0;
+      let hasValue = false;
+      for (const fName of Object.keys(fileDataMap)) {
+        if (fileDataMap[fName][field] !== undefined && fileDataMap[fName][field] !== null) {
+          sum += fileDataMap[fName][field];
+          hasValue = true;
+        }
+      }
+      if (hasValue) {
+        if (field === "totalLoad" || field === "jumpVolume") {
+          calculatedSums[field] = sum.toFixed(2);
+        } else {
+          calculatedSums[field] = Math.round(sum);
+        }
+      }
+    }
+  }
+
+  const newRawCsvData = JSON.stringify({
+    ...rawCsvObj,
+    fileData: fileDataMap
+  });
+
   const mergeField = (newVal: any, existingVal: any, defaultVal: any = null) => {
     if (newVal !== undefined && newVal !== null && newVal !== "") {
       return newVal;
@@ -1366,29 +1436,39 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     return existingVal !== undefined && existingVal !== null ? existingVal : defaultVal;
   };
 
+  const mergeAdditiveField = (newVal: any, existingVal: any, calculatedVal: any) => {
+    if (calculatedVal !== undefined && calculatedVal !== null) {
+      return calculatedVal;
+    }
+    if (newVal !== undefined && newVal !== null && newVal !== "") {
+      return newVal;
+    }
+    return existingVal !== undefined && existingVal !== null ? existingVal : null;
+  };
+
   const mergedData = {
     ...data,
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
     maxJumpHeight: mergeField(data.maxJumpHeight, existing?.maxJumpHeight),
     avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight),
-    totalJumps: mergeField(data.totalJumps, existing?.totalJumps),
-    jumpVolume: mergeField(data.jumpVolume, existing?.jumpVolume),
-    jumpsOver40cm: mergeField(data.jumpsOver40cm, existing?.jumpsOver40cm),
-    jumpZone1Count: mergeField(data.jumpZone1Count, existing?.jumpZone1Count),
-    jumpZone2Count: mergeField(data.jumpZone2Count, existing?.jumpZone2Count),
-    jumpZone3Count: mergeField(data.jumpZone3Count, existing?.jumpZone3Count),
-    jumpZone4Count: mergeField(data.jumpZone4Count, existing?.jumpZone4Count),
-    jumpZone5Count: mergeField(data.jumpZone5Count, existing?.jumpZone5Count),
+    totalJumps: mergeAdditiveField(data.totalJumps, existing?.totalJumps, calculatedSums.totalJumps),
+    jumpVolume: mergeAdditiveField(data.jumpVolume, existing?.jumpVolume, calculatedSums.jumpVolume),
+    jumpsOver40cm: mergeAdditiveField(data.jumpsOver40cm, existing?.jumpsOver40cm, calculatedSums.jumpsOver40cm),
+    jumpZone1Count: mergeAdditiveField(data.jumpZone1Count, existing?.jumpZone1Count, calculatedSums.jumpZone1Count),
+    jumpZone2Count: mergeAdditiveField(data.jumpZone2Count, existing?.jumpZone2Count, calculatedSums.jumpZone2Count),
+    jumpZone3Count: mergeAdditiveField(data.jumpZone3Count, existing?.jumpZone3Count, calculatedSums.jumpZone3Count),
+    jumpZone4Count: mergeAdditiveField(data.jumpZone4Count, existing?.jumpZone4Count, calculatedSums.jumpZone4Count),
+    jumpZone5Count: mergeAdditiveField(data.jumpZone5Count, existing?.jumpZone5Count, calculatedSums.jumpZone5Count),
     
     avgAcceleration: mergeField(data.avgAcceleration, existing?.avgAcceleration),
     maxAcceleration: mergeField(data.maxAcceleration, existing?.maxAcceleration),
     accelVolume: mergeField(data.accelVolume, existing?.accelVolume),
-    accelCount: mergeField(data.accelCount, existing?.accelCount),
+    accelCount: mergeAdditiveField(data.accelCount, existing?.accelCount, calculatedSums.accelCount),
     
     totalDistance: mergeField(data.totalDistance, existing?.totalDistance, "0.00"),
     avgSpeed: mergeField(data.avgSpeed, existing?.avgSpeed, "0.00"),
     maxSpeed: mergeField(data.maxSpeed, existing?.maxSpeed, "0.00"),
-    totalLoad: mergeField(data.totalLoad, existing?.totalLoad),
+    totalLoad: mergeAdditiveField(data.totalLoad, existing?.totalLoad, calculatedSums.totalLoad),
     avgLoad: mergeField(data.avgLoad, existing?.avgLoad),
     duration: mergeField(data.duration, existing?.duration, 3600),
     rawMenuData: mergeField(data.rawMenuData, existing?.rawMenuData),
@@ -1403,7 +1483,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     avgHeartRate: mergeField(data.avgHeartRate, existing?.avgHeartRate),
     physiologicalMarker: mergeField(data.physiologicalMarker, existing?.physiologicalMarker),
     coachAdvice: mergeField(data.coachAdvice, existing?.coachAdvice),
-    rawCsvData: data.rawCsvData,
+    rawCsvData: newRawCsvData,
   };
 
   if (existing) {
@@ -1428,7 +1508,13 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   }
 }
 
-export async function importPerformanceCsv(teamId: number, uploadedBy: number, csvText: string, fileName = "catapult_import.csv") {
+export async function importPerformanceCsv(
+  teamId: number,
+  uploadedBy: number,
+  csvText: string,
+  fileName = "catapult_import.csv",
+  targetSessionType: "practice" | "individual" | "match" | "auto" = "auto"
+) {
   const db = await getDb();
   
   // Create history record
@@ -1619,7 +1705,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessSleep: sleepVal,
           wellnessStress: stressVal,
           wellnessSoreness: null,
-          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -1708,7 +1795,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           sRPE: sumSrpe,
           rpeValue: maxRpe,
           rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
-          rawCsvData: JSON.stringify({ note: "sRPE log", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "sRPE log", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -1769,7 +1857,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessSleep: sleepVal,
           hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
           avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
-          rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -1892,7 +1981,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           maxAcceleration: maxAcceleration ? maxAcceleration.toFixed(2) : undefined,
           avgAcceleration: avgAcceleration ? avgAcceleration.toFixed(2) : undefined,
           accelCount,
-          rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -2072,7 +2162,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           accelCount,
           totalLoad: agg.loads.length > 0 ? agg.loads.reduce((a, b) => a + b, 0).toFixed(2) : undefined,
           duration,
-          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -2170,7 +2261,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           date: agg.dateObj,
           totalLoad: totalLoad.toFixed(2),
           rawMenuData: JSON.stringify(agg.menuLoads),
-          rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Menu Load Parser", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
@@ -2290,7 +2382,8 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessStress: rec.stressVal !== undefined && !isNaN(rec.stressVal) ? rec.stressVal : undefined,
           hrv: rec.hrvVal !== undefined && !isNaN(rec.hrvVal) ? rec.hrvVal : undefined,
           rawMenuData: JSON.stringify({ sRpeBall: ballSrpe, sRpeSandC: sandCSrpe }),
-          rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "sRPE/Wellness Parser", fileName, sessionType: targetSessionType })
         });
         importedCount++;
       });
