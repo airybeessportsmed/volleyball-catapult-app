@@ -1869,6 +1869,7 @@ export async function importPerformanceCsv(
       const heightCol = findHeaderIndex(["height", "高さ", "jump height"]);
       const intensityCol = findHeaderIndex(["intensity", "強度"]);
       const eventTimeCol = findHeaderIndex(["event_time", "time", "時間"]);
+      const periodCol = findHeaderIndex(["period", "ピリオド", "メニュー", "セッション"]);
 
       if (athleteCol === -1 || tagCol === -1) {
         throw new Error("IMA log is missing Athlete or Tag headers");
@@ -1877,6 +1878,7 @@ export async function importPerformanceCsv(
       interface ImaGroup {
         athleteName: string;
         jerseyNumber: number | null;
+        sessionType: "practice" | "individual";
         dateObj: Date;
         jumps: number[];
         accelerations: number[];
@@ -1905,11 +1907,20 @@ export async function importPerformanceCsv(
           if (!isNaN(timeMs)) dateObj = new Date(timeMs);
         }
 
+        // Determine sessionType from Period column if 'auto' is selected
+        let rowSessionType: "practice" | "individual" = "practice";
+        if (targetSessionType !== "auto") {
+          rowSessionType = targetSessionType === "match" ? "practice" : targetSessionType;
+        } else {
+          const isIndividualRow = periodCol !== -1 && vals[periodCol] && vals[periodCol].trim().toLowerCase() === "individual";
+          rowSessionType = isIndividualRow ? "individual" : "practice";
+        }
+
         const dateKey = formatDateKey(dateObj);
-        const groupKey = `${rawAthlete.trim()}_${dateKey}`;
+        const groupKey = `${rawAthlete.trim()}_${rowSessionType}_${dateKey}`;
 
         if (!imaGroups.has(groupKey)) {
-          imaGroups.set(groupKey, { athleteName: rawAthlete.trim(), jerseyNumber: jNum, dateObj, jumps: [], accelerations: [] });
+          imaGroups.set(groupKey, { athleteName: rawAthlete.trim(), jerseyNumber: jNum, sessionType: rowSessionType, dateObj, jumps: [], accelerations: [] });
         }
         const g = imaGroups.get(groupKey)!;
 
@@ -1981,8 +1992,8 @@ export async function importPerformanceCsv(
           maxAcceleration: maxAcceleration ? maxAcceleration.toFixed(2) : undefined,
           avgAcceleration: avgAcceleration ? avgAcceleration.toFixed(2) : undefined,
           accelCount,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
-          rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName, sessionType: targetSessionType })
+          sessionType: ig.sessionType,
+          rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName, sessionType: ig.sessionType })
         });
         importedCount++;
       });
