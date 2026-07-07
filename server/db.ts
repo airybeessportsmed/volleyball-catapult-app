@@ -1046,17 +1046,33 @@ export async function getImportStatusByMonth(teamId: number, year: number, month
       );
   }
   
-  const statusMap: Record<string, { hasIma: boolean; hasPlayerLoad: boolean }> = {};
+  const statusMap: Record<string, { 
+    hasIma: boolean; 
+    hasPlayerLoad: boolean; 
+    hasWellness: boolean; 
+    hasSrpe: boolean; 
+    hasSoxai: boolean; 
+    hasMenu: boolean; 
+    hasRpeLog: boolean;
+  }> = {};
   
   for (const record of records) {
     const d = new Date(record.date);
     const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     
     if (!statusMap[dateKey]) {
-      statusMap[dateKey] = { hasIma: false, hasPlayerLoad: false };
+      statusMap[dateKey] = { 
+        hasIma: false, 
+        hasPlayerLoad: false, 
+        hasWellness: false, 
+        hasSrpe: false, 
+        hasSoxai: false, 
+        hasMenu: false, 
+        hasRpeLog: false 
+      };
     }
     
-    // IMA (Event log): Check for jump metrics or acceleration metrics
+    // 1. IMA (Event log)
     const hasImaFields = 
       record.maxJumpHeight !== null || 
       record.avgJumpHeight !== null || 
@@ -1064,17 +1080,36 @@ export async function getImportStatusByMonth(teamId: number, year: number, month
       record.avgAcceleration !== null || 
       record.maxAcceleration !== null;
       
-    // Player Load (Menu Load): Check for load metric
+    // 2. Player Load (PL)
     const hasLoadFields = 
       record.totalLoad !== null && 
       Number(record.totalLoad) > 0;
+
+    // 3. Wellness (Onetap)
+    const hasWellnessFields = 
+      record.wellnessFatigue !== null || 
+      record.wellnessSleep !== null || 
+      record.wellnessStress !== null;
+
+    // 4. sRPE (Total)
+    const hasSrpeFields = record.sRPE !== null && Number(record.sRPE) > 0;
+
+    // 5. SOXAI (hrv)
+    const hasSoxaiFields = record.hrv !== null && Number(record.hrv) > 0;
+
+    // 6. Menu (Menu Load)
+    const hasMenuFields = record.rawMenuData !== null && record.rawMenuData.length > 2;
+
+    // 7. RPE Log
+    const hasRpeLogFields = record.rpeValue !== null && Number(record.rpeValue) > 0;
       
-    if (hasImaFields) {
-      statusMap[dateKey].hasIma = true;
-    }
-    if (hasLoadFields) {
-      statusMap[dateKey].hasPlayerLoad = true;
-    }
+    if (hasImaFields) statusMap[dateKey].hasIma = true;
+    if (hasLoadFields) statusMap[dateKey].hasPlayerLoad = true;
+    if (hasWellnessFields) statusMap[dateKey].hasWellness = true;
+    if (hasSrpeFields) statusMap[dateKey].hasSrpe = true;
+    if (hasSoxaiFields) statusMap[dateKey].hasSoxai = true;
+    if (hasMenuFields) statusMap[dateKey].hasMenu = true;
+    if (hasRpeLogFields) statusMap[dateKey].hasRpeLog = true;
   }
   
   return Object.entries(statusMap).map(([date, status]) => ({
@@ -1434,7 +1469,7 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
     };
 
     // Detection flags for 7 user formats
-    const isWellnessOnetap = findHeaderIndex(["項目名"]) !== -1 && findHeaderIndex(["値"]) !== -1 && findHeaderIndex(["内訳"]) !== -1;
+    const isWellnessOnetap = findHeaderIndex(["項目名", "項目"]) !== -1 && findHeaderIndex(["値", "スコア", "回答", "value"]) !== -1 && (findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name"]) !== -1 || findHeaderIndex(["内訳"]) !== -1);
     const isSRPE = findHeaderIndex(["トレーニング実施日"]) !== -1 && findHeaderIndex(["Session RPE"]) !== -1;
     const isSoxai = csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数");
     const isImaLog = findHeaderIndex(["OF Event"]) !== -1 && findHeaderIndex(["Jump Attribute"]) !== -1;
@@ -1477,10 +1512,10 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
     };
 
     if (isWellnessOnetap) {
-      const dateCol = findHeaderIndex(["日付"]);
-      const nameCol = findHeaderIndex(["選手名"]);
-      const itemCol = findHeaderIndex(["項目名"]);
-      const valCol = findHeaderIndex(["値"]);
+      const dateCol = findHeaderIndex(["日付", "日時", "回答日時", "date"]);
+      const nameCol = findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name", "内訳"]);
+      const itemCol = findHeaderIndex(["項目名", "項目", "item", "metric"]);
+      const valCol = findHeaderIndex(["値", "スコア", "回答", "value"]);
 
       if (dateCol === -1 || nameCol === -1 || itemCol === -1 || valCol === -1) {
         throw new Error("Wellness (Onetap) headers are missing.");
@@ -1521,9 +1556,16 @@ export async function importPerformanceCsv(teamId: number, uploadedBy: number, c
           wellnessGroups.set(groupKey, { athleteName: nameStr, dateObj });
         }
         const g = wellnessGroups.get(groupKey)!;
-        if (itemStr.includes("疲労感") || itemStr.includes("疲労")) g.fatigue = valNum;
-        if (itemStr.includes("気分") || itemStr.includes("モチベーション")) g.motivation = valNum;
-        if (itemStr.includes("食欲")) g.appetite = valNum;
+        const cleanedItem = itemStr.replace(/\s+/g, "");
+        if (cleanedItem.includes("疲労感") || cleanedItem.includes("疲労") || cleanedItem.includes("fatigue") || cleanedItem.includes("しんどさ")) {
+          g.fatigue = valNum;
+        }
+        if (cleanedItem.includes("気分") || cleanedItem.includes("モチベーション") || cleanedItem.includes("精神") || cleanedItem.includes("メンタル") || cleanedItem.includes("ストレス") || cleanedItem.includes("motivation") || cleanedItem.includes("stress")) {
+          g.motivation = valNum;
+        }
+        if (cleanedItem.includes("食欲") || cleanedItem.includes("食事") || cleanedItem.includes("appetite")) {
+          g.appetite = valNum;
+        }
       }
 
       const wellnessList = Array.from(wellnessGroups.values());

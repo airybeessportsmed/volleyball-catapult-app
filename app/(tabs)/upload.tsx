@@ -237,25 +237,38 @@ export default function CoachUploadScreen() {
     setErrorMsg("");
   };
 
-  const calendarDays = useMemo(() => {
+  const monthDaysList = useMemo(() => {
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-    const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay();
-    
     const days = [];
+    const weekNames = ["日", "月", "火", "水", "木", "金", "土"];
     
-    // Empty prefix cells
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push({ day: null, dateString: null });
-    }
-    
-    // Month days
     for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(currentYear, currentMonth - 1, d);
+      const dayOfWeekIdx = dateObj.getDay();
       const dateString = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      days.push({ day: d, dateString });
+      days.push({ 
+        day: d, 
+        weekName: weekNames[dayOfWeekIdx],
+        dayOfWeekIdx,
+        dateString 
+      });
     }
-    
     return days;
   }, [currentYear, currentMonth]);
+
+  const weeks = useMemo(() => {
+    const list = [];
+    let currentWeek = [];
+    for (let i = 0; i < monthDaysList.length; i++) {
+      const day = monthDaysList[i];
+      currentWeek.push(day);
+      if (day.dayOfWeekIdx === 6 || i === monthDaysList.length - 1) {
+        list.push(currentWeek);
+        currentWeek = [];
+      }
+    }
+    return list;
+  }, [monthDaysList]);
 
   const handlePrevMonth = () => {
     if (currentMonth === 1) {
@@ -291,12 +304,12 @@ export default function CoachUploadScreen() {
 
         <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
           <View className="gap-6">
-            {/* Calendar Read Status Check */}
+            {/* Sync Check List */}
             <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-4">
               <View className="flex-row justify-between items-center pb-2 border-b border-border">
                 <View className="flex-1 pr-2">
-                  <Text className="text-base font-bold text-foreground">練習データ読込状況</Text>
-                  <Text className="text-[10px] text-muted font-sans">練習ごとにIMAデータとPlayer Loadデータが揃っているか確認</Text>
+                  <Text className="text-base font-bold text-foreground font-sans">同期チェック一覧</Text>
+                  <Text className="text-[10px] text-muted font-sans">各曜日ごとに7つのデータが同期完了しているか確認</Text>
                 </View>
                 <View className="flex-row items-center gap-3">
                   <TouchableOpacity onPress={handlePrevMonth} className="p-1 bg-muted/20 rounded-full active:bg-muted/40">
@@ -310,94 +323,104 @@ export default function CoachUploadScreen() {
               </View>
 
               {/* Legend */}
-              <View className="flex-row flex-wrap gap-x-4 gap-y-1.5 bg-muted/20 p-2.5 rounded-xl">
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1.5 bg-muted/20 p-3 rounded-2xl">
                 <View className="flex-row items-center gap-1.5">
-                  <View className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <Text className="text-[10px] text-muted font-semibold">🟢 読込完了 (IMA + PL)</Text>
+                  <View className="w-3.5 h-3.5 rounded-full bg-emerald-500 items-center justify-center">
+                    <IconSymbol size={8} name="checkmark" color="#FFF" />
+                  </View>
+                  <Text className="text-[10px] text-muted font-bold font-sans">🟢 同期完了</Text>
                 </View>
                 <View className="flex-row items-center gap-1.5">
-                  <View className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <Text className="text-[10px] text-muted font-semibold">🟡 未完了 (片方のみ)</Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  <Text className="text-[10px] text-muted font-sans">※ IMA: 加速度・ジャンプ | PL: 運動量</Text>
+                  <Text className="text-[10px] text-muted font-sans">※ 7つの項目が同期されているか週ごとに確認できます。</Text>
                 </View>
               </View>
 
-              {/* Calendar Grid */}
-              <View>
-                {/* Week Headers */}
-                <View className="flex-row mb-2">
-                  {["日", "月", "火", "水", "木", "金", "土"].map((w, idx) => (
-                    <View key={idx} className="flex-1 items-center">
-                      <Text className={`text-[10px] font-bold ${idx === 0 ? "text-red-500" : idx === 6 ? "text-blue-500" : "text-muted"}`}>{w}</Text>
-                    </View>
-                  ))}
-                </View>
+              {/* Weekly Sync Status Tables */}
+              <View className="gap-5">
+                {weeks.map((week, weekIdx) => {
+                  const firstDay = week[0];
+                  const lastDay = week[week.length - 1];
+                  const weekTitle = `${currentMonth}月${firstDay.day}日(${firstDay.weekName}) 〜 ${lastDay.day}日(${lastDay.weekName})`;
 
-                {/* Days */}
-                <View className="flex-row flex-wrap">
-                  {calendarDays.map((item, idx) => {
-                    if (!item.day) {
-                      return (
-                        <View key={`empty-${idx}`} className="w-[14.28%] aspect-square p-0.5">
-                          <View className="flex-1 bg-transparent border border-transparent" />
-                        </View>
-                      );
-                    }
-
-                    const status = importStatus?.find(s => s.date === item.dateString);
-                    const hasIma = status?.hasIma || false;
-                    const hasPlayerLoad = status?.hasPlayerLoad || false;
-                    const isComplete = hasIma && hasPlayerLoad;
-                    const isPartial = (hasIma && !hasPlayerLoad) || (!hasIma && hasPlayerLoad);
-
-                    // Cell Styles
-                    let cellBg = "bg-transparent";
-                    let borderColor = "border-transparent";
-                    if (isComplete) {
-                      cellBg = "bg-emerald-500/5";
-                      borderColor = "border-emerald-500/30";
-                    } else if (isPartial) {
-                      cellBg = "bg-amber-500/5";
-                      borderColor = "border-amber-500/30";
-                    }
-
-                    return (
-                      <View 
-                        key={item.dateString} 
-                        className="w-[14.28%] aspect-square p-0.5"
-                      >
-                        <View className={`flex-1 justify-between items-center p-1 rounded-xl border ${cellBg} ${borderColor} bg-muted/5`}>
-                          <Text className="text-xs font-bold text-foreground font-mono">{item.day}</Text>
-                          
-                          {/* Indicators */}
-                          <View className="flex-row gap-0.5 justify-center items-center h-4">
-                            {isComplete ? (
-                              <IconSymbol size={12} name="checkmark.circle.fill" color="#10B981" />
-                            ) : (
-                              <>
-                                {hasIma && (
-                                  <View className="px-1 py-0.5 bg-blue-500/10 rounded-md">
-                                    <Text className="text-[7px] font-extrabold text-blue-600 font-sans">IMA</Text>
-                                  </View>
-                                )}
-                                {hasPlayerLoad && (
-                                  <View className="px-1 py-0.5 bg-emerald-500/10 rounded-md">
-                                    <Text className="text-[7px] font-extrabold text-emerald-600 font-sans">PL</Text>
-                                  </View>
-                                )}
-                                {!hasIma && !hasPlayerLoad && (
-                                  <View className="w-1.5 h-1.5 rounded-full bg-muted/40" />
-                                )}
-                              </>
-                            )}
-                          </View>
-                        </View>
+                  return (
+                    <View key={weekIdx} className="bg-muted/10 border border-border/60 rounded-2xl p-3.5 gap-2.5">
+                      {/* Week Header */}
+                      <View className="flex-row justify-between items-center border-b border-border/40 pb-1.5">
+                        <Text className="text-xs font-extrabold text-foreground font-sans">第{weekIdx + 1}週 <Text className="text-[10px] text-muted font-medium">({weekTitle})</Text></Text>
                       </View>
-                    );
-                  })}
-                </View>
+
+                      {/* Scrollable Horizontal Table Grid */}
+                      <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} className="w-full">
+                        <View className="gap-2 min-w-full">
+                          {/* Table Headers */}
+                          <View style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderColor: "#E2E8F0", paddingBottom: 4, height: 26 }}>
+                            <View style={{ width: 68 }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>日付</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>IMA</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>PL</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>Well</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>sRPE</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>SOXAI</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>Menu</Text></View>
+                            <View style={{ width: 42, alignItems: "center" }}><Text style={{ fontSize: 9, fontWeight: "bold", color: "#64748B" }}>RPE</Text></View>
+                          </View>
+
+                          {/* Table Rows for each day in this week */}
+                          {week.map((item) => {
+                            const status = importStatus?.find(s => s.date === item.dateString);
+                            const hasIma = (status as any)?.hasIma || false;
+                            const hasPL = (status as any)?.hasPlayerLoad || false;
+                            const hasWell = (status as any)?.hasWellness || false;
+                            const hasSrpe = (status as any)?.hasSrpe || false;
+                            const hasSoxai = (status as any)?.hasSoxai || false;
+                            const hasMenu = (status as any)?.hasMenu || false;
+                            const hasRpeLog = (status as any)?.hasRpeLog || false;
+
+                            const renderStatusDot = (hasData: boolean) => {
+                              return hasData ? (
+                                <View className="w-5 h-5 rounded-full bg-emerald-500/10 items-center justify-center border border-emerald-500/20">
+                                  <IconSymbol size={9} name="checkmark" color="#10B981" />
+                                </View>
+                              ) : (
+                                <View className="w-5 h-5 rounded-full bg-red-500/5 items-center justify-center border border-red-500/10">
+                                  <Text style={{ fontSize: 8, fontWeight: "bold", color: "#EF4444" }}>ー</Text>
+                                </View>
+                              );
+                            };
+
+                            return (
+                              <View 
+                                key={item.dateString} 
+                                style={{ flexDirection: "row", alignItems: "center", height: 32, borderBottomWidth: 0.5, borderColor: "#F1F5F9" }}
+                              >
+                                {/* Date label */}
+                                <View style={{ width: 68 }}>
+                                  <Text 
+                                    style={{ 
+                                      fontSize: 10, 
+                                      fontWeight: "bold",
+                                      color: item.dayOfWeekIdx === 0 ? "#EF4444" : item.dayOfWeekIdx === 6 ? "#3B82F6" : "#1E293B" 
+                                    }}
+                                  >
+                                    {item.day}日 ({item.weekName})
+                                  </Text>
+                                </View>
+
+                                {/* 7 Sync Indicators */}
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasIma)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasPL)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasWell)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasSrpe)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasSoxai)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasMenu)}</View>
+                                <View style={{ width: 42, alignItems: "center" }}>{renderStatusDot(hasRpeLog)}</View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
