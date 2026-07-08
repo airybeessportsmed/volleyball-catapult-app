@@ -1445,7 +1445,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     return safeA !== null ? safeA.toFixed(2) : (safeB !== null ? safeB.toFixed(2) : null);
   };
 
-  const mergeField = (newVal: any, existingVal: any, defaultVal: any = "practice") => {
+  const mergeField = (newVal: any, existingVal: any, defaultVal: any = null) => {
     if (newVal !== undefined && newVal !== null && newVal !== "") {
       const parsed = parseFloat(newVal);
       if (isNaN(parsed) && (typeof newVal === "string" && (newVal.toLowerCase() === "nan" || newVal === ""))) {
@@ -1517,7 +1517,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     ...data,
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
     maxJumpHeight: mergeMaxField(data.maxJumpHeight, existing?.maxJumpHeight),
-    avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight),
+    avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight, null),
     totalJumps: mergeAdditiveField(data.totalJumps, existing?.totalJumps, calculatedSums.totalJumps),
     jumpVolume: mergeAdditiveField(data.jumpVolume, existing?.jumpVolume, calculatedSums.jumpVolume),
     jumpsOver40cm: mergeAdditiveField(data.jumpsOver40cm, existing?.jumpsOver40cm, calculatedSums.jumpsOver40cm),
@@ -1527,22 +1527,22 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     jumpZone4Count: mergeAdditiveField(data.jumpZone4Count, existing?.jumpZone4Count, calculatedSums.jumpZone4Count),
     jumpZone5Count: mergeAdditiveField(data.jumpZone5Count, existing?.jumpZone5Count, calculatedSums.jumpZone5Count),
     
-    avgAcceleration: mergeField(data.avgAcceleration, existing?.avgAcceleration),
+    avgAcceleration: mergeField(data.avgAcceleration, existing?.avgAcceleration, null),
     maxAcceleration: mergeMaxField(data.maxAcceleration, existing?.maxAcceleration),
-    accelVolume: mergeField(data.accelVolume, existing?.accelVolume),
+    accelVolume: mergeField(data.accelVolume, existing?.accelVolume, null),
     accelCount: mergeAdditiveField(data.accelCount, existing?.accelCount, calculatedSums.accelCount),
     
     totalDistance: mergeField(data.totalDistance, existing?.totalDistance, "0.00"),
     avgSpeed: mergeField(data.avgSpeed, existing?.avgSpeed, "0.00"),
     maxSpeed: mergeField(data.maxSpeed, existing?.maxSpeed, "0.00"),
     totalLoad: mergeAdditiveField(data.totalLoad, existing?.totalLoad, calculatedSums.totalLoad),
-    avgLoad: mergeField(data.avgLoad, existing?.avgLoad),
-    duration: mergeField(data.duration, existing?.duration, 3600),
+    avgLoad: mergeField(data.avgLoad, existing?.avgLoad, null),
+    duration: mergeField(data.duration, existing?.duration, null),
     rawMenuData: finalRawMenuData,
-    sRPE: mergeField(data.sRPE, existing?.sRPE),
-    rpeValue: mergeField(data.rpeValue, existing?.rpeValue),
-    wellnessSleep: mergeField(data.wellnessSleep, existing?.wellnessSleep),
-    wellnessFatigue: mergeField(data.wellnessFatigue, existing?.wellnessFatigue),
+    sRPE: mergeField(data.sRPE, existing?.sRPE, null),
+    rpeValue: mergeField(data.rpeValue, existing?.rpeValue, null),
+    wellnessSleep: mergeField(data.wellnessSleep, existing?.wellnessSleep, null),
+    wellnessFatigue: mergeField(data.wellnessFatigue, existing?.wellnessFatigue, null),
     wellnessSoreness: mergeField(data.wellnessSoreness, existing?.wellnessSoreness),
     wellnessStress: mergeField(data.wellnessStress, existing?.wellnessStress),
     hrv: mergeField(data.hrv, existing?.hrv),
@@ -2528,8 +2528,13 @@ export async function importPerformanceCsv(
     return { success: true, importedCount, unregisteredAthletes: Array.from(unregisteredSet) };
   } catch (error: any) {
     console.error("[CSV Import] Failed to import CSV:", error);
-    await updateCsvUploadStatus(uploadId, "failed", error.message || "Unknown error during parsing");
-    throw error;
+    let errorDetail = error.message || "Unknown error during parsing";
+    if (error.detail) errorDetail += ` (Detail: ${error.detail})`;
+    if (error.code) errorDetail += ` (Code: ${error.code})`;
+    if (error.hint) errorDetail += ` (Hint: ${error.hint})`;
+    
+    await updateCsvUploadStatus(uploadId, "failed", errorDetail);
+    throw new Error(errorDetail);
   }
 }
 
