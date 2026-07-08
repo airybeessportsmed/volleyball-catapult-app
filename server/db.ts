@@ -1965,6 +1965,8 @@ export async function importPerformanceCsv(
       }
       const imaGroups = new Map<string, ImaGroup>();
 
+      const fallbackDate = getFallbackDate(fileName);
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -1981,7 +1983,7 @@ export async function importPerformanceCsv(
           jNum = parseInt(numMatch[1] || numMatch[0], 10);
         }
 
-        let dateObj = getFallbackDate(fileName);
+        let dateObj = fallbackDate;
         if (eventTimeCol !== -1 && vals[eventTimeCol]) {
           const timeMs = parseFloat(vals[eventTimeCol]);
           if (!isNaN(timeMs)) dateObj = new Date(timeMs);
@@ -2145,6 +2147,8 @@ export async function importPerformanceCsv(
         return match ? parseFloat(match[0]) : undefined;
       };
 
+      const fallbackDate = getFallbackDate(fileName);
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -2165,7 +2169,7 @@ export async function importPerformanceCsv(
           timeMs = parseFloat(values[startTimeIdx]);
         }
         
-        let dateObj = getFallbackDate(fileName);
+        let dateObj = fallbackDate;
         if (!isNaN(timeMs)) dateObj = new Date(timeMs);
 
         const dateKey = formatDateKey(dateObj);
@@ -2305,6 +2309,8 @@ export async function importPerformanceCsv(
       }
       const loadAggregations = new Map<string, LoadGroup>();
 
+      const fallbackDate = getFallbackDate(fileName);
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -2342,7 +2348,7 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        let dateObj = getFallbackDate(fileName);
+        let dateObj = fallbackDate;
         if (dateIdx !== -1 && values[dateIdx]) {
           const parsed = new Date(values[dateIdx]);
           if (!isNaN(parsed.getTime())) dateObj = parsed;
@@ -2435,6 +2441,8 @@ export async function importPerformanceCsv(
       }
       const rpeRecords: RpeRecord[] = [];
 
+      const fallbackDate = getFallbackDate(fileName);
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -2447,7 +2455,7 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        let dateObj = getFallbackDate(fileName);
+        let dateObj = fallbackDate;
         if (dateIdx !== -1 && values[dateIdx]) {
           const parsed = parseDateFlexible(values[dateIdx]);
           if (parsed) dateObj = parsed;
