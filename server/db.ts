@@ -2326,14 +2326,18 @@ export async function importPerformanceCsv(
 
         if (!matchedAthlete && values[categoryIdx]) {
           const rawName = values[categoryIdx];
-          const cleanName = rawName.includes("-") ? rawName.split("-").pop()!.trim() : rawName.trim();
+          const cleanName = rawName.includes(" - ") 
+            ? rawName.split(" - ").pop()!.trim() 
+            : (rawName.includes("-") ? rawName.split("-").pop()!.trim() : rawName.trim());
           matchedAthlete = findAthleteByCsvName(teamAthletes, cleanName, "catapult");
         }
 
         if (!matchedAthlete) {
           if (values[categoryIdx]) {
             const rawName = values[categoryIdx];
-            const cleanName = rawName.includes("-") ? rawName.split("-").pop()!.trim() : rawName.trim();
+            const cleanName = rawName.includes(" - ") 
+              ? rawName.split(" - ").pop()!.trim() 
+              : (rawName.includes("-") ? rawName.split("-").pop()!.trim() : rawName.trim());
             let jNum = null;
             if (jerseyIdx !== -1 && values[jerseyIdx]) {
               const parsedJ = parseInt(values[jerseyIdx], 10);
@@ -2356,7 +2360,18 @@ export async function importPerformanceCsv(
 
         let menuName = "全体";
         if (values[categoryIdx] && values[categoryIdx].includes("-")) {
-          menuName = values[categoryIdx].split("-")[0].trim();
+          const rawCat = values[categoryIdx];
+          if (rawCat.includes(" - ")) {
+            menuName = rawCat.split(" - ")[0].trim();
+          } else {
+            const parts = rawCat.split("-");
+            if (parts.length > 1) {
+              parts.pop();
+              menuName = parts.join("-").trim();
+            } else {
+              menuName = rawCat.trim();
+            }
+          }
         }
 
         let rowSessionType: "practice" | "individual" = "practice";
