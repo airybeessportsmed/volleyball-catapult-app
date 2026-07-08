@@ -5,6 +5,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import * as db from "./db";
 import { sdk } from "./_core/sdk";
+import { eq } from "drizzle-orm";
+import { users, athletes } from "../drizzle/schema";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -69,6 +71,124 @@ export const appRouter = router({
 
         const token = await sdk.createSessionToken(input.openId, { name: input.name });
         return { token };
+      }),
+
+    login: publicProcedure
+      .input(z.object({
+        role: z.enum(["coach", "viewer", "athlete"]),
+        athleteId: z.number().optional(),
+        password: z.string()
+      }))
+      .mutation(async ({ input }) => {
+        const database = await db.getDb();
+        if (!database) {
+          // Mock mode
+          let openId = "";
+          let expectedPassword = "";
+          let name = "";
+          let email = "";
+          if (input.role === "coach") {
+            openId = "democoach";
+            expectedPassword = "admin123";
+            name = "スタッフ (管理者)";
+            email = "admin@example.com";
+          } else if (input.role === "viewer") {
+            openId = "demoviewer";
+            expectedPassword = "viewer123";
+            name = "スタッフ (閲覧用)";
+            email = "viewer@example.com";
+          } else {
+            if (!input.athleteId) throw new Error("選手が選択されていません。");
+            const mockAth = (await db.getAthletesByTeamId(1)).find(a => a.id === input.athleteId);
+            if (!mockAth) throw new Error("選手が見つかりません。");
+            email = mockAth.user?.email || `athlete_${mockAth.id}@example.com`;
+            openId = `athlete_${email.replace(/[@.]/g, "_")}`;
+            expectedPassword = "athlete123";
+            name = mockAth.user?.name || `選手${mockAth.jerseyNumber}`;
+          }
+          
+          const matchedMockUser = await db.getUserByOpenId(openId);
+          const finalPass = matchedMockUser?.password || expectedPassword;
+          if (input.password !== finalPass) {
+            throw new Error("パスワードが正しくありません。");
+          }
+          
+          const token = await sdk.createSessionToken(openId, { name });
+          return { token, user: { openId, name, email, role: input.role, teamId: 1 } };
+        }
+
+        // Live DB mode
+        let userObj = null;
+        let defaultPass = "";
+        
+        if (input.role === "coach") {
+          userObj = await database.select().from(users).where(eq(users.role, "coach")).limit(1).then(r => r[0]);
+          defaultPass = "admin123";
+        } else if (input.role === "viewer") {
+          userObj = await database.select().from(users).where(eq(users.role, "viewer")).limit(1).then(r => r[0]);
+          defaultPass = "viewer123";
+        } else {
+          if (!input.athleteId) throw new Error("選手が選択されていません。");
+          const ath = await database.select().from(athletes).where(eq(athletes.id, input.athleteId)).limit(1).then(r => r[0]);
+          if (!ath) throw new Error("選手が見つかりません。");
+          userObj = await database.select().from(users).where(eq(users.id, ath.userId)).limit(1).then(r => r[0]);
+          defaultPass = "athlete123";
+        }
+
+        if (!userObj) {
+          throw new Error("対象のユーザーアカウントが見つかりません。");
+        }
+
+        const expectedPass = userObj.password || defaultPass;
+        if (input.password !== expectedPass) {
+          throw new Error("パスワードが正しくありません。");
+        }
+
+        const token = await sdk.createSessionToken(userObj.openId, { name: userObj.name || undefined });
+        return { token, user: userObj };
+      }),
+
+    changePassword: protectedProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        newPassword: z.string().min(4, "パスワードは4文字以上で指定してください。")
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await db.getDb();
+        const isCoach = ctx.user.role === "coach" || ctx.user.role === "admin";
+        
+        // Find target user
+        let targetUserId = ctx.user.id;
+        if (input.userId && isCoach) {
+          // If admin changes athlete password, map athleteId to userId
+          const ath = database 
+            ? await database.select().from(athletes).where(eq(athletes.id, input.userId)).limit(1).then(r => r[0])
+            : (await db.getAthletesByTeamId(1)).find(a => a.id === input.userId);
+          
+          if (!ath) throw new Error("選手が見つかりません。");
+          targetUserId = ath.userId;
+        }
+
+        if (targetUserId !== ctx.user.id && !isCoach) {
+          throw new Error("パスワードを変更する権限がありません。");
+        }
+
+        if (!database) {
+          // Mock mode
+          const user = await db.getUserById(targetUserId);
+          if (user) {
+            user.password = input.newPassword;
+            user.updatedAt = new Date();
+          }
+          return { success: true };
+        }
+
+        // Live DB mode
+        await database.update(users)
+          .set({ password: input.newPassword, updatedAt: new Date() })
+          .where(eq(users.id, targetUserId));
+
+        return { success: true };
       }),
   }),
 
@@ -191,6 +311,7 @@ export const appRouter = router({
           onetapName: z.string().nullable().optional(),
           catapultName: z.string().nullable().optional(),
           soxaiEmail: z.string().nullable().optional(),
+          password: z.string().nullable().optional(),
           isDeleted: z.boolean().optional(),
         }))
       }))

@@ -264,6 +264,8 @@ export default function HomeScreen() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [trendMetric, setTrendMetric] = useState<"load" | "jumps">("load");
   const mockTokenMutation = trpc.auth.getMockToken.useMutation();
+  const loginMutation = trpc.auth.login.useMutation();
+  const changePasswordMutation = trpc.auth.changePassword.useMutation();
 
   const [selectedUserType, setSelectedUserType] = useState<"coach" | "viewer" | "athlete" | null>(null);
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
@@ -317,6 +319,13 @@ export default function HomeScreen() {
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const { data: allPerfData, refetch: refetchAllPerf } = trpc.performance.getByTeam.useQuery(
     { teamId: user?.teamId || 1, date: rawDate, limit: 1500 },
@@ -572,83 +581,31 @@ export default function HomeScreen() {
     };
 
     const handleDemoLogin = async (role: "coach" | "viewer" | "athlete", athleteId?: number) => {
-      // Validate password
-      if (role === "coach") {
-        if (password !== "admin123") {
-          setLoginError("管理者用パスワードが正しくありません。");
-          return;
-        }
-      } else if (role === "viewer") {
-        if (password !== "viewer123") {
-          setLoginError("閲覧用パスワードが正しくありません。");
-          return;
-        }
-      } else {
-        if (password !== "athlete123") {
-          setLoginError("選手用パスワードが正しくありません。");
-          return;
-        }
+      if (role === "athlete" && !athleteId) {
+        setLoginError("選手を選択してください。");
+        return;
+      }
+      if (!password) {
+        setLoginError("パスワードを入力してください。");
+        return;
       }
 
       if (isLoggingIn) return;
       setIsLoggingIn(true);
       setLoginError(null);
 
-      let demoUser;
-      if (role === "coach") {
-        demoUser = {
-          id: 1,
-          openId: "democoach",
-          name: "スタッフ (管理者)",
-          email: "admin@example.com",
-          loginMethod: "manus",
-          role: "coach",
-          teamId: 1,
-          lastSignedIn: new Date().toISOString()
-        };
-      } else if (role === "viewer") {
-        demoUser = {
-          id: 5,
-          openId: "demoviewer",
-          name: "スタッフ (閲覧用)",
-          email: "viewer@example.com",
-          loginMethod: "manus",
-          role: "viewer",
-          teamId: 1,
-          lastSignedIn: new Date().toISOString()
-        };
-      } else {
-        const selected = publicAthletes?.find(a => a.id === athleteId);
-        if (!selected) {
-          setLoginError("選択された選手が見つかりません。");
-          setIsLoggingIn(false);
-          return;
-        }
-        const email = selected.user?.email || `athlete_${selected.id}@example.com`;
-        const openId = `athlete_${email.replace(/[@.]/g, "_")}`;
-        demoUser = {
-          id: selected.id,
-          openId,
-          name: selected.user?.name || `選手${selected.jerseyNumber}`,
-          email,
-          loginMethod: "manus",
-          role: "athlete",
-          teamId: 1,
-          lastSignedIn: new Date().toISOString()
-        };
-      }
-
       try {
-        const { token } = await mockTokenMutation.mutateAsync({
-          openId: demoUser.openId,
-          name: demoUser.name,
+        const { token, user: loggedUser } = await loginMutation.mutateAsync({
+          role,
+          athleteId,
+          password,
         });
 
-        const userBase64 = safeBtoa(JSON.stringify(demoUser));
+        const userBase64 = safeBtoa(JSON.stringify(loggedUser));
         router.push(`/oauth/callback?sessionToken=${token}&user=${userBase64}`);
-      } catch (e) {
-        console.error("Failed to generate mock token:", e);
-        setLoginError("ログイン中にエラーが発生しました。");
+      } catch (e: any) {
+        console.error("Failed to login:", e);
+        setLoginError(e.message || "ログイン中にエラーが発生しました。");
         setIsLoggingIn(false);
       }
     };
@@ -790,6 +747,39 @@ export default function HomeScreen() {
       </ScreenContainer>
     );
   }
+
+  const handleChangePassword = async () => {
+    if (!newPasswordVal) {
+      setPasswordError("新しいパスワードを入力してください。");
+      return;
+    }
+    if (newPasswordVal.length < 4) {
+      setPasswordError("パスワードは4文字以上で設定してください。");
+      return;
+    }
+    if (newPasswordVal !== confirmPassword) {
+      setPasswordError("新しいパスワードが一致しません。");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    try {
+      await changePasswordMutation.mutateAsync({
+        newPassword: newPasswordVal,
+      });
+      setPasswordSuccess("パスワードを変更しました！");
+      setNewPasswordVal("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      console.error("Failed to change password:", e);
+      setPasswordError(e.message || "パスワードの変更に失敗しました。");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   // Athlete Dashboard
   if (user?.role === "athlete") {
@@ -2094,19 +2084,78 @@ export default function HomeScreen() {
             )}
 
             {/* SETTINGS TAB */}
-            {activeTab === "settings" && teamSettings && (
+            {activeTab === "settings" && (
               <View style={{ gap: 20 }}>
-                {/* 状態インジケータ */}
-                <View style={{ backgroundColor: "#E8F0FE", borderColor: "#B5D1F6", borderWidth: 1, borderRadius: 12, padding: 14 }}>
-                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1C4587" }}>
-                    ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessStress"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
-                  </Text>
+                {/* 🔒 ログインパスワードの変更 */}
+                <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>🔒 ログインパスワードの変更</Text>
+                  <Text style={{ fontSize: 11, color: "#64748B", lineHeight: 16 }}>ログインに使用するパスワードを変更します。4文字以上で設定してください。</Text>
+                  
+                  <View style={{ gap: 10, marginTop: 4 }}>
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>新しいパスワード</Text>
+                      <TextInput
+                        value={newPasswordVal}
+                        onChangeText={setNewPasswordVal}
+                        secureTextEntry
+                        placeholder="新しいパスワード"
+                        placeholderTextColor="#94A3B8"
+                        style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, color: "#1E293B", backgroundColor: "#FFFFFF" }}
+                      />
+                    </View>
+
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>新しいパスワード（確認用）</Text>
+                      <TextInput
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry
+                        placeholder="もう一度入力してください"
+                        placeholderTextColor="#94A3B8"
+                        style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, color: "#1E293B", backgroundColor: "#FFFFFF" }}
+                      />
+                    </View>
+
+                    {passwordError && (
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#EF4444" }}>{passwordError}</Text>
+                    )}
+                    {passwordSuccess && (
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#22C55E" }}>{passwordSuccess}</Text>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={handleChangePassword}
+                      disabled={isChangingPassword}
+                      style={{
+                        backgroundColor: "#2F80ED",
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        alignItems: "center",
+                        marginTop: 6,
+                        opacity: isChangingPassword ? 0.6 : 1
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
+                        {isChangingPassword ? "変更中..." : "パスワードを変更する"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                {/* 1. 基準窓 (スライダー ＆ 日数) */}
-                <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>基準窓 (個人ベースラインの比較範囲)</Text>
-                  <Text style={{ fontSize: 11, color: "#64748B", lineHeight: 16 }}>当日を含まない過去の移動平均±SDを基準にします。ピリオダイゼーションの文脈に応じて変更してください。</Text>
+                {/* チーム全体の設定（スタッフのみ） */}
+                {(user?.role === "coach" || (user?.role as string) === "admin") && teamSettings && (
+                  <>
+                    {/* 状態インジケータ */}
+                    <View style={{ backgroundColor: "#E8F0FE", borderColor: "#B5D1F6", borderWidth: 1, borderRadius: 12, padding: 14 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1C4587" }}>
+                        ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessStress"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
+                      </Text>
+                    </View>
+
+                    {/* 1. 基準窓 (スライダー ＆ 日数) */}
+                    <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>基準窓 (個人ベースラインの比較範囲)</Text>
+                      <Text style={{ fontSize: 11, color: "#64748B", lineHeight: 16 }}>当日を含まない過去の移動平均±SDを基準にします。ピリオダイゼーションの文脈に応じて変更してください。</Text>
                   
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginTop: 4 }}>
                     {/* Custom Slider Bar */}
@@ -2430,6 +2479,8 @@ export default function HomeScreen() {
                     })}
                   </View>
                 </View>
+                  </>
+                )}
               </View>
             )}
           </View>

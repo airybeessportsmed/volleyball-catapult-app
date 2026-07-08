@@ -18,6 +18,7 @@ interface EditableAthlete {
   onetapName: string | null;
   catapultName: string | null;
   soxaiEmail: string | null;
+  password?: string | null;
   isDeleted?: boolean;
 }
 
@@ -78,6 +79,7 @@ export default function CoachTeamScreen() {
           onetapName: a.onetapName || "",
           catapultName: a.catapultName || "",
           soxaiEmail: a.soxaiEmail || "",
+          password: "",
           isDeleted: false,
         }))
       );
@@ -102,6 +104,7 @@ export default function CoachTeamScreen() {
         onetapName: "",
         catapultName: "",
         soxaiEmail: "",
+        password: "",
         isDeleted: false,
       }
     ]);
@@ -255,6 +258,9 @@ export default function CoachTeamScreen() {
                       <Text className="font-bold text-xs text-muted">メール *</Text>
                     </View>
                     <View style={{ width: 140 }} className="justify-center px-2">
+                      <Text className="font-bold text-xs text-muted">パスワード</Text>
+                    </View>
+                    <View style={{ width: 140 }} className="justify-center px-2">
                       <Text className="font-bold text-xs text-muted">Onetap登録名</Text>
                     </View>
                     <View style={{ width: 140 }} className="justify-center px-2">
@@ -329,6 +335,19 @@ export default function CoachTeamScreen() {
                             placeholderTextColor="#9CA3AF"
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            editable={!athlete.isDeleted}
+                            className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm"
+                          />
+                        </View>
+
+                        {/* パスワード */}
+                        <View style={{ width: 140 }} className="px-1">
+                          <TextInput
+                            value={athlete.password || ""}
+                            onChangeText={(val) => handleFieldChange(index, "password", val)}
+                            placeholder={athlete.id ? "変更時のみ入力" : "パスワード設定"}
+                            placeholderTextColor="#9CA3AF"
+                            secureTextEntry
                             editable={!athlete.isDeleted}
                             className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm"
                           />
@@ -558,7 +577,7 @@ export default function CoachTeamScreen() {
                   <Text className="font-bold text-primary">デモ検証用のアカウント情報</Text>
                 </View>
                 <Text className="text-xs text-foreground/80 leading-relaxed">
-                  選手用アカウントでログインして自分の運動量を確認するには、以下のメールアドレスを使用してください。
+                  選手用アカウントでログインして自分の運動量を確認するには、以下のメールアドレスを使用してください。個別設定したパスワード（未設定の時の初期値は athlete123）でログインできます。
                 </Text>
                 <View className="gap-1 bg-surface p-3 rounded-lg border border-border">
                   <Text className="text-xs text-muted">・宮下 さくら: sakura@example.com (パスワード不要/OAuth自動ログイン)</Text>

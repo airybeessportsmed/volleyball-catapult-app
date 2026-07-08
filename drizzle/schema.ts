@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   teamId: integer("teamId"), // Team association for coaches and athletes
   role: varchar("role", { length: 30 }).default("user").notNull(), // "user" | "admin" | "coach" | "athlete"
+  password: varchar("password", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

@@ -35,6 +35,7 @@ let mockUsers: User[] = [
     loginMethod: "manus",
     teamId: 1,
     role: "coach",
+    password: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -47,6 +48,7 @@ let mockUsers: User[] = [
     loginMethod: "manus",
     teamId: 1,
     role: "viewer",
+    password: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -59,6 +61,7 @@ let mockUsers: User[] = [
     loginMethod: "manus",
     teamId: 1,
     role: "athlete",
+    password: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -71,6 +74,7 @@ let mockUsers: User[] = [
     loginMethod: "manus",
     teamId: 1,
     role: "athlete",
+    password: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -83,6 +87,7 @@ let mockUsers: User[] = [
     loginMethod: "manus",
     teamId: 1,
     role: "athlete",
+    password: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -492,6 +497,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       existing.loginMethod = loginMethod;
       existing.role = role;
       existing.teamId = teamId;
+      if (user.password !== undefined) existing.password = user.password;
       existing.lastSignedIn = new Date();
       existing.updatedAt = new Date();
     } else {
@@ -503,6 +509,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         loginMethod,
         teamId,
         role,
+        password: user.password ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignedIn: new Date(),
@@ -517,7 +524,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "password"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -575,6 +582,7 @@ export async function createAthleteUser(user: InsertUser): Promise<number> {
       loginMethod: user.loginMethod ?? "manus",
       teamId: user.teamId ?? null,
       role: "athlete",
+      password: user.password ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: signedInAt,
@@ -589,6 +597,7 @@ export async function createAthleteUser(user: InsertUser): Promise<number> {
     loginMethod: user.loginMethod ?? "manus",
     role: "athlete",
     teamId: user.teamId,
+    password: user.password ?? null,
     lastSignedIn: signedInAt,
   }).returning();
   return result.id;
@@ -772,6 +781,7 @@ export interface BatchSaveAthleteInput {
   onetapName?: string | null;
   catapultName?: string | null;
   soxaiEmail?: string | null;
+  password?: string | null;
   isDeleted?: boolean;
 }
 
@@ -812,6 +822,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           if (user) {
             user.name = item.name;
             user.email = item.email;
+            if (item.password !== undefined) user.password = item.password;
             user.updatedAt = new Date();
           }
         }
@@ -828,6 +839,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           loginMethod: "manus",
           teamId,
           role: "athlete",
+          password: item.password ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
           lastSignedIn: new Date(),
@@ -874,12 +886,16 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
         const [athlete] = await tx.select().from(athletes).where(eq(athletes.id, item.id)).limit(1);
         if (athlete) {
           // users 更新
+          const userUpdates: Record<string, any> = {
+            name: item.name,
+            email: item.email,
+            updatedAt: new Date()
+          };
+          if (item.password !== undefined && item.password !== "") {
+            userUpdates.password = item.password;
+          }
           await tx.update(users)
-            .set({
-              name: item.name,
-              email: item.email,
-              updatedAt: new Date()
-            })
+            .set(userUpdates)
             .where(eq(users.id, athlete.userId));
           
           // athletes 更新
@@ -908,6 +924,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           loginMethod: "manus",
           teamId,
           role: "athlete",
+          password: item.password ?? null,
         }).returning();
         const userId = userResult.id;
 
