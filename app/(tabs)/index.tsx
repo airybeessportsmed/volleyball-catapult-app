@@ -1837,7 +1837,7 @@ export default function HomeScreen() {
                         {/* ヘッダー行1 (大グループ) */}
                         <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" }}>
                           {/* 左端固定エリアプレースホルダー */}
-                          <View style={{ width: 240, height: 32, justifyContent: "center", paddingLeft: 12 }}>
+                          <View style={{ width: 240, height: 32, justifyContent: "center", paddingLeft: 12, position: "sticky" as any, left: 0, zIndex: 10, backgroundColor: "#F8FAFC" }}>
                             <Text style={{ fontSize: 11, fontWeight: "bold", color: "#64748B" }}>選手属性</Text>
                           </View>
                           {/* Jump Volume 大ヘッダー */}
@@ -1863,17 +1863,19 @@ export default function HomeScreen() {
                         {/* ヘッダー行2 (メニュー名リスト) */}
                         <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F1F5F9" }}>
                           {/* 左側属性列のヘッダー */}
-                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>部分</Text>
-                          </View>
-                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>No.</Text>
-                          </View>
-                          <View style={{ width: 120, height: 36, justifyContent: "center", paddingLeft: 8 }}>
-                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>選手名</Text>
-                          </View>
-                          <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>Pos</Text>
+                          <View style={{ flexDirection: "row", width: 240, position: "sticky" as any, left: 0, zIndex: 10, backgroundColor: "#F1F5F9" }}>
+                            <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>部分</Text>
+                            </View>
+                            <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>No.</Text>
+                            </View>
+                            <View style={{ width: 120, height: 36, justifyContent: "center", paddingLeft: 8 }}>
+                              <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>選手名</Text>
+                            </View>
+                            <View style={{ width: 40, height: 36, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 9, fontWeight: "bold", color: "#475569" }}>Pos</Text>
+                            </View>
                           </View>
 
                           {/* Jump Volume のメニュー名ヘッダー */}
@@ -1903,66 +1905,73 @@ export default function HomeScreen() {
                         </View>
 
                         {/* 選手データ行 */}
-                        {catapultData.athletes.map((ath, idx) => (
-                          <View key={ath.athleteId} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC" }}>
-                            {/* 属性セル */}
-                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
-                              {/* 部分参加チェックマーク (スクリーンショット準拠の□) */}
-                              <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: "#94A3B8", borderRadius: 2 }} />
-                            </View>
-                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
-                              <Text style={{ fontSize: 11, color: "#475569" }}>{ath.jerseyNumber ?? "-"}</Text>
-                            </View>
-                            <View style={{ width: 120, height: 32, justifyContent: "center", paddingLeft: 8 }}>
-                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>{ath.athleteName}</Text>
-                            </View>
-                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
-                              <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "bold" }}>{ath.position}</Text>
-                            </View>
+                        {catapultData.athletes.map((ath, idx) => {
+                          const rowBgColor = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+                          return (
+                            <View key={ath.athleteId} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: rowBgColor }}>
+                              {/* 属性セル */}
+                              <View style={{ flexDirection: "row", width: 240, position: "sticky" as any, left: 0, zIndex: 2, backgroundColor: rowBgColor }}>
+                                <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                                  {/* 部分参加チェックマーク (スクリーンショット準拠の□) */}
+                                  <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: "#94A3B8", borderRadius: 2 }} />
+                                </View>
+                                <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                                  <Text style={{ fontSize: 11, color: "#475569" }}>{ath.jerseyNumber ?? "-"}</Text>
+                                </View>
+                                <View style={{ width: 120, height: 32, justifyContent: "center", paddingLeft: 8 }}>
+                                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>{ath.athleteName}</Text>
+                                </View>
+                                <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                                  <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "bold" }}>{ath.position}</Text>
+                                </View>
+                              </View>
 
-                            {/* Jump Volume 値 */}
-                            {catapultData.menus.map(m => {
-                              const val = ath.jumpVolumes[m];
-                              return (
-                                <View key={`j_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
-                                  <Text style={{ fontSize: 11, color: val ? "#0284C7" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                    {val !== undefined ? Math.round(val) : "-"}
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                            {/* Accel Volume 値 */}
-                            {catapultData.menus.map(m => {
-                              const val = ath.accelVolumes[m];
-                              return (
-                                <View key={`a_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
-                                  <Text style={{ fontSize: 11, color: val ? "#DC2626" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                    {val !== undefined ? val.toFixed(1) : "-"}
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                            {/* Player Load 値 */}
-                            {catapultData.menus.map(m => {
-                              const val = ath.playerLoads[m];
-                              return (
-                                <View key={`p_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
-                                  <Text style={{ fontSize: 11, color: val ? "#16A34A" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                    {val !== undefined ? val.toFixed(1) : "-"}
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        ))}
+                              {/* Jump Volume 値 */}
+                              {catapultData.menus.map(m => {
+                                const val = ath.jumpVolumes[m];
+                                return (
+                                  <View key={`j_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                    <Text style={{ fontSize: 11, color: val ? "#0284C7" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                      {val !== undefined ? Math.round(val) : "-"}
+                                    </Text>
+                                  </View>
+                                );
+                              })}
+                              {/* Accel Volume 値 */}
+                              {catapultData.menus.map(m => {
+                                const val = ath.accelVolumes[m];
+                                return (
+                                  <View key={`a_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                    <Text style={{ fontSize: 11, color: val ? "#DC2626" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                      {val !== undefined ? val.toFixed(1) : "-"}
+                                    </Text>
+                                  </View>
+                                );
+                              })}
+                              {/* Player Load 値 */}
+                              {catapultData.menus.map(m => {
+                                const val = ath.playerLoads[m];
+                                return (
+                                  <View key={`p_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
+                                    <Text style={{ fontSize: 11, color: val ? "#16A34A" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
+                                      {val !== undefined ? val.toFixed(1) : "-"}
+                                    </Text>
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          );
+                        })}
 
                         {/* Team 平均行 */}
                         <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC" }}>
-                          <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
-                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>Team平均</Text>
-                          </View>
-                          <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 9, color: "#64748B", fontWeight: "bold" }}>Team</Text>
+                          <View style={{ flexDirection: "row", width: 240, position: "sticky" as any, left: 0, zIndex: 2, backgroundColor: "#F8FAFC" }}>
+                            <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
+                              <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>Team平均</Text>
+                            </View>
+                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 9, color: "#64748B", fontWeight: "bold" }}>Team</Text>
+                            </View>
                           </View>
 
                           {/* Jump Volume 平均 */}
@@ -2003,11 +2012,13 @@ export default function HomeScreen() {
                         {/* ポジション別平均行 */}
                         {["S", "OH", "MB", "L"].map(pos => (
                           <View key={`pos_row_${pos}`} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FFEDD5" }}>
-                            <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
-                              <Text style={{ fontSize: 10, fontWeight: "bold", color: "#9A3412" }}>{pos}平均</Text>
-                            </View>
-                            <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
-                              <Text style={{ fontSize: 10, color: "#9A3412", fontWeight: "bold" }}>{pos}</Text>
+                            <View style={{ flexDirection: "row", width: 240, position: "sticky" as any, left: 0, zIndex: 2, backgroundColor: "#FFEDD5" }}>
+                              <View style={{ width: 200, height: 32, justifyContent: "center", alignItems: "flex-end", paddingRight: 12 }}>
+                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#9A3412" }}>{pos}平均</Text>
+                              </View>
+                              <View style={{ width: 40, height: 32, justifyContent: "center", alignItems: "center" }}>
+                                <Text style={{ fontSize: 10, color: "#9A3412", fontWeight: "bold" }}>{pos}</Text>
+                              </View>
                             </View>
 
                             {/* Jump Volume */}
