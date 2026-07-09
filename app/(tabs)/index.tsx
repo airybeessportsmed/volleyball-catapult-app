@@ -797,9 +797,10 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity 
             onPress={logout}
-            className="p-2 bg-muted/20 rounded-full"
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#FEF2F2", borderRadius: 8, borderWidth: 1, borderColor: "#FEE2E2" }}
           >
-            <IconSymbol size={20} name="power" color="#EF4444" />
+            <IconSymbol size={16} name="power" color="#EF4444" />
+            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#EF4444" }}>ログアウト</Text>
           </TouchableOpacity>
         </View>
 
