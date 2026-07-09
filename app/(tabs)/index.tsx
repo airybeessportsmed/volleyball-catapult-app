@@ -479,8 +479,17 @@ export default function HomeScreen() {
       if (teamSums[m].load > 0) loadChartData.push({ label: m, value: parseFloat(teamSums[m].load.toFixed(1)) });
     });
 
+    const sortedAthletes = [...parsedRecords].sort((a, b) => {
+      const numA = a.jerseyNumber;
+      const numB = b.jerseyNumber;
+      if (numA === null && numB === null) return 0;
+      if (numA === null) return 1;
+      if (numB === null) return -1;
+      return numA - numB;
+    });
+
     return {
-      athletes: parsedRecords,
+      athletes: sortedAthletes,
       menus,
       teamAverages,
       positionAverages,
