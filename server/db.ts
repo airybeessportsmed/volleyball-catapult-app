@@ -1016,10 +1016,12 @@ export async function getPerformanceDataByAthleteId(athleteId: number, limit: nu
       .slice(-limit);
   }
   
-  return db.select().from(performanceData)
+  const list = await db.select().from(performanceData)
     .where(eq(performanceData.athleteId, athleteId))
-    .orderBy((table) => table.date)
+    .orderBy(desc(performanceData.date))
     .limit(limit);
+
+  return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 export async function getPerformanceDataByTeamId(teamId: number, dateStr?: string, limit: number = 1500) {
@@ -1166,7 +1168,7 @@ export async function getLatestPerformanceDataByAthlete(athleteId: number) {
   
   const result = await db.select().from(performanceData)
     .where(eq(performanceData.athleteId, athleteId))
-    .orderBy((table) => table.date)
+    .orderBy(desc(performanceData.date))
     .limit(1);
   
   return result.length > 0 ? result[0] : undefined;
