@@ -884,23 +884,31 @@ export default function AthleteAnalyticsScreen() {
           </View>
         ) : (
           <View style={{ gap: 8, marginTop: 4, paddingLeft: 26 }}>
-            <Text style={{ fontSize: 11, color: "#475569", lineHeight: 16 }}>
-              このデータはすでに補正または承認されています。元の生データに戻す場合は、下のボタンからキャンセル（差し戻し）を行ってください。
-            </Text>
-            <TouchableOpacity
-              onPress={handleRollback}
-              style={{
-                backgroundColor: "#475569",
-                paddingVertical: 10,
-                borderRadius: 10,
-                alignItems: "center",
-                marginTop: 4
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
-                補正をキャンセルして元に戻す
+            {latest.originalRawData ? (
+              <>
+                <Text style={{ fontSize: 11, color: "#475569", lineHeight: 16 }}>
+                  このデータはすでに補正または承認されています。元の生データに戻す場合は、下のボタンからキャンセル（差し戻し）を行ってください。
+                </Text>
+                <TouchableOpacity
+                  onPress={handleRollback}
+                  style={{
+                    backgroundColor: "#475569",
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: "center",
+                    marginTop: 4
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
+                    補正をキャンセルして元に戻す
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={{ fontSize: 11, color: "#94A3B8", fontStyle: "italic", lineHeight: 16 }}>
+                このデータはすでに補正済みです（機能追加前のデータのため、生データの復元はできません）。
               </Text>
-            </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
