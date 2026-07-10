@@ -261,6 +261,10 @@ export default function HomeScreen() {
   const { user, isAuthenticated, loading, logout } = useAuth();
   const router = useRouter();
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+  const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [trendMetric, setTrendMetric] = useState<"load" | "jumps">("load");
   const mockTokenMutation = trpc.auth.getMockToken.useMutation();
@@ -284,9 +288,9 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && user?.role === "athlete" }
   );
 
-  // Fetch latest performance data
-  const { data: latestPerformance, isLoading: perfLoading } = trpc.performance.getLatest.useQuery(
-    { athleteId: athlete?.id || 0 },
+  // Fetch performance data for selected date
+  const { data: latestPerformance, isLoading: perfLoading } = trpc.performance.getByAthleteAndDate.useQuery(
+    { athleteId: athlete?.id || 0, date: rawDate },
     { enabled: !!athlete?.id }
   );
 
@@ -315,10 +319,6 @@ export default function HomeScreen() {
   const [adviceText, setAdviceText] = useState("");
   const [activeTab, setActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings">("summary");
   const [expandedAthlete, setExpandedAthlete] = useState<number | null>(null);
-  const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
-  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
-  const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPasswordVal, setNewPasswordVal] = useState("");
@@ -800,9 +800,16 @@ export default function HomeScreen() {
             <Text className="text-2xl font-bold text-foreground">
               {user?.name || "選手ダッシュボード"}
             </Text>
-            <Text className="text-xs text-muted">
-              {latestPerformance ? `最新データ: ${new Date(latestPerformance.date).toLocaleDateString("ja-JP")}` : "データなし"}
-            </Text>
+            <TouchableOpacity 
+              onPress={() => setCalendarModalOpen(true)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, backgroundColor: "#F1F5F9", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" }}
+            >
+              <IconSymbol size={12} name="calendar" color="#64748B" />
+              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
+                {new Date(rawDate).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
+              </Text>
+              <IconSymbol size={10} name="chevron.down" color="#64748B" />
+            </TouchableOpacity>
           </View>
           <TouchableOpacity 
             onPress={logout}
@@ -949,6 +956,149 @@ export default function HomeScreen() {
             </View>
           </View>
         </ScrollView>
+
+        {/* 日付選択カレンダーモーダル (選手用) */}
+        <Modal
+          visible={calendarModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setCalendarModalOpen(false)}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0.4)", justifyContent: "center", alignItems: "center" }}
+            activeOpacity={1}
+            onPress={() => setCalendarModalOpen(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              style={{ 
+                width: 320, 
+                backgroundColor: "#FFFFFF", 
+                borderRadius: 24, 
+                padding: 20, 
+                borderWidth: 1, 
+                borderColor: "#E2E8F0",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+                elevation: 5
+              }}
+            >
+              {/* カレンダーヘッダー */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (calMonth === 1) {
+                      setCalMonth(12);
+                      setCalYear(prev => prev - 1);
+                    } else {
+                      setCalMonth(prev => prev - 1);
+                    }
+                  }}
+                  style={{ padding: 8 }}
+                >
+                  <IconSymbol size={16} name="chevron.left" color="#475569" />
+                </TouchableOpacity>
+                
+                <Text style={{ fontSize: 15, fontWeight: "bold", color: "#1E293B" }}>
+                  {calYear}年 {calMonth}月
+                </Text>
+                
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (calMonth === 12) {
+                      setCalMonth(1);
+                      setCalYear(prev => prev + 1);
+                    } else {
+                      setCalMonth(prev => prev + 1);
+                    }
+                  }}
+                  style={{ padding: 8 }}
+                >
+                  <IconSymbol size={16} name="chevron.right" color="#475569" />
+                </TouchableOpacity>
+              </View>
+
+              {/* 曜日ヘッダー */}
+              <View style={{ flexDirection: "row", marginBottom: 8 }}>
+                {["日", "月", "火", "水", "木", "金", "土"].map((w, idx) => (
+                  <View key={idx} style={{ flex: 1, alignItems: "center" }}>
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: idx === 0 ? "#EF4444" : idx === 6 ? "#3B82F6" : "#64748B" }}>
+                      {w}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* 日付グリッド */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                {(() => {
+                  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+                  const firstDayIdx = new Date(calYear, calMonth - 1, 1).getDay();
+                  const cells = [];
+
+                  // 空白セル
+                  for (let i = 0; i < firstDayIdx; i++) {
+                    cells.push(<View key={`empty-${i}`} style={{ width: "14.28%", aspectRatio: 1 }} />);
+                  }
+
+                  // 日付セル
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                    const isSelected = rawDate === dateStr;
+
+                    cells.push(
+                      <TouchableOpacity
+                        key={`day-${d}`}
+                        onPress={() => {
+                          setRawDate(dateStr);
+                          setCalendarModalOpen(false);
+                        }}
+                        style={{ 
+                          width: "14.28%", 
+                          aspectRatio: 1, 
+                          justifyContent: "center", 
+                          alignItems: "center",
+                          padding: 2
+                        }}
+                      >
+                        <View style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: isSelected ? "#FF6B35" : "transparent",
+                          justifyContent: "center",
+                          alignItems: "center"
+                        }}>
+                          <Text style={{ 
+                            fontSize: 12, 
+                            fontWeight: "bold", 
+                            color: isSelected ? "#FFFFFF" : "#1E293B" 
+                          }}>
+                            {d}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  return cells;
+                })()}
+              </View>
+
+              {/* 閉じる */}
+              <View style={{ borderTopWidth: 1, borderColor: "#F1F5F9", marginTop: 12, paddingTop: 12, alignItems: "center" }}>
+                <TouchableOpacity 
+                  onPress={() => setCalendarModalOpen(false)}
+                  style={{ paddingVertical: 8, paddingHorizontal: 24 }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "bold", color: "#64748B" }}>閉じる</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </ScreenContainer>
     );
   }

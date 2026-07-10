@@ -1174,6 +1174,32 @@ export async function getLatestPerformanceDataByAthlete(athleteId: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getPerformanceDataByAthleteAndDate(athleteId: number, dateStr: string) {
+  const db = await getDb();
+  if (!db) {
+    return mockPerformanceData.find(p => {
+      const d = new Date(p.date);
+      return p.athleteId === athleteId && formatDateKey(d) === dateStr;
+    });
+  }
+
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+  const endDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+
+  const result = await db.select().from(performanceData)
+    .where(
+      and(
+        eq(performanceData.athleteId, athleteId),
+        gte(performanceData.date, startDate),
+        lte(performanceData.date, endDate)
+      )
+    )
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function getPerformanceDataById(id: number) {
   const db = await getDb();
   if (!db) {

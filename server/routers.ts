@@ -378,6 +378,10 @@ export const appRouter = router({
       }))
       .query(({ input }) => db.getImportStatusByMonth(input.teamId, input.year, input.month)),
     
+    getByAthleteAndDate: protectedProcedure
+      .input(z.object({ athleteId: z.number(), date: z.string() }))
+      .query(({ input }) => db.getPerformanceDataByAthleteAndDate(input.athleteId, input.date)),
+
     getLatest: protectedProcedure
       .input(z.object({ athleteId: z.number() }))
       .query(({ input }) => db.getLatestPerformanceDataByAthlete(input.athleteId)),
