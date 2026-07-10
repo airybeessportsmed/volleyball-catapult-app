@@ -4073,6 +4073,17 @@ export async function correctPerformanceAnomaly(
   let samePosJumpHeights: number[] = [];
   let samePosAccels: number[] = [];
   
+  let samePosMaxHeights: number[] = [];
+  let samePosOver40s: number[] = [];
+  let samePosAvgLoads: number[] = [];
+  let samePosAvgAccels: number[] = [];
+  let samePosMaxAccels: number[] = [];
+  let samePosZone1Count: number[] = [];
+  let samePosZone2Count: number[] = [];
+  let samePosZone3Count: number[] = [];
+  let samePosZone4Count: number[] = [];
+  let samePosZone5Count: number[] = [];
+
   if (!db) {
     const samePosAthIds = mockAthletes.filter(a => a.teamId === teamId && a.position === position).map(a => a.id);
     const normalRecords = mockPerformanceData.filter(p => 
@@ -4084,6 +4095,17 @@ export async function correctPerformanceAnomaly(
     samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
     samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
     samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
+    
+    samePosMaxHeights = normalRecords.map(p => Number(p.maxJumpHeight || 0));
+    samePosOver40s = normalRecords.map(p => Number(p.jumpsOver40cm || 0));
+    samePosAvgLoads = normalRecords.map(p => Number(p.avgLoad || 0));
+    samePosAvgAccels = normalRecords.map(p => Number(p.avgAcceleration || 0));
+    samePosMaxAccels = normalRecords.map(p => Number(p.maxAcceleration || 0));
+    samePosZone1Count = normalRecords.map(p => Number(p.jumpZone1Count || 0));
+    samePosZone2Count = normalRecords.map(p => Number(p.jumpZone2Count || 0));
+    samePosZone3Count = normalRecords.map(p => Number(p.jumpZone3Count || 0));
+    samePosZone4Count = normalRecords.map(p => Number(p.jumpZone4Count || 0));
+    samePosZone5Count = normalRecords.map(p => Number(p.jumpZone5Count || 0));
   } else {
     const samePosAthletes = await db.select().from(athletes).where(and(eq(athletes.teamId, teamId), eq(athletes.position, position)));
     const samePosAthIds = samePosAthletes.map(a => a.id);
@@ -4099,6 +4121,17 @@ export async function correctPerformanceAnomaly(
       samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
       samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
       samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
+
+      samePosMaxHeights = normalRecords.map(p => Number(p.maxJumpHeight || 0));
+      samePosOver40s = normalRecords.map(p => Number(p.jumpsOver40cm || 0));
+      samePosAvgLoads = normalRecords.map(p => Number(p.avgLoad || 0));
+      samePosAvgAccels = normalRecords.map(p => Number(p.avgAcceleration || 0));
+      samePosMaxAccels = normalRecords.map(p => Number(p.maxAcceleration || 0));
+      samePosZone1Count = normalRecords.map(p => Number(p.jumpZone1Count || 0));
+      samePosZone2Count = normalRecords.map(p => Number(p.jumpZone2Count || 0));
+      samePosZone3Count = normalRecords.map(p => Number(p.jumpZone3Count || 0));
+      samePosZone4Count = normalRecords.map(p => Number(p.jumpZone4Count || 0));
+      samePosZone5Count = normalRecords.map(p => Number(p.jumpZone5Count || 0));
     }
   }
 
@@ -4115,22 +4148,72 @@ export async function correctPerformanceAnomaly(
   const correctedHeight = Number(avg(samePosJumpHeights, fallbackHeight).toFixed(2));
   const correctedAccel = Math.round(avg(samePosAccels, fallbackAccel));
 
-  // 元の生データ退避用JSON
+  const correctedMaxHeight = Number(avg(samePosMaxHeights, 45).toFixed(2));
+  const correctedOver40 = Math.round(avg(samePosOver40s, 10));
+  const correctedAvgLoad = Number(avg(samePosAvgLoads, 1.8).toFixed(2));
+  const correctedAvgAcc = Number(avg(samePosAvgAccels, 1.9).toFixed(2));
+  const correctedMaxAcc = Number(avg(samePosMaxAccels, 4.0).toFixed(2));
+  const correctedZone1 = Math.round(avg(samePosZone1Count, 5));
+  const correctedZone2 = Math.round(avg(samePosZone2Count, 10));
+  const correctedZone3 = Math.round(avg(samePosZone3Count, 15));
+  const correctedZone4 = Math.round(avg(samePosZone4Count, 12));
+  const correctedZone5 = Math.round(avg(samePosZone5Count, 10));
+
+  // 元の生データ退避用JSON (関連指標含む)
   const originalRawDataJson = record.originalRawData || JSON.stringify({
     totalJumps: record.totalJumps,
-    totalLoad: record.totalLoad ? String(record.totalLoad) : "0",
     avgJumpHeight: record.avgJumpHeight ? String(record.avgJumpHeight) : "0",
+    maxJumpHeight: record.maxJumpHeight ? String(record.maxJumpHeight) : "0",
+    jumpVolume: record.jumpVolume ? String(record.jumpVolume) : "0",
+    jumpsOver40cm: record.jumpsOver40cm,
+    jumpZone1Count: record.jumpZone1Count,
+    jumpZone2Count: record.jumpZone2Count,
+    jumpZone3Count: record.jumpZone3Count,
+    jumpZone4Count: record.jumpZone4Count,
+    jumpZone5Count: record.jumpZone5Count,
+    totalLoad: record.totalLoad ? String(record.totalLoad) : "0",
+    avgLoad: record.avgLoad ? String(record.avgLoad) : "0",
+    rawMenuData: record.rawMenuData,
     accelCount: record.accelCount,
+    avgAcceleration: record.avgAcceleration ? String(record.avgAcceleration) : "0",
+    maxAcceleration: record.maxAcceleration ? String(record.maxAcceleration) : "0",
+    accelVolume: record.accelVolume ? String(record.accelVolume) : "0",
     isAnomaly: record.isAnomaly,
     anomalyDetails: record.anomalyDetails
   });
 
-  // 4. アップデートフィールドの構築 (指定された項目のみ補正)
+  const finalLoad = metricsToCorrect.includes("totalLoad") ? correctedLoad : Number(record.totalLoad || 0);
+  const finalJumps = metricsToCorrect.includes("totalJumps") ? correctedJumps : record.totalJumps;
+  const finalHeight = metricsToCorrect.includes("totalJumps") ? correctedHeight : Number(record.avgJumpHeight || 0);
+  const finalAvgAcc = metricsToCorrect.includes("accelCount") ? correctedAvgAcc : Number(record.avgAcceleration || 0);
+  const finalAccelCount = metricsToCorrect.includes("accelCount") ? correctedAccel : record.accelCount;
+
+  // 4. アップデートフィールドの構築 (指定された項目と関連指標を補正)
   const updateFields = {
-    totalJumps: metricsToCorrect.includes("totalJumps") ? correctedJumps : record.totalJumps,
-    totalLoad: metricsToCorrect.includes("totalLoad") ? correctedLoad.toFixed(2) : record.totalLoad,
-    avgJumpHeight: metricsToCorrect.includes("avgJumpHeight") ? correctedHeight.toFixed(2) : record.avgJumpHeight,
-    accelCount: metricsToCorrect.includes("accelCount") ? correctedAccel : record.accelCount,
+    totalJumps: finalJumps,
+    avgJumpHeight: finalHeight.toFixed(2),
+    maxJumpHeight: metricsToCorrect.includes("totalJumps") ? correctedMaxHeight.toFixed(2) : record.maxJumpHeight,
+    jumpVolume: ((finalJumps * finalHeight) / 100).toFixed(2),
+    jumpsOver40cm: metricsToCorrect.includes("totalJumps") ? correctedOver40 : record.jumpsOver40cm,
+    jumpZone1Count: metricsToCorrect.includes("totalJumps") ? correctedZone1 : record.jumpZone1Count,
+    jumpZone2Count: metricsToCorrect.includes("totalJumps") ? correctedZone2 : record.jumpZone2Count,
+    jumpZone3Count: metricsToCorrect.includes("totalJumps") ? correctedZone3 : record.jumpZone3Count,
+    jumpZone4Count: metricsToCorrect.includes("totalJumps") ? correctedZone4 : record.jumpZone4Count,
+    jumpZone5Count: metricsToCorrect.includes("totalJumps") ? correctedZone5 : record.jumpZone5Count,
+    
+    totalLoad: finalLoad.toFixed(2),
+    avgLoad: metricsToCorrect.includes("totalLoad") ? correctedAvgLoad.toFixed(2) : record.avgLoad,
+    rawMenuData: metricsToCorrect.includes("totalLoad") ? JSON.stringify({
+      "W-up": (finalLoad * 0.15).toFixed(1),
+      "6v6": (finalLoad * 0.60).toFixed(1),
+      "Individual": (finalLoad * 0.25).toFixed(1)
+    }) : record.rawMenuData,
+
+    accelCount: finalAccelCount,
+    avgAcceleration: finalAvgAcc.toFixed(2),
+    maxAcceleration: metricsToCorrect.includes("accelCount") ? correctedMaxAcc.toFixed(2) : record.maxAcceleration,
+    accelVolume: (finalAvgAcc * finalAccelCount).toFixed(2),
+
     isAnomaly: true,
     anomalyDetails: record.anomalyDetails || (metricsToCorrect.length === 0 ? "指導者により正常判定（補正なし）" : "指導者による手動判定・補正"),
     isCorrected: true,
@@ -4215,9 +4298,22 @@ export async function rollbackPerformanceAnomaly(recordId: number): Promise<void
   const orig = JSON.parse(record.originalRawData);
   const rollbackFields = {
     totalJumps: orig.totalJumps,
-    totalLoad: orig.totalLoad,
     avgJumpHeight: orig.avgJumpHeight,
+    maxJumpHeight: orig.maxJumpHeight,
+    jumpVolume: orig.jumpVolume,
+    jumpsOver40cm: orig.jumpsOver40cm,
+    jumpZone1Count: orig.jumpZone1Count,
+    jumpZone2Count: orig.jumpZone2Count,
+    jumpZone3Count: orig.jumpZone3Count,
+    jumpZone4Count: orig.jumpZone4Count,
+    jumpZone5Count: orig.jumpZone5Count,
+    totalLoad: orig.totalLoad,
+    avgLoad: orig.avgLoad,
+    rawMenuData: orig.rawMenuData,
     accelCount: orig.accelCount,
+    avgAcceleration: orig.avgAcceleration,
+    maxAcceleration: orig.maxAcceleration,
+    accelVolume: orig.accelVolume,
     isAnomaly: orig.isAnomaly,
     anomalyDetails: orig.anomalyDetails,
     isCorrected: false,
