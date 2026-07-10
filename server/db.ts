@@ -1,6 +1,8 @@
 import { eq, and, gte, lte, desc, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import fs from "fs";
+import path from "path";
 import { InsertUser, users, teams, athletes, performanceData, csvUploads, teamSettings, InsertAthlete, InsertPerformanceData, InsertCsvUpload, User, Team, Athlete, PerformanceData as PerfData, CsvUpload, TeamSettings } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -490,6 +492,47 @@ const generateDemoPerformanceData = () => {
 };
 mockPerformanceData = generateDemoPerformanceData();
 
+const MOCK_ATHLETES_FILE = path.join(process.cwd(), "server/mock_athletes.json");
+const MOCK_USERS_FILE = path.join(process.cwd(), "server/mock_users.json");
+const MOCK_PERF_FILE = path.join(process.cwd(), "server/mock_performance.json");
+
+export function saveMockStore() {
+  try {
+    fs.writeFileSync(MOCK_ATHLETES_FILE, JSON.stringify(mockAthletes, null, 2), "utf8");
+    fs.writeFileSync(MOCK_USERS_FILE, JSON.stringify(mockUsers, null, 2), "utf8");
+    fs.writeFileSync(MOCK_PERF_FILE, JSON.stringify(mockPerformanceData, null, 2), "utf8");
+  } catch (err) {
+    console.error("Failed to save mock store to disk:", err);
+  }
+}
+
+export function loadMockStore() {
+  try {
+    if (fs.existsSync(MOCK_ATHLETES_FILE)) {
+      const data = fs.readFileSync(MOCK_ATHLETES_FILE, "utf8");
+      mockAthletes = JSON.parse(data);
+    }
+    if (fs.existsSync(MOCK_USERS_FILE)) {
+      const data = fs.readFileSync(MOCK_USERS_FILE, "utf8");
+      mockUsers = JSON.parse(data);
+    }
+    if (fs.existsSync(MOCK_PERF_FILE)) {
+      const data = fs.readFileSync(MOCK_PERF_FILE, "utf8");
+      const parsed = JSON.parse(data);
+      mockPerformanceData = parsed.map((p: any) => ({
+        ...p,
+        date: new Date(p.date),
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt)
+      }));
+    }
+  } catch (err) {
+    console.error("Failed to load mock store from disk:", err);
+  }
+}
+
+loadMockStore();
+
 let mockCsvUploads: CsvUpload[] = [];
 
 // ==========================================
@@ -884,6 +927,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
         });
       }
     }
+    saveMockStore();
     return;
   }
 
@@ -3996,6 +4040,7 @@ export async function updateAthleteCsvNames(athleteId: number, csvNames: string)
     const a = mockAthletes.find(item => item.id === athleteId);
     if (a) {
       a.csvNames = csvNames;
+      saveMockStore();
     }
     return { success: true };
   }
@@ -4229,6 +4274,7 @@ export async function correctPerformanceAnomaly(
         ...updateFields
       } as any;
     }
+    saveMockStore();
   } else {
     await db.update(performanceData)
       .set(updateFields as any)
@@ -4329,6 +4375,7 @@ export async function rollbackPerformanceAnomaly(recordId: number): Promise<void
         ...rollbackFields
       } as any;
     }
+    saveMockStore();
   } else {
     await db.update(performanceData)
       .set(rollbackFields as any)
