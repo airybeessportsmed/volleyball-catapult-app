@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, useWindowDimensions } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
@@ -152,6 +152,11 @@ export default function AthleteAnalyticsScreen() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<"summary" | "jumps" | "menu" | "comparison">("summary");
+  const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
+  const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
 
   // Fetch specific athlete profile
   const { data: athlete, isLoading: athleteLoading } = trpc.athlete.getById.useQuery(
@@ -161,7 +166,7 @@ export default function AthleteAnalyticsScreen() {
 
   // Fetch full analytics dashboard data for this athlete
   const { data: analytics, isLoading: analyticsLoading, refetch } = trpc.performance.getAthleteAnalytics.useQuery(
-    { athleteId: athleteId || 0 },
+    { athleteId: athleteId || 0, date: rawDate, acwrMetric },
     { enabled: !!athleteId }
   );
 
@@ -255,6 +260,39 @@ export default function AthleteAnalyticsScreen() {
           <View className={`px-3 py-1 rounded-full ${statusBg}`}>
             <Text className={`text-xs font-bold ${statusColor}`}>{statusText}</Text>
           </View>
+        </View>
+
+        <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 3, borderRadius: 12, marginVertical: 4 }}>
+          {[
+            { key: "totalLoad", label: "PlayerLoad" },
+            { key: "jumpVolume", label: "Jump Volume" },
+            { key: "accelVolume", label: "Accel Volume" }
+          ].map(opt => {
+            const isSelected = acwrMetric === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setAcwrMetric(opt.key as any)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 6,
+                  borderRadius: 9,
+                  backgroundColor: isSelected ? "#FFFFFF" : "transparent",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  shadowColor: isSelected ? "#000" : "transparent",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: isSelected ? 0.1 : 0,
+                  shadowRadius: 1,
+                  elevation: isSelected ? 1 : 0
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: "bold", color: isSelected ? "#0F172A" : "#64748B" }}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <View className="gap-2.5 my-2">
@@ -1126,11 +1164,57 @@ export default function AthleteAnalyticsScreen() {
           <IconSymbol size={20} name="chevron.left" color="#4B5563" />
         </TouchableOpacity>
         <View className="flex-1 pr-2">
-          <Text className="text-xl font-bold text-foreground">トレンド分析</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text className="text-xl font-bold text-foreground">トレンド分析</Text>
+            {latest?.isAnomaly && (
+              <View style={{ backgroundColor: latest.isCorrected ? "#E2E8F0" : "#FEE2E2", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 8, fontWeight: "bold", color: latest.isCorrected ? "#475569" : "#EF4444" }}>
+                  {latest.isCorrected ? "測定不良(補正済)" : "⚠️測定不良(要補正)"}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text className="text-xs text-muted" numberOfLines={1}>
             {(athlete as any).user?.name} | {athlete.position || "ポジション未設定"} #{athlete.jerseyNumber || ""}
           </Text>
         </View>
+
+        {/* 日付切り替えボタン */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <TouchableOpacity
+            onPress={() => {
+              const d = new Date(rawDate);
+              d.setDate(d.getDate() - 1);
+              setRawDate(d.toLocaleDateString("sv-SE"));
+            }}
+            style={{ backgroundColor: "#F1F5F9", padding: 6, borderRadius: 8 }}
+          >
+            <IconSymbol size={12} name="chevron.left" color="#475569" />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => setCalendarModalOpen(true)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+          >
+            <IconSymbol size={12} name="calendar" color="#64748B" />
+            <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
+              {new Date(rawDate).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
+            </Text>
+            <IconSymbol size={10} name="chevron.down" color="#64748B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              const d = new Date(rawDate);
+              d.setDate(d.getDate() + 1);
+              setRawDate(d.toLocaleDateString("sv-SE"));
+            }}
+            style={{ backgroundColor: "#F1F5F9", padding: 6, borderRadius: 8 }}
+          >
+            <IconSymbol size={12} name="chevron.right" color="#475569" />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity 
           onPress={() => refetch()}
           className="p-2.5 bg-muted/20 rounded-full active:bg-muted/30"
@@ -1181,6 +1265,134 @@ export default function AthleteAnalyticsScreen() {
           {activeTab === "comparison" && renderComparisonAnalytics()}
         </View>
       </ScrollView>
+      {/* 日付選択カレンダーモーダル */}
+      <Modal
+        visible={calendarModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCalendarModalOpen(false)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          onPress={() => setCalendarModalOpen(false)}
+          style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", padding: 20 }}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 340, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}
+          >
+            {/* カレンダーヘッダー */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 12 }}>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (calMonth === 1) {
+                    setCalMonth(12);
+                    setCalYear(prev => prev - 1);
+                  } else {
+                    setCalMonth(prev => prev - 1);
+                  }
+                }}
+                style={{ padding: 8 }}
+              >
+                <IconSymbol size={16} name="chevron.left" color="#475569" />
+              </TouchableOpacity>
+              
+              <Text style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>
+                {calYear}年 {calMonth}月
+              </Text>
+
+              <TouchableOpacity 
+                onPress={() => {
+                  if (calMonth === 12) {
+                    setCalMonth(1);
+                    setCalYear(prev => prev - 1);
+                  } else {
+                    setCalMonth(prev => prev + 1);
+                  }
+                }}
+                style={{ padding: 8 }}
+              >
+                <IconSymbol size={16} name="chevron.right" color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 曜日ヘッダー */}
+            <View style={{ flexDirection: "row", marginBottom: 8 }}>
+              {["日", "月", "火", "水", "木", "金", "土"].map((w, idx) => (
+                <View key={idx} style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 10, fontWeight: "bold", color: idx === 0 ? "#EF4444" : idx === 6 ? "#3B82F6" : "#64748B" }}>
+                    {w}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 日付グリッド */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              {(() => {
+                const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+                const firstDayIdx = new Date(calYear, calMonth - 1, 1).getDay();
+                const cells = [];
+
+                for (let i = 0; i < firstDayIdx; i++) {
+                  cells.push(<View key={`empty-${i}`} style={{ width: "14.28%", aspectRatio: 1 }} />);
+                }
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const dateStr = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  const isSelected = rawDate === dateStr;
+
+                  cells.push(
+                    <TouchableOpacity
+                      key={`day-${d}`}
+                      onPress={() => {
+                        setRawDate(dateStr);
+                        setCalendarModalOpen(false);
+                      }}
+                      style={{ 
+                        width: "14.28%", 
+                        aspectRatio: 1, 
+                        justifyContent: "center", 
+                        alignItems: "center",
+                        padding: 2
+                      }}
+                    >
+                      <View style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: isSelected ? "#FF6B35" : "transparent",
+                        justifyContent: "center",
+                        alignItems: "center"
+                      }}>
+                        <Text style={{ 
+                          fontSize: 12, 
+                          fontWeight: "bold", 
+                          color: isSelected ? "#FFFFFF" : "#1E293B" 
+                        }}>
+                          {d}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }
+
+                return cells;
+              })()}
+            </View>
+
+            {/* 閉じる */}
+            <View style={{ borderTopWidth: 1, borderColor: "#F1F5F9", marginTop: 12, paddingTop: 12, alignItems: "center" }}>
+              <TouchableOpacity 
+                onPress={() => setCalendarModalOpen(false)}
+                style={{ paddingVertical: 8, paddingHorizontal: 24 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "bold", color: "#64748B" }}>閉じる</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </ScreenContainer>
   );
 }
