@@ -632,13 +632,46 @@ export default function HomeScreen() {
         } catch (e) {}
       }
       
-      let playerLoads = menuObj.playerLoads || {};
-      let jumpVolumes = menuObj.jumpVolumes || {};
-      let accelVolumes = menuObj.accelVolumes || {};
+      let playerLoads: Record<string, number> = {};
+      let jumpVolumes: Record<string, number> = {};
+      let accelVolumes: Record<string, number> = {};
 
-      if (!menuObj.playerLoads && !menuObj.jumpVolumes && !menuObj.accelVolumes && Object.keys(menuObj).length > 0) {
-        if (!menuObj.sRpeBall && !menuObj.sRpeSandC) {
-          playerLoads = menuObj;
+      if (menuObj && menuObj.loads) {
+        playerLoads = menuObj.loads;
+        accelVolumes = menuObj.ima || {};
+        const totalJumpsVol = p.jumpVolume ? Number(p.jumpVolume) : 0;
+        const totalLoadVal = p.totalLoad ? Number(p.totalLoad) : 1;
+        Object.entries(playerLoads).forEach(([m, val]) => {
+          jumpVolumes[m] = (Number(val) / totalLoadVal) * totalJumpsVol;
+        });
+      } else {
+        let rawLoads = (menuObj && menuObj.playerLoads) || {};
+        let rawJumps = (menuObj && menuObj.jumpVolumes) || {};
+        let rawAccels = (menuObj && menuObj.accelVolumes) || {};
+
+        if (menuObj && !menuObj.playerLoads && !menuObj.jumpVolumes && !menuObj.accelVolumes && Object.keys(menuObj).length > 0) {
+          if (!menuObj.sRpeBall && !menuObj.sRpeSandC) {
+            rawLoads = menuObj;
+          }
+        }
+        
+        playerLoads = rawLoads;
+        jumpVolumes = rawJumps;
+        accelVolumes = rawAccels;
+
+        if (Object.keys(accelVolumes).length === 0) {
+          const totalIma = p.accelCount || 0;
+          const totalLoadVal = p.totalLoad ? Number(p.totalLoad) : 1;
+          Object.entries(playerLoads).forEach(([m, val]) => {
+            accelVolumes[m] = (Number(val) / totalLoadVal) * totalIma;
+          });
+        }
+        if (Object.keys(jumpVolumes).length === 0) {
+          const totalJumpsVol = p.jumpVolume ? Number(p.jumpVolume) : 0;
+          const totalLoadVal = p.totalLoad ? Number(p.totalLoad) : 1;
+          Object.entries(playerLoads).forEach(([m, val]) => {
+            jumpVolumes[m] = (Number(val) / totalLoadVal) * totalJumpsVol;
+          });
         }
       }
 
