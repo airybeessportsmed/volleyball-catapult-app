@@ -2975,7 +2975,7 @@ export default function HomeScreen() {
                                 return (
                                   <View key={`j_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
                                     <Text style={{ fontSize: 11, color: val ? "#0284C7" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                      {val !== undefined ? Math.round(val) : "-"}
+                                      {val !== undefined && val !== null ? Math.round(Number(val)) : "-"}
                                     </Text>
                                   </View>
                                 );
@@ -2986,7 +2986,7 @@ export default function HomeScreen() {
                                 return (
                                   <View key={`a_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
                                     <Text style={{ fontSize: 11, color: val ? "#DC2626" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                      {val !== undefined ? val.toFixed(1) : "-"}
+                                      {val !== undefined && val !== null ? Number(val).toFixed(1) : "-"}
                                     </Text>
                                   </View>
                                 );
@@ -2997,7 +2997,7 @@ export default function HomeScreen() {
                                 return (
                                   <View key={`p_v_${ath.athleteId}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#F1F5F9" }}>
                                     <Text style={{ fontSize: 11, color: val ? "#16A34A" : "#CBD5E1", fontWeight: val ? "bold" : "normal" }}>
-                                      {val !== undefined ? val.toFixed(1) : "-"}
+                                      {val !== undefined && val !== null ? Number(val).toFixed(1) : "-"}
                                     </Text>
                                   </View>
                                 );
@@ -3023,7 +3023,7 @@ export default function HomeScreen() {
                             return (
                               <View key={`j_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
                                 <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0369A1" }}>
-                                  {val !== null ? Math.round(val) : "-"}
+                                  {val !== null && val !== undefined ? Math.round(Number(val)) : "-"}
                                 </Text>
                               </View>
                             );
@@ -3034,7 +3034,7 @@ export default function HomeScreen() {
                             return (
                               <View key={`a_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
                                 <Text style={{ fontSize: 11, fontWeight: "bold", color: "#B91C1C" }}>
-                                  {val !== null ? val.toFixed(1) : "-"}
+                                  {val !== null && val !== undefined ? Number(val).toFixed(1) : "-"}
                                 </Text>
                               </View>
                             );
@@ -3045,7 +3045,7 @@ export default function HomeScreen() {
                             return (
                               <View key={`p_team_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#E2E8F0" }}>
                                 <Text style={{ fontSize: 11, fontWeight: "bold", color: "#15803D" }}>
-                                  {val !== null ? val.toFixed(1) : "-"}
+                                  {val !== null && val !== undefined ? Number(val).toFixed(1) : "-"}
                                 </Text>
                               </View>
                             );
@@ -3070,7 +3070,7 @@ export default function HomeScreen() {
                               return (
                                 <View key={`j_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
                                   <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
-                                    {val !== null ? Math.round(val) : "-"}
+                                    {val !== null && val !== undefined ? Math.round(Number(val)) : "-"}
                                   </Text>
                                 </View>
                               );
@@ -3081,7 +3081,7 @@ export default function HomeScreen() {
                               return (
                                 <View key={`a_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
                                   <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
-                                    {val !== null ? val.toFixed(1) : "-"}
+                                    {val !== null && val !== undefined ? Number(val).toFixed(1) : "-"}
                                   </Text>
                                 </View>
                               );
@@ -3092,7 +3092,7 @@ export default function HomeScreen() {
                               return (
                                 <View key={`p_${pos}_${m}`} style={{ width: 75, height: 32, justifyContent: "center", alignItems: "center", borderLeftWidth: 1, borderColor: "#FED7AA" }}>
                                   <Text style={{ fontSize: 11, fontWeight: "bold", color: "#C2410C" }}>
-                                    {val !== null ? val.toFixed(1) : "-"}
+                                    {val !== null && val !== undefined ? Number(val).toFixed(1) : "-"}
                                   </Text>
                                 </View>
                               );
