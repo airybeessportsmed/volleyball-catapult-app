@@ -1683,24 +1683,26 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     rawCsvData: newRawCsvData,
   };
 
-  // 異常判定
-  let isAnomaly = existing?.isAnomaly || false;
-  let anomalyDetails = existing?.anomalyDetails || null;
-  let isCorrected = existing?.isCorrected || false;
+  // 異常判定と補正状態のリセット
+  // 新しいCSVから同じ日付のデータが再度アップロードされた場合は、
+  // 以前の補正状態をリセットし、最初から補正・承認のし直しができるようにします。
+  let isAnomaly = false;
+  let anomalyDetails = null;
+  let isCorrected = false;
+  let originalRawData = null;
 
-  if (!isCorrected) {
-    const anomalyCheck = checkPerformanceAnomaly(mergedData);
-    if (anomalyCheck.isAnomaly) {
-      isAnomaly = true;
-      anomalyDetails = anomalyCheck.details;
-    }
+  const anomalyCheck = checkPerformanceAnomaly(mergedData);
+  if (anomalyCheck.isAnomaly) {
+    isAnomaly = true;
+    anomalyDetails = anomalyCheck.details;
   }
 
   const finalMerged = {
     ...mergedData,
     isAnomaly,
     anomalyDetails,
-    isCorrected
+    isCorrected,
+    originalRawData
   };
 
   if (existing) {
