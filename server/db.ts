@@ -331,9 +331,16 @@ const generateDemoPerformanceData = () => {
       avgLoad: (1.5 + Math.random() * 0.5).toFixed(2) as any,
       duration: sakuraDurationMin * 60,
       rawMenuData: JSON.stringify({
-        "W-up": (sakuraLoadFinal * 0.15).toFixed(1),
-        "6v6": (sakuraLoadFinal * 0.60).toFixed(1),
-        "Individual": (sakuraLoadFinal * 0.25).toFixed(1)
+        loads: {
+          "W-up": Number((sakuraLoadFinal * 0.15).toFixed(1)),
+          "6v6": Number((sakuraLoadFinal * 0.60).toFixed(1)),
+          "Individual": Number((sakuraLoadFinal * 0.25).toFixed(1))
+        },
+        ima: {
+          "W-up": Math.round(sakuraAccelCount * 0.10),
+          "6v6": Math.round(sakuraAccelCount * 0.70),
+          "Individual": Math.round(sakuraAccelCount * 0.20)
+        }
       }),
       coachAdvice: getAdvice(1, i),
       sRPE: sakuraRpe * sakuraDurationMin,
@@ -402,9 +409,16 @@ const generateDemoPerformanceData = () => {
       avgLoad: (2.2 + Math.random() * 0.8).toFixed(2) as any,
       duration: hinataDurationMin * 60,
       rawMenuData: JSON.stringify({
-        "W-up": (hinataLoad * 0.15).toFixed(1),
-        "6v6": (hinataLoad * 0.55).toFixed(1),
-        "Individual": (hinataLoad * 0.30).toFixed(1)
+        loads: {
+          "W-up": Number((hinataLoad * 0.15).toFixed(1)),
+          "6v6": Number((hinataLoad * 0.55).toFixed(1)),
+          "Individual": Number((hinataLoad * 0.30).toFixed(1))
+        },
+        ima: {
+          "W-up": Math.round(hinataAccelCount * 0.10),
+          "6v6": Math.round(hinataAccelCount * 0.65),
+          "Individual": Math.round(hinataAccelCount * 0.25)
+        }
       }),
       coachAdvice: getAdvice(2, i),
       sRPE: hinataRpe * hinataDurationMin,
@@ -464,9 +478,16 @@ const generateDemoPerformanceData = () => {
       avgLoad: (1.8 + Math.random() * 0.6).toFixed(2) as any,
       duration: mioDurationMin * 60,
       rawMenuData: JSON.stringify({
-        "W-up": (mioLoad * 0.15).toFixed(1),
-        "6v6": (mioLoad * 0.65).toFixed(1),
-        "Individual": (mioLoad * 0.20).toFixed(1)
+        loads: {
+          "W-up": Number((mioLoad * 0.15).toFixed(1)),
+          "6v6": Number((mioLoad * 0.65).toFixed(1)),
+          "Individual": Number((mioLoad * 0.20).toFixed(1))
+        },
+        ima: {
+          "W-up": Math.round(mioAccelCount * 0.10),
+          "6v6": Math.round(mioAccelCount * 0.70),
+          "Individual": Math.round(mioAccelCount * 0.20)
+        }
       }),
       coachAdvice: getAdvice(3, i),
       sRPE: mioRpe * mioDurationMin,
@@ -4248,11 +4269,32 @@ export async function correctPerformanceAnomaly(
     
     totalLoad: finalLoad.toFixed(2),
     avgLoad: metricsToCorrect.includes("totalLoad") ? correctedAvgLoad.toFixed(2) : record.avgLoad,
-    rawMenuData: metricsToCorrect.includes("totalLoad") ? JSON.stringify({
-      "W-up": (finalLoad * 0.15).toFixed(1),
-      "6v6": (finalLoad * 0.60).toFixed(1),
-      "Individual": (finalLoad * 0.25).toFixed(1)
-    }) : record.rawMenuData,
+    rawMenuData: JSON.stringify({
+      loads: metricsToCorrect.includes("totalLoad") ? {
+        "W-up": Number((finalLoad * 0.15).toFixed(1)),
+        "6v6": Number((finalLoad * 0.60).toFixed(1)),
+        "Individual": Number((finalLoad * 0.25).toFixed(1))
+      } : (
+        (() => {
+          try {
+            const p = JSON.parse(record.rawMenuData || "{}");
+            return p.loads || p;
+          } catch(e) { return {}; }
+        })()
+      ),
+      ima: metricsToCorrect.includes("accelCount") ? {
+        "W-up": Math.round(finalAccelCount * 0.10),
+        "6v6": Math.round(finalAccelCount * 0.70),
+        "Individual": Math.round(finalAccelCount * 0.20)
+      } : (
+        (() => {
+          try {
+            const p = JSON.parse(record.rawMenuData || "{}");
+            return p.ima || {};
+          } catch(e) { return {}; }
+        })()
+      )
+    }),
 
     accelCount: finalAccelCount,
     avgAcceleration: finalAvgAcc.toFixed(2),

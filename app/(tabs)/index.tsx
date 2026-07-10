@@ -554,6 +554,7 @@ export default function HomeScreen() {
 
   const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "jumps" | "menu">("summary");
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
+  const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
 
   // Fetch athlete info
   // Fetch performance data for selected date
@@ -1245,7 +1246,6 @@ export default function HomeScreen() {
       const ratio40 = totalJumps > 0 ? ((jumpsOver40 / totalJumps) * 100).toFixed(1) : "0.0";
       
       const maxCount = Math.max(...zones.map(z => z.count), 1);
-
       return (
         <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
           <View>
@@ -1301,37 +1301,77 @@ export default function HomeScreen() {
       );
     };
 
-    // メニュー別負荷描画ヘルパー
+    // メニュー別負荷・IMA描画ヘルパー
     const renderMenuLoadAnalytics = () => {
       if (!latest) return null;
       let menuLoads: Record<string, number> = {};
+      let menuIma: Record<string, number> = {};
+      
       try {
         if (latest.rawMenuData) {
-          menuLoads = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
+          const parsed = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
+          if (parsed && parsed.loads) {
+            menuLoads = parsed.loads;
+            menuIma = parsed.ima || {};
+          } else {
+            // 互換用: すべてを load と見なす
+            menuLoads = parsed || {};
+            // ima は load の比率から適当に分配
+            const totalIma = latest.accelCount || 0;
+            const totalLoad = latest.totalLoad ? Number(latest.totalLoad) : 1;
+            Object.entries(menuLoads).forEach(([name, val]) => {
+              menuIma[name] = Math.round((Number(val) / totalLoad) * totalIma);
+            });
+          }
         }
       } catch (e) {
         console.warn("Failed to parse rawMenuData", e);
       }
 
-      const menuItems = Object.entries(menuLoads).map(([name, val]) => ({
+      const isLoad = menuMetric === "load";
+      const targetData = isLoad ? menuLoads : menuIma;
+      
+      const menuItems = Object.entries(targetData).map(([name, val]) => ({
         name,
-        load: Number(val)
-      })).sort((a, b) => b.load - a.load);
+        value: Number(val)
+      })).sort((a, b) => b.value - a.value);
 
-      const totalLoadSum = menuItems.reduce((a, b) => a + b.load, 0) || 1;
+      const totalSum = menuItems.reduce((a, b) => a + b.value, 0) || 1;
 
       return (
         <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
-          <View>
-            <Text className="text-sm font-bold text-foreground">練習メニュー別運動量</Text>
-            <Text className="text-[10px] text-muted font-medium">メニューごとの負荷配分と自主練の数値</Text>
+          <View className="flex-row justify-between items-start">
+            <View>
+              <Text className="text-sm font-bold text-foreground">
+                {isLoad ? "練習メニュー別運動量 (PlayerLoad)" : "練習メニュー別加速回数 (IMA)"}
+              </Text>
+              <Text className="text-[10px] text-muted font-medium">
+                {isLoad ? "メニューごとの負荷配分と自主練の数値" : "メニューごとの加速・動作アクションの回数"}
+              </Text>
+            </View>
+
+            {/* 指標切り替えセグメントトグル */}
+            <View className="flex-row bg-muted/30 p-0.5 rounded-xl border border-border/40">
+              <TouchableOpacity
+                onPress={() => setMenuMetric("load")}
+                className={`px-3 py-1.5 rounded-lg ${isLoad ? "bg-surface shadow-xs" : ""}`}
+              >
+                <Text className={`text-[10px] font-bold ${isLoad ? "text-foreground" : "text-muted"}`}>運動量</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setMenuMetric("ima")}
+                className={`px-3 py-1.5 rounded-lg ${!isLoad ? "bg-surface shadow-xs" : ""}`}
+              >
+                <Text className={`text-[10px] font-bold ${!isLoad ? "text-foreground" : "text-muted"}`}>IMA加速</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {menuItems.length > 0 ? (
             <View className="gap-5">
               <View className="h-6 w-full rounded-full overflow-hidden flex-row border border-border/30 bg-muted/20">
                 {menuItems.map((item, idx) => {
-                  const itemPercent = `${(item.load / totalLoadSum) * 100}%`;
+                  const itemPercent = `${(item.value / totalSum) * 100}%`;
                   const colors = [
                     "bg-primary",
                     "bg-secondary",
@@ -1352,7 +1392,7 @@ export default function HomeScreen() {
 
               <View className="gap-3">
                 {menuItems.map((item, idx) => {
-                  const percentVal = ((item.load / totalLoadSum) * 100).toFixed(1);
+                  const percentVal = ((item.value / totalSum) * 100).toFixed(1);
                   const colors = [
                     "bg-primary text-white",
                     "bg-secondary text-white",
@@ -1383,7 +1423,10 @@ export default function HomeScreen() {
                       </View>
                       
                       <Text className="text-sm font-extrabold text-foreground font-mono">
-                        {item.load.toFixed(1)}
+                        {item.value.toFixed(isLoad ? 1 : 0)}
+                        <Text className="text-[10px] font-normal text-muted ml-0.5">
+                          {isLoad ? "" : "回"}
+                        </Text>
                       </Text>
                     </View>
                   );
