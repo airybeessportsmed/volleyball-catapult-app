@@ -170,6 +170,8 @@ export default function AthleteAnalyticsScreen() {
     { enabled: !!athleteId }
   );
 
+  const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
+
   if (athleteLoading || analyticsLoading) {
     return (
       <ScreenContainer className="flex items-center justify-center bg-background">
@@ -688,6 +690,73 @@ export default function AthleteAnalyticsScreen() {
               </Text>
             </View>
           </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderManualAnomalyHandler = () => {
+    if (!latest) return null;
+
+    return (
+      <View style={{
+        backgroundColor: latest.isCorrected ? "#F8FAFC" : "#FEF2F2",
+        borderColor: latest.isCorrected ? "#E2E8F0" : "#FCA5A5",
+        borderWidth: 1,
+        borderRadius: 20,
+        padding: 16,
+        gap: 10,
+        marginBottom: 4
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <IconSymbol size={18} name="exclamationmark.triangle.fill" color={latest.isCorrected ? "#64748B" : "#EF4444"} />
+          <Text style={{ fontSize: 13, fontWeight: "bold", color: latest.isCorrected ? "#334155" : "#991B1B" }}>
+            {latest.isAnomaly 
+              ? (latest.isCorrected ? "測定不良データ (補正・承認済)" : "自動検知された測定不良データ (未補正)")
+              : "この日の測定データは自動検知では正常と判定されています"
+            }
+          </Text>
+        </View>
+
+        {latest.isAnomaly && (
+          <Text style={{ fontSize: 11, color: latest.isCorrected ? "#64748B" : "#B91C1C", lineHeight: 15, paddingLeft: 26 }}>
+            検出詳細: {latest.anomalyDetails}
+          </Text>
+        )}
+
+        {!latest.isCorrected ? (
+          <View style={{ gap: 6, marginTop: 4 }}>
+            <Text style={{ fontSize: 10, color: "#64748B", lineHeight: 14, paddingLeft: 26 }}>
+              ※Catapultデータの測定漏れやデバイス誤作動等で異常値が生じている場合、手動で「測定不良」としてマークし、ポジション別平均値に補正することができます。
+            </Text>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await correctAnomalyMutation.mutateAsync({ recordId: latest.id });
+                  alert("データを手動で測定不良として判定し、ポジション平均値で補正しました。");
+                  refetch();
+                } catch (e: any) {
+                  alert(`補正に失敗しました: ${e.message}`);
+                }
+              }}
+              style={{
+                backgroundColor: "#EF4444",
+                paddingVertical: 10,
+                borderRadius: 10,
+                alignItems: "center",
+                marginLeft: 26,
+                marginTop: 4
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
+                {latest.isAnomaly ? "ポジション平均で補正し承認" : "測定不良として手動補正・承認"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={{ fontSize: 11, color: "#475569", fontStyle: "italic", paddingLeft: 26 }}>
+            手動補正が完了しています。このデータはポジション平均値で上書き保存されています。
+          </Text>
         )}
       </View>
     );
@@ -1253,6 +1322,7 @@ export default function AthleteAnalyticsScreen() {
         <View className="gap-5">
           {activeTab === "summary" && (
             <>
+              {renderManualAnomalyHandler()}
               {renderSignalLightCard()}
               {renderGuidanceAndAdvice()}
               {renderACWRGauge()}

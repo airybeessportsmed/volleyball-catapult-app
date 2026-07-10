@@ -4115,6 +4115,8 @@ export async function correctPerformanceAnomaly(recordId: number): Promise<void>
     totalLoad: correctedLoad.toFixed(2),
     avgJumpHeight: correctedHeight.toFixed(2),
     accelCount: correctedAccel,
+    isAnomaly: true,
+    anomalyDetails: record.anomalyDetails || "指導者による手動判定・補正",
     isCorrected: true,
     updatedAt: new Date()
   };
