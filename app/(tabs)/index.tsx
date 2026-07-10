@@ -1301,16 +1301,40 @@ export default function HomeScreen() {
             <Text className="text-2xl font-bold text-foreground">
               {user?.name || "選手ダッシュボード"}
             </Text>
-            <TouchableOpacity 
-              onPress={() => setCalendarModalOpen(true)}
-              style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, backgroundColor: "#F1F5F9", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" }}
-            >
-              <IconSymbol size={12} name="calendar" color="#64748B" />
-              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
-                {new Date(rawDate).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
-              </Text>
-              <IconSymbol size={10} name="chevron.down" color="#64748B" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  const d = new Date(rawDate);
+                  d.setDate(d.getDate() - 1);
+                  setRawDate(d.toLocaleDateString("sv-SE"));
+                }}
+                style={{ backgroundColor: "#F1F5F9", padding: 6, borderRadius: 8 }}
+              >
+                <IconSymbol size={12} name="chevron.left" color="#475569" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => setCalendarModalOpen(true)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+              >
+                <IconSymbol size={12} name="calendar" color="#64748B" />
+                <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
+                  {new Date(rawDate).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
+                </Text>
+                <IconSymbol size={10} name="chevron.down" color="#64748B" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const d = new Date(rawDate);
+                  d.setDate(d.getDate() + 1);
+                  setRawDate(d.toLocaleDateString("sv-SE"));
+                }}
+                style={{ backgroundColor: "#F1F5F9", padding: 6, borderRadius: 8 }}
+              >
+                <IconSymbol size={12} name="chevron.right" color="#475569" />
+              </TouchableOpacity>
+            </View>
           </View>
           <TouchableOpacity 
             onPress={logout}
