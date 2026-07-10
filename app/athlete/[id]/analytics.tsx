@@ -157,6 +157,9 @@ export default function AthleteAnalyticsScreen() {
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+  const [correctLoad, setCorrectLoad] = useState(true);
+  const [correctJumps, setCorrectJumps] = useState(true);
+  const [correctAccel, setCorrectAccel] = useState(true);
 
   // Fetch specific athlete profile
   const { data: athlete, isLoading: athleteLoading } = trpc.athlete.getById.useQuery(
@@ -171,6 +174,7 @@ export default function AthleteAnalyticsScreen() {
   );
 
   const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
+  const rollbackAnomalyMutation = trpc.performance.rollbackAnomaly.useMutation();
 
   if (athleteLoading || analyticsLoading) {
     return (
@@ -698,6 +702,41 @@ export default function AthleteAnalyticsScreen() {
   const renderManualAnomalyHandler = () => {
     if (!latest) return null;
 
+    const handleCorrect = async (useAverage: boolean) => {
+      try {
+        const metrics: string[] = [];
+        if (useAverage) {
+          if (correctLoad) metrics.push("totalLoad");
+          if (correctJumps) {
+            metrics.push("totalJumps");
+            metrics.push("avgJumpHeight");
+          }
+          if (correctAccel) metrics.push("accelCount");
+        }
+        await correctAnomalyMutation.mutateAsync({
+          recordId: latest.id,
+          metricsToCorrect: metrics
+        });
+        alert(useAverage 
+          ? "指定したデータをポジション平均値で補正・承認しました。"
+          : "データを生データのまま正常として承認しました。"
+        );
+        refetch();
+      } catch (e: any) {
+        alert(`処理に失敗しました: ${e.message}`);
+      }
+    };
+
+    const handleRollback = async () => {
+      try {
+        await rollbackAnomalyMutation.mutateAsync({ recordId: latest.id });
+        alert("補正を取り消し、元の生データに戻しました。");
+        refetch();
+      } catch (e: any) {
+        alert(`ロールバックに失敗しました: ${e.message}`);
+      }
+    };
+
     return (
       <View style={{
         backgroundColor: latest.isCorrected ? "#F8FAFC" : "#FEF2F2",
@@ -725,38 +764,101 @@ export default function AthleteAnalyticsScreen() {
         )}
 
         {!latest.isCorrected ? (
-          <View style={{ gap: 6, marginTop: 4 }}>
-            <Text style={{ fontSize: 10, color: "#64748B", lineHeight: 14, paddingLeft: 26 }}>
-              ※Catapultデータの測定漏れやデバイス誤作動等で異常値が生じている場合、手動で「測定不良」としてマークし、ポジション別平均値に補正することができます。
+          <View style={{ gap: 10, marginTop: 4, paddingLeft: 26 }}>
+            <Text style={{ fontSize: 10, color: "#64748B", lineHeight: 14 }}>
+              ※測定不良が生じている場合、補正する項目（指標）を選んでポジション平均値に置き換えることができます。
+            </Text>
+
+            {/* 項目選択チェックボックス */}
+            <View style={{ gap: 8, marginVertical: 4 }}>
+              {/* PlayerLoad */}
+              <TouchableOpacity 
+                onPress={() => setCorrectLoad(!correctLoad)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctLoad ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {correctLoad && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+                </View>
+                <Text style={{ fontSize: 12, color: "#1E293B" }}>PlayerLoad (全体負荷を平均値で補正)</Text>
+              </TouchableOpacity>
+
+              {/* Jumps */}
+              <TouchableOpacity 
+                onPress={() => setCorrectJumps(!correctJumps)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctJumps ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {correctJumps && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+                </View>
+                <Text style={{ fontSize: 12, color: "#1E293B" }}>Jumps (ジャンプ数・平均高さを平均値で補正)</Text>
+              </TouchableOpacity>
+
+              {/* Acceleration */}
+              <TouchableOpacity 
+                onPress={() => setCorrectAccel(!correctAccel)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctAccel ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {correctAccel && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+                </View>
+                <Text style={{ fontSize: 12, color: "#1E293B" }}>IMA (加速回数を平均値で補正)</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={() => handleCorrect(true)}
+                style={{
+                  flex: 1.8,
+                  backgroundColor: "#EF4444",
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
+                  選択項目を補正し承認
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleCorrect(false)}
+                style={{
+                  flex: 1.2,
+                  backgroundColor: "#E2E8F0",
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>
+                  補正なしで承認
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={{ gap: 8, marginTop: 4, paddingLeft: 26 }}>
+            <Text style={{ fontSize: 11, color: "#475569", lineHeight: 16 }}>
+              このデータはすでに補正または承認されています。元の生データに戻す場合は、下のボタンからキャンセル（差し戻し）を行ってください。
             </Text>
             <TouchableOpacity
-              onPress={async () => {
-                try {
-                  await correctAnomalyMutation.mutateAsync({ recordId: latest.id });
-                  alert("データを手動で測定不良として判定し、ポジション平均値で補正しました。");
-                  refetch();
-                } catch (e: any) {
-                  alert(`補正に失敗しました: ${e.message}`);
-                }
-              }}
+              onPress={handleRollback}
               style={{
-                backgroundColor: "#EF4444",
+                backgroundColor: "#475569",
                 paddingVertical: 10,
                 borderRadius: 10,
                 alignItems: "center",
-                marginLeft: 26,
                 marginTop: 4
               }}
             >
               <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
-                {latest.isAnomaly ? "ポジション平均で補正し承認" : "測定不良として手動補正・承認"}
+                補正をキャンセルして元に戻す
               </Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <Text style={{ fontSize: 11, color: "#475569", fontStyle: "italic", paddingLeft: 26 }}>
-            手動補正が完了しています。このデータはポジション平均値で上書き保存されています。
-          </Text>
         )}
       </View>
     );

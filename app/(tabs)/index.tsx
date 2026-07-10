@@ -394,6 +394,132 @@ export function getCellStyle(zScore: number, polarity: "positive" | "negative") 
   return styles[type];
 }
 
+const AnomalyItemRow = ({ item, onResolve, correctMutation }: { item: any; onResolve: () => void; correctMutation: any }) => {
+  const [correctLoad, setCorrectLoad] = useState(true);
+  const [correctJumps, setCorrectJumps] = useState(true);
+  const [correctAccel, setCorrectAccel] = useState(true);
+
+  const handleCorrect = async (useAverage: boolean) => {
+    try {
+      const metrics: string[] = [];
+      if (useAverage) {
+        if (correctLoad) metrics.push("totalLoad");
+        if (correctJumps) {
+          metrics.push("totalJumps");
+          metrics.push("avgJumpHeight");
+        }
+        if (correctAccel) metrics.push("accelCount");
+      }
+      // metrics が空配列の場合、生データのまま承認（isCorrected = true, metricsToCorrect = []）となります
+      await correctMutation.mutateAsync({
+        recordId: item.id,
+        metricsToCorrect: metrics
+      });
+      alert(useAverage 
+        ? `${item.athleteName} 選手の指定データをポジション平均値で補正・承認しました。`
+        : `${item.athleteName} 選手の測定データを生データのまま正常として承認しました。`
+      );
+      onResolve();
+    } catch (e: any) {
+      alert(`承認・補正処理に失敗しました: ${e.message}`);
+    }
+  };
+
+  return (
+    <View style={{ backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", padding: 14, gap: 8, marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A" }}>
+          {item.athleteName} (No.{item.jerseyNumber})
+        </Text>
+        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#64748B", backgroundColor: "#E2E8F0", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+          {item.position}
+        </Text>
+      </View>
+
+      <Text style={{ fontSize: 11, color: "#475569" }}>
+        日付: {new Date(item.date).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
+      </Text>
+
+      <View style={{ backgroundColor: "#FEF2F2", padding: 8, borderRadius: 8, gap: 2 }}>
+        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#991B1B" }}>検出された異常値:</Text>
+        <Text style={{ fontSize: 10, color: "#B91C1C", lineHeight: 14 }}>{item.anomalyDetails}</Text>
+      </View>
+
+      {/* 項目ごとの補正選択チェックボックス */}
+      <View style={{ gap: 8, marginVertical: 6, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#E2E8F0", paddingVertical: 8 }}>
+        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>ポジション平均に補正する項目:</Text>
+        
+        {/* PlayerLoad */}
+        <TouchableOpacity 
+          onPress={() => setCorrectLoad(!correctLoad)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
+          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctLoad ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+            {correctLoad && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+          </View>
+          <Text style={{ fontSize: 12, color: "#1E293B" }}>PlayerLoad (全体負荷を平均値で補正)</Text>
+        </TouchableOpacity>
+
+        {/* Jumps */}
+        <TouchableOpacity 
+          onPress={() => setCorrectJumps(!correctJumps)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
+          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctJumps ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+            {correctJumps && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+          </View>
+          <Text style={{ fontSize: 12, color: "#1E293B" }}>Jumps (ジャンプ数・平均高さを平均値で補正)</Text>
+        </TouchableOpacity>
+
+        {/* Acceleration */}
+        <TouchableOpacity 
+          onPress={() => setCorrectAccel(!correctAccel)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
+          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctAccel ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
+            {correctAccel && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
+          </View>
+          <Text style={{ fontSize: 12, color: "#1E293B" }}>IMA (加速回数を平均値で補正)</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+        <TouchableOpacity
+          onPress={() => handleCorrect(true)}
+          style={{
+            flex: 1.8,
+            backgroundColor: "#0F172A",
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#FFFFFF" }}>
+            選択項目を補正して承認
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleCorrect(false)}
+          style={{
+            flex: 1.2,
+            backgroundColor: "#E2E8F0",
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>
+            補正なしで承認
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export default function HomeScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { user, isAuthenticated, loading, logout } = useAuth();
@@ -3351,52 +3477,15 @@ export default function HomeScreen() {
                 <View style={{ gap: 10 }}>
                   {uncorrectedAnomalies && uncorrectedAnomalies.length > 0 ? (
                     uncorrectedAnomalies.map((item: any) => (
-                      <View 
+                      <AnomalyItemRow 
                         key={item.id} 
-                        style={{ backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", padding: 14, gap: 8 }}
-                      >
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                          <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A" }}>
-                            {item.athleteName} (No.{item.jerseyNumber})
-                          </Text>
-                          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#64748B", backgroundColor: "#E2E8F0", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            {item.position}
-                          </Text>
-                        </View>
-
-                        <Text style={{ fontSize: 11, color: "#475569" }}>
-                          日付: {new Date(item.date).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
-                        </Text>
-
-                        <View style={{ backgroundColor: "#FEF2F2", padding: 8, borderRadius: 8, gap: 2 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#991B1B" }}>検出された異常値:</Text>
-                          <Text style={{ fontSize: 10, color: "#B91C1C", lineHeight: 14 }}>{item.anomalyDetails}</Text>
-                        </View>
-
-                        <TouchableOpacity
-                          onPress={async () => {
-                            try {
-                              await correctAnomalyMutation.mutateAsync({ recordId: item.id });
-                              alert(`${item.athleteName} 選手の測定データをポジション平均値で補正・承認しました。`);
-                              refetchAnomalies();
-                              refetchTeam();
-                            } catch (e: any) {
-                              alert(`補正に失敗しました: ${e.message}`);
-                            }
-                          }}
-                          style={{
-                            backgroundColor: "#0F172A",
-                            paddingVertical: 10,
-                            borderRadius: 10,
-                            alignItems: "center",
-                            marginTop: 6
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#FFFFFF" }}>
-                            ポジション平均値で補正して承認
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                        item={item} 
+                        correctMutation={correctAnomalyMutation} 
+                        onResolve={() => {
+                          refetchAnomalies();
+                          refetchTeam();
+                        }}
+                      />
                     ))
                   ) : (
                     <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", textAlign: "center", paddingVertical: 16 }}>

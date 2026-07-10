@@ -128,6 +128,7 @@ export const performanceData = pgTable("performanceData", {
   isAnomaly: boolean("isAnomaly").default(false).notNull(),
   anomalyDetails: text("anomalyDetails"),
   isCorrected: boolean("isCorrected").default(false).notNull(),
+  originalRawData: text("originalRawData"),
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

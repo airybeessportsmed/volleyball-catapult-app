@@ -345,6 +345,7 @@ const generateDemoPerformanceData = () => {
       wellnessSoreness: Math.floor(4 + Math.random() * 2),
       wellnessStress: Math.floor(4 + Math.random() * 2),
       rawCsvData: null,
+      originalRawData: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -418,6 +419,7 @@ const generateDemoPerformanceData = () => {
       isAnomaly: false,
       anomalyDetails: null,
       isCorrected: false,
+      originalRawData: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -479,6 +481,7 @@ const generateDemoPerformanceData = () => {
       isAnomaly: false,
       anomalyDetails: null,
       isCorrected: false,
+      originalRawData: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -4034,7 +4037,10 @@ export function checkPerformanceAnomaly(data: any): { isAnomaly: boolean; detail
   return { isAnomaly: false, details: null };
 }
 
-export async function correctPerformanceAnomaly(recordId: number): Promise<void> {
+export async function correctPerformanceAnomaly(
+  recordId: number, 
+  metricsToCorrect: string[] = ["totalLoad", "totalJumps", "avgJumpHeight", "accelCount"]
+): Promise<void> {
   const db = await getDb();
   
   // 1. 対象レコードを取得
@@ -4109,15 +4115,26 @@ export async function correctPerformanceAnomaly(recordId: number): Promise<void>
   const correctedHeight = Number(avg(samePosJumpHeights, fallbackHeight).toFixed(2));
   const correctedAccel = Math.round(avg(samePosAccels, fallbackAccel));
 
-  // 4. アップデート
+  // 元の生データ退避用JSON
+  const originalRawDataJson = record.originalRawData || JSON.stringify({
+    totalJumps: record.totalJumps,
+    totalLoad: record.totalLoad ? String(record.totalLoad) : "0",
+    avgJumpHeight: record.avgJumpHeight ? String(record.avgJumpHeight) : "0",
+    accelCount: record.accelCount,
+    isAnomaly: record.isAnomaly,
+    anomalyDetails: record.anomalyDetails
+  });
+
+  // 4. アップデートフィールドの構築 (指定された項目のみ補正)
   const updateFields = {
-    totalJumps: correctedJumps,
-    totalLoad: correctedLoad.toFixed(2),
-    avgJumpHeight: correctedHeight.toFixed(2),
-    accelCount: correctedAccel,
+    totalJumps: metricsToCorrect.includes("totalJumps") ? correctedJumps : record.totalJumps,
+    totalLoad: metricsToCorrect.includes("totalLoad") ? correctedLoad.toFixed(2) : record.totalLoad,
+    avgJumpHeight: metricsToCorrect.includes("avgJumpHeight") ? correctedHeight.toFixed(2) : record.avgJumpHeight,
+    accelCount: metricsToCorrect.includes("accelCount") ? correctedAccel : record.accelCount,
     isAnomaly: true,
-    anomalyDetails: record.anomalyDetails || "指導者による手動判定・補正",
+    anomalyDetails: record.anomalyDetails || (metricsToCorrect.length === 0 ? "指導者により正常判定（補正なし）" : "指導者による手動判定・補正"),
     isCorrected: true,
+    originalRawData: originalRawDataJson,
     updatedAt: new Date()
   };
 
@@ -4177,6 +4194,50 @@ export async function getUncorrectedAnomalies(teamId: number) {
       maxJumpHeight: item.maxJumpHeight ? Number(item.maxJumpHeight) : 0
     };
   });
+}
+
+export async function rollbackPerformanceAnomaly(recordId: number): Promise<void> {
+  const db = await getDb();
+  
+  // 1. 対象レコードを取得
+  let record: any = null;
+  if (!db) {
+    record = mockPerformanceData.find(p => p.id === recordId);
+  } else {
+    const res = await db.select().from(performanceData).where(eq(performanceData.id, recordId)).limit(1);
+    record = res[0] || null;
+  }
+  
+  if (!record || !record.originalRawData) {
+    throw new Error("元の生データが見つからないか、補正されていないため元に戻せません。");
+  }
+
+  const orig = JSON.parse(record.originalRawData);
+  const rollbackFields = {
+    totalJumps: orig.totalJumps,
+    totalLoad: orig.totalLoad,
+    avgJumpHeight: orig.avgJumpHeight,
+    accelCount: orig.accelCount,
+    isAnomaly: orig.isAnomaly,
+    anomalyDetails: orig.anomalyDetails,
+    isCorrected: false,
+    originalRawData: null,
+    updatedAt: new Date()
+  };
+
+  if (!db) {
+    const idx = mockPerformanceData.findIndex(p => p.id === recordId);
+    if (idx !== -1) {
+      mockPerformanceData[idx] = {
+        ...mockPerformanceData[idx],
+        ...rollbackFields
+      } as any;
+    }
+  } else {
+    await db.update(performanceData)
+      .set(rollbackFields as any)
+      .where(eq(performanceData.id, recordId));
+  }
 }
 
 

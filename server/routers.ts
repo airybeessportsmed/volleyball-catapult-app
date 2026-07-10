@@ -442,9 +442,19 @@ export const appRouter = router({
       .query(({ input }) => db.getUncorrectedAnomalies(input.teamId)),
 
     correctAnomaly: protectedProcedure
+      .input(z.object({ 
+        recordId: z.number(),
+        metricsToCorrect: z.array(z.string()).optional()
+      }))
+      .mutation(async ({ input }) => {
+        await db.correctPerformanceAnomaly(input.recordId, input.metricsToCorrect);
+        return { success: true };
+      }),
+
+    rollbackAnomaly: protectedProcedure
       .input(z.object({ recordId: z.number() }))
       .mutation(async ({ input }) => {
-        await db.correctPerformanceAnomaly(input.recordId);
+        await db.rollbackPerformanceAnomaly(input.recordId);
         return { success: true };
       }),
 
