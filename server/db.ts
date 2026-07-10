@@ -3994,11 +3994,10 @@ export async function seedDatabase() {
             soxaiEmail: a.soxai || null,
           });
         } else {
+          // すでに選手が存在している場合は、手動で修正されたポジションや背番号を上書きしない
           await db.update(athletes).set({
-            jerseyNumber: a.jersey,
-            position: a.pos,
-            onetapName: a.onetap,
-            catapultName: a.catapult,
+            onetapName: a.onetap || existingAthlete[0].onetapName,
+            catapultName: a.catapult || existingAthlete[0].catapultName,
             soxaiEmail: a.soxai || existingAthlete[0].soxaiEmail,
             teamId: 1,
           }).where(eq(athletes.userId, uId));
