@@ -427,6 +427,7 @@ export default function HomeScreen() {
   );
 
   const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "jumps" | "menu">("summary");
+  const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
 
   // Fetch athlete info
   // Fetch performance data for selected date
@@ -443,7 +444,7 @@ export default function HomeScreen() {
 
   // Fetch athlete analytics for athlete dashboard (date dependent)
   const { data: analytics, isLoading: analyticsLoading } = trpc.performance.getAthleteAnalytics.useQuery(
-    { athleteId: athlete?.id || 0, date: rawDate },
+    { athleteId: athlete?.id || 0, date: rawDate, acwrMetric },
     { enabled: !!athlete?.id }
   );
 
@@ -987,6 +988,39 @@ export default function HomeScreen() {
             <View className={`px-3 py-1 rounded-full ${statusBg}`}>
               <Text className={`text-xs font-bold ${statusColor}`}>{statusText}</Text>
             </View>
+          </View>
+
+          <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 3, borderRadius: 12, marginVertical: 4 }}>
+            {[
+              { key: "totalLoad", label: "PlayerLoad" },
+              { key: "jumpVolume", label: "Jump Volume" },
+              { key: "accelVolume", label: "Accel Volume" }
+            ].map(opt => {
+              const isSelected = acwrMetric === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => setAcwrMetric(opt.key as any)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 6,
+                    borderRadius: 9,
+                    backgroundColor: isSelected ? "#FFFFFF" : "transparent",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    shadowColor: isSelected ? "#000" : "transparent",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: isSelected ? 0.1 : 0,
+                    shadowRadius: 1,
+                    elevation: isSelected ? 1 : 0
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: "bold", color: isSelected ? "#0F172A" : "#64748B" }}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <View className="gap-2.5 my-2">

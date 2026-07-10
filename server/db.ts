@@ -1796,9 +1796,12 @@ export async function importPerformanceCsv(
           wellnessGroups.set(groupKey, { athleteName: nameStr, dateObj });
         }
         const g = wellnessGroups.get(groupKey)!;
-        const cleanedItem = itemStr.replace(/\s+/g, "");
+        const cleanedItem = itemStr.replace(/\s+/g, "").toLowerCase();
         if (cleanedItem.includes("疲労感") || cleanedItem.includes("疲労") || cleanedItem.includes("fatigue") || cleanedItem.includes("しんどさ")) {
           g.fatigue = valNum;
+        }
+        if (cleanedItem.includes("睡眠") || cleanedItem.includes("睡眠の質") || cleanedItem.includes("sleep")) {
+          g.sleep = valNum;
         }
         if (cleanedItem.includes("気分") || cleanedItem.includes("モチベーション") || cleanedItem.includes("精神") || cleanedItem.includes("メンタル") || cleanedItem.includes("ストレス") || cleanedItem.includes("motivation") || cleanedItem.includes("stress")) {
           g.motivation = valNum;
@@ -1817,7 +1820,7 @@ export async function importPerformanceCsv(
         }
 
         const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue) : undefined;
-        const sleepVal = wg.appetite !== undefined ? Math.round(wg.appetite) : undefined;
+        const sleepVal = wg.sleep !== undefined ? Math.round(wg.sleep) : undefined;
         const stressVal = wg.motivation !== undefined ? Math.round(wg.motivation) : undefined;
 
         await mergePerformanceData(db, teamId, {
@@ -2606,7 +2609,7 @@ export async function importPerformanceCsv(
   }
 }
 
-export async function getAthleteAnalytics(athleteId: number, targetDateStr?: string) {
+export async function getAthleteAnalytics(athleteId: number, targetDateStr?: string, acwrMetricStr?: string) {
   const db = await getDb();
   
   // 1. Get athlete profile and team details
@@ -2659,20 +2662,22 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     latestSession = allPerf[0];
   }
 
-  // 4. Calculate ACWR (Acute:Chronic Workload Ratio) based on Player Load
+  // 4. Calculate ACWR (Acute:Chronic Workload Ratio) based on chosen metric
   const calculateACWR = () => {
     if (allPerf.length === 0) return { acwr: 1.0, acute: 0, chronic: 0, status: "normal" as const };
 
     const today = latestSession ? new Date(latestSession.date) : new Date();
     const oneDay = 24 * 60 * 60 * 1000;
     
+    const metricKey = acwrMetricStr === "jumpVolume" ? "jumpVolume" : acwrMetricStr === "accelVolume" ? "accelVolume" : "totalLoad";
+
     // Create an array of loads for past 28 days
     const dailyLoads = Array(28).fill(0);
     for (let i = 0; i < 28; i++) {
       const targetDateStrKey = formatDateKey(new Date(today.getTime() - i * oneDay));
       const record = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStrKey);
-      if (record && record.totalLoad) {
-        dailyLoads[i] = Number(record.totalLoad);
+      if (record && record[metricKey]) {
+        dailyLoads[i] = Number(record[metricKey]);
       }
     }
 
@@ -2937,38 +2942,42 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       { key: "physiologicalMarker", name: "生理学マーカー(CK)", type: "load" as const },
     ];
 
-    const getVal = (p: any, key: string): number => {
-      if (!p) return 0;
+    const getVal = (p: any, key: string): number | null => {
+      if (!p) return null;
       if (key === "sRpeBall" || key === "sRpeSandC") {
         try {
           const menuData = p.rawMenuData ? JSON.parse(p.rawMenuData) : {};
-          return menuData[key] ? Number(menuData[key]) : 0;
+          const val = menuData[key];
+          return val !== undefined && val !== null ? Number(val) : null;
         } catch (e) {
-          return 0;
+          return null;
         }
       }
-      return p[key] ? Number(p[key]) : 0;
+      const val = p[key];
+      return val !== undefined && val !== null ? Number(val) : null;
     };
 
-    const baselines: Record<string, { mean: number; sd: number; val: number; zScore: number; status: "green" | "yellow" | "red" }> = {};
+    const baselines: Record<string, { mean: number; sd: number; val: number | null; zScore: number; status: "green" | "yellow" | "red" }> = {};
     const signals: Record<string, "green" | "yellow" | "red"> = {};
     
     let isDataAccumulating = pastSessions.length < 3;
 
     metricDefinitions.forEach(m => {
-      const pastVals = pastSessions.map(p => getVal(p, m.key)).filter(v => v > 0);
+      const pastVals = pastSessions
+        .map(p => getVal(p, m.key))
+        .filter((v): v is number => v !== null && v > 0);
       const stats = calcMeanAndSd(pastVals);
       
-      const latestVal = latestSession ? getVal(latestSession, m.key) : 0;
+      const latestVal = latestSession ? getVal(latestSession, m.key) : null;
       
       let zScore = 0;
-      if (stats.sd > 0 && latestVal > 0) {
+      if (stats.sd > 0 && latestVal !== null && latestVal > 0) {
         zScore = (latestVal - stats.mean) / stats.sd;
       }
       
       let status: "green" | "yellow" | "red" = "green";
       
-      if (!isDataAccumulating && stats.sd > 0 && latestVal > 0) {
+      if (!isDataAccumulating && stats.sd > 0 && latestVal !== null && latestVal > 0) {
         if (m.type === "load") {
           // 負荷や生理学マーカー（CK等）は高値で警告
           if (zScore > 1.5) status = "red";
@@ -3015,7 +3024,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       const vals = allPerf
         .slice(0, 14)
         .map(p => getVal(p, m.key))
-        .filter(v => v > 0)
+        .filter((v): v is number => v !== null && v > 0)
         .reverse();
       metricHistory[m.key] = vals;
     });

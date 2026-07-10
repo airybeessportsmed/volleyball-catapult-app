@@ -698,6 +698,7 @@ export default function AthleteAnalyticsScreen() {
               .filter(m => (m.category === "load_ext" || m.category === "load_int") && enabledMetrics.includes(m.key))
               .map(m => {
                 const base = signal.baselines?.[m.key];
+                if (!base || base.val === null) return null;
                 const z = base ? base.zScore : 0;
                 const status = base ? base.status : "green";
                 const val = base ? base.val : 0;
@@ -729,6 +730,7 @@ export default function AthleteAnalyticsScreen() {
               .filter(m => (m.category === "state_subj" || m.category === "state_obj") && enabledMetrics.includes(m.key))
               .map(m => {
                 const base = signal.baselines?.[m.key];
+                if (!base || base.val === null) return null;
                 const z = base ? base.zScore : 0;
                 const status = base ? base.status : "green";
                 const val = base ? base.val : 0;
