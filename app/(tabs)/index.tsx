@@ -2825,18 +2825,44 @@ export default function HomeScreen() {
                 {/* ヘッダーエリア */}
                 <View style={{ backgroundColor: "#FFFFFF", padding: 20, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                    <View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {/* 前日ボタン */}
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const current = new Date(rawDate);
+                          current.setDate(current.getDate() - 1);
+                          setRawDate(current.toLocaleDateString("sv-SE"));
+                        }}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#F8FAFC", borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "bold", color: "#475569" }}>◀ 前日</Text>
+                      </TouchableOpacity>
+
+                      {/* カレンダー選択ボタン */}
                       <TouchableOpacity 
                         onPress={() => setCalendarModalOpen(true)}
                         style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" }}
                       >
                         <IconSymbol size={16} name="calendar" color="#0F172A" />
-                        <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>
+                        <Text style={{ fontSize: 15, fontWeight: "bold", color: "#0F172A" }}>
                           {rawDate.replace(/-/g, "/")}
                         </Text>
                       </TouchableOpacity>
+
+                      {/* 翌日ボタン */}
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const current = new Date(rawDate);
+                          current.setDate(current.getDate() + 1);
+                          setRawDate(current.toLocaleDateString("sv-SE"));
+                        }}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#F8FAFC", borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "bold", color: "#475569" }}>翌日 ▶</Text>
+                      </TouchableOpacity>
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: "bold", color: "#475569" }}>
+
+                    <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569" }}>
                       Menu別 運動量の比較 (Jump Vol / Accel Vol / Player Load)
                     </Text>
                   </View>
