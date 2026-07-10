@@ -437,6 +437,17 @@ export const appRouter = router({
       .input(z.object({ teamId: z.number() }))
       .query(({ input }) => db.getTeamAnalytics(input.teamId)),
 
+    getUncorrectedAnomalies: protectedProcedure
+      .input(z.object({ teamId: z.number() }))
+      .query(({ input }) => db.getUncorrectedAnomalies(input.teamId)),
+
+    correctAnomaly: protectedProcedure
+      .input(z.object({ recordId: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.correctPerformanceAnomaly(input.recordId);
+        return { success: true };
+      }),
+
     saveCoachAdvice: protectedProcedure
       .input(z.object({
         athleteId: z.number(),

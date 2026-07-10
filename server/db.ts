@@ -297,16 +297,21 @@ const generateDemoPerformanceData = () => {
     const sakuraDurationMin = Math.floor(90 + Math.random() * 30);
     const sakuraRpe = Math.floor(5 + Math.random() * 2); // Moderate fatigue (5-6)
 
-    data.push({
+    const isSakuraAnomaly = i === 1; // 昨日のデータに異常値を設定
+    const sakuraJumpsFinal = isSakuraAnomaly ? 850 : sakuraJumps;
+    const sakuraLoadFinal = isSakuraAnomaly ? 3500 : sakuraLoad;
+    const maxJumpHeightFinal = isSakuraAnomaly ? 145.5 : (52 + Math.random() * 8);
+
+    const sakuraRecord: any = {
       id: idCounter++,
       athleteId: 1,
       teamId: 1,
       date,
       sessionType,
-      maxJumpHeight: (52 + Math.random() * 8).toFixed(2) as any,
+      maxJumpHeight: maxJumpHeightFinal.toFixed(2) as any,
       avgJumpHeight: sakuraAvgHeight.toFixed(2) as any,
-      totalJumps: sakuraJumps,
-      jumpVolume: ((sakuraJumps * sakuraAvgHeight) / 100).toFixed(2) as any,
+      totalJumps: sakuraJumpsFinal,
+      jumpVolume: ((sakuraJumpsFinal * sakuraAvgHeight) / 100).toFixed(2) as any,
       jumpsOver40cm: sakuraJumpMetrics.over40,
       jumpZone1Count: sakuraJumpMetrics.z1,
       jumpZone2Count: sakuraJumpMetrics.z2,
@@ -320,13 +325,13 @@ const generateDemoPerformanceData = () => {
       totalDistance: (3800 + Math.random() * 1500).toFixed(2) as any,
       avgSpeed: (2.1 + Math.random() * 0.5).toFixed(2) as any,
       maxSpeed: (5.2 + Math.random() * 1.2).toFixed(2) as any,
-      totalLoad: sakuraLoad.toFixed(2) as any,
+      totalLoad: sakuraLoadFinal.toFixed(2) as any,
       avgLoad: (1.5 + Math.random() * 0.5).toFixed(2) as any,
       duration: sakuraDurationMin * 60,
       rawMenuData: JSON.stringify({
-        "W-up": (sakuraLoad * 0.15).toFixed(1),
-        "6v6": (sakuraLoad * 0.60).toFixed(1),
-        "Individual": (sakuraLoad * 0.25).toFixed(1)
+        "W-up": (sakuraLoadFinal * 0.15).toFixed(1),
+        "6v6": (sakuraLoadFinal * 0.60).toFixed(1),
+        "Individual": (sakuraLoadFinal * 0.25).toFixed(1)
       }),
       coachAdvice: getAdvice(1, i),
       sRPE: sakuraRpe * sakuraDurationMin,
@@ -342,7 +347,13 @@ const generateDemoPerformanceData = () => {
       rawCsvData: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    });
+    };
+
+    const sakuraAnomalyCheck = checkPerformanceAnomaly(sakuraRecord);
+    sakuraRecord.isAnomaly = sakuraAnomalyCheck.isAnomaly;
+    sakuraRecord.anomalyDetails = sakuraAnomalyCheck.details;
+    sakuraRecord.isCorrected = false;
+    data.push(sakuraRecord);
 
     // Athlete 2: Hinata (Overworked & Divergence State in recent days)
     const hinataJumps = Math.floor(50 + Math.random() * 30);
@@ -404,6 +415,9 @@ const generateDemoPerformanceData = () => {
       wellnessSoreness: hinataSoreness,
       wellnessStress: Math.floor(3 + Math.random() * 2),
       rawCsvData: null,
+      isAnomaly: false,
+      anomalyDetails: null,
+      isCorrected: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -462,6 +476,9 @@ const generateDemoPerformanceData = () => {
       wellnessSoreness: 4,
       wellnessStress: 4,
       rawCsvData: null,
+      isAnomaly: false,
+      anomalyDetails: null,
+      isCorrected: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -1598,24 +1615,44 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     rawCsvData: newRawCsvData,
   };
 
+  // 異常判定
+  let isAnomaly = existing?.isAnomaly || false;
+  let anomalyDetails = existing?.anomalyDetails || null;
+  let isCorrected = existing?.isCorrected || false;
+
+  if (!isCorrected) {
+    const anomalyCheck = checkPerformanceAnomaly(mergedData);
+    if (anomalyCheck.isAnomaly) {
+      isAnomaly = true;
+      anomalyDetails = anomalyCheck.details;
+    }
+  }
+
+  const finalMerged = {
+    ...mergedData,
+    isAnomaly,
+    anomalyDetails,
+    isCorrected
+  };
+
   if (existing) {
     if (!db) {
-      Object.assign(existing, mergedData);
+      Object.assign(existing, finalMerged);
       existing.updatedAt = new Date();
     } else {
-      await db.update(performanceData).set(mergedData as any).where(eq(performanceData.id, existing.id));
+      await db.update(performanceData).set(finalMerged as any).where(eq(performanceData.id, existing.id));
     }
   } else {
     if (!db) {
       const newId = mockPerformanceData.length + 1;
       mockPerformanceData.push({
         id: newId,
-        ...mergedData,
+        ...finalMerged,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
     } else {
-      await db.insert(performanceData).values(mergedData as any);
+      await db.insert(performanceData).values(finalMerged as any);
     }
   }
 }
@@ -3969,6 +4006,175 @@ export async function updateAthleteCsvNames(athleteId: number, csvNames: string)
     console.error("[Database] Failed to update athlete csvNames:", error);
     return { success: false, error: error.message || "Database update failure" };
   }
+}
+
+export function checkPerformanceAnomaly(data: any): { isAnomaly: boolean; details: string | null } {
+  const totalJumps = data.totalJumps ? Number(data.totalJumps) : 0;
+  const totalLoad = data.totalLoad ? Number(data.totalLoad) : 0;
+  const maxJumpHeight = data.maxJumpHeight ? Number(data.maxJumpHeight) : 0;
+  const accelCount = data.accelCount ? Number(data.accelCount) : 0;
+
+  const anomalies: string[] = [];
+  if (totalJumps > 300) {
+    anomalies.push(`ジャンプ数: ${totalJumps}回 (閾値: 300回)`);
+  }
+  if (totalLoad > 2000) {
+    anomalies.push(`PlayerLoad: ${totalLoad.toFixed(1)} (閾値: 2000)`);
+  }
+  if (maxJumpHeight > 110) {
+    anomalies.push(`最大ジャンプ高: ${maxJumpHeight.toFixed(1)}cm (閾値: 110cm)`);
+  }
+  if (accelCount > 500) {
+    anomalies.push(`加速回数: ${accelCount}回 (閾値: 500回)`);
+  }
+
+  if (anomalies.length > 0) {
+    return { isAnomaly: true, details: anomalies.join(", ") };
+  }
+  return { isAnomaly: false, details: null };
+}
+
+export async function correctPerformanceAnomaly(recordId: number): Promise<void> {
+  const db = await getDb();
+  
+  // 1. 対象レコードを取得
+  let record: any = null;
+  if (!db) {
+    record = mockPerformanceData.find(p => p.id === recordId);
+  } else {
+    const res = await db.select().from(performanceData).where(eq(performanceData.id, recordId)).limit(1);
+    record = res[0] || null;
+  }
+  
+  if (!record) {
+    throw new Error("対象のデータレコードが見つかりません。");
+  }
+
+  // 2. 選手のポジションを取得
+  let position = "";
+  let teamId = record.teamId;
+  if (!db) {
+    const ath = mockAthletes.find(a => a.id === record.athleteId);
+    position = ath?.position || "";
+  } else {
+    const res = await db.select().from(athletes).where(eq(athletes.id, record.athleteId)).limit(1);
+    position = res[0]?.position || "";
+  }
+
+  // 3. 同じポジションの選手の「正常データ」を直近28日分取得し平均を計算
+  let samePosLoads: number[] = [];
+  let samePosJumps: number[] = [];
+  let samePosJumpHeights: number[] = [];
+  let samePosAccels: number[] = [];
+  
+  if (!db) {
+    const samePosAthIds = mockAthletes.filter(a => a.teamId === teamId && a.position === position).map(a => a.id);
+    const normalRecords = mockPerformanceData.filter(p => 
+      samePosAthIds.includes(p.athleteId) && 
+      !p.isAnomaly && 
+      p.id !== recordId
+    );
+    samePosLoads = normalRecords.map(p => Number(p.totalLoad || 0));
+    samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
+    samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
+    samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
+  } else {
+    const samePosAthletes = await db.select().from(athletes).where(and(eq(athletes.teamId, teamId), eq(athletes.position, position)));
+    const samePosAthIds = samePosAthletes.map(a => a.id);
+    if (samePosAthIds.length > 0) {
+      const normalRecords = await db.select()
+        .from(performanceData)
+        .where(and(
+          inArray(performanceData.athleteId, samePosAthIds),
+          eq(performanceData.isAnomaly, false),
+          sql`${performanceData.id} != ${recordId}`
+        ));
+      samePosLoads = normalRecords.map(p => Number(p.totalLoad || 0));
+      samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
+      samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
+      samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
+    }
+  }
+
+  const avg = (arr: number[], fallback: number) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : fallback;
+
+  // ポジション平均値
+  const fallbackJumps = position.includes("setter") ? 30 : position.includes("blocker") ? 75 : 55;
+  const fallbackLoad = 350;
+  const fallbackHeight = 35;
+  const fallbackAccel = 80;
+
+  const correctedJumps = Math.round(avg(samePosJumps, fallbackJumps));
+  const correctedLoad = Number(avg(samePosLoads, fallbackLoad).toFixed(2));
+  const correctedHeight = Number(avg(samePosJumpHeights, fallbackHeight).toFixed(2));
+  const correctedAccel = Math.round(avg(samePosAccels, fallbackAccel));
+
+  // 4. アップデート
+  const updateFields = {
+    totalJumps: correctedJumps,
+    totalLoad: correctedLoad.toFixed(2),
+    avgJumpHeight: correctedHeight.toFixed(2),
+    accelCount: correctedAccel,
+    isCorrected: true,
+    updatedAt: new Date()
+  };
+
+  if (!db) {
+    const idx = mockPerformanceData.findIndex(p => p.id === recordId);
+    if (idx !== -1) {
+      mockPerformanceData[idx] = {
+        ...mockPerformanceData[idx],
+        ...updateFields
+      } as any;
+    }
+  } else {
+    await db.update(performanceData)
+      .set(updateFields as any)
+      .where(eq(performanceData.id, recordId));
+  }
+}
+
+export async function getUncorrectedAnomalies(teamId: number) {
+  const db = await getDb();
+  let list: any[] = [];
+  
+  if (!db) {
+    const athIds = mockAthletes.filter(a => a.teamId === teamId).map(a => a.id);
+    list = mockPerformanceData.filter(p => 
+      athIds.includes(p.athleteId) && 
+      p.isAnomaly && 
+      !p.isCorrected
+    );
+  } else {
+    const athletesList = await db.select().from(athletes).where(eq(athletes.teamId, teamId));
+    const athIds = athletesList.map(a => a.id);
+    if (athIds.length > 0) {
+      list = await db.select()
+        .from(performanceData)
+        .where(and(
+          inArray(performanceData.athleteId, athIds),
+          eq(performanceData.isAnomaly, true),
+          eq(performanceData.isCorrected, false)
+        ));
+    }
+  }
+
+  const athletesData = await getAthletesByTeamId(teamId);
+  return list.map(item => {
+    const ath = athletesData.find(a => a.id === item.athleteId);
+    return {
+      id: item.id,
+      athleteId: item.athleteId,
+      athleteName: ath?.user?.name || `選手${ath?.jerseyNumber}`,
+      jerseyNumber: ath?.jerseyNumber,
+      position: ath?.position || "",
+      date: item.date,
+      anomalyDetails: item.anomalyDetails,
+      totalJumps: item.totalJumps,
+      totalLoad: item.totalLoad ? Number(item.totalLoad) : 0,
+      maxJumpHeight: item.maxJumpHeight ? Number(item.maxJumpHeight) : 0
+    };
+  });
 }
 
 

@@ -125,6 +125,10 @@ export const performanceData = pgTable("performanceData", {
   avgHeartRate: integer("avgHeartRate"),
   physiologicalMarker: numeric("physiologicalMarker", { precision: 7, scale: 2 }),
   
+  isAnomaly: boolean("isAnomaly").default(false).notNull(),
+  anomalyDetails: text("anomalyDetails"),
+  isCorrected: boolean("isCorrected").default(false).notNull(),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

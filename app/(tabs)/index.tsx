@@ -454,6 +454,14 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
+  const { data: uncorrectedAnomalies, refetch: refetchAnomalies } = trpc.performance.getUncorrectedAnomalies.useQuery(
+    { teamId: user?.teamId || 1 },
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
+  );
+
+  const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
+  const [anomalyModalOpen, setAnomalyModalOpen] = useState(false);
+
   const saveAdviceMutation = trpc.performance.saveCoachAdvice.useMutation();
   const updateSettingsMutation = trpc.team.updateSettings.useMutation();
   const updateMetricMutation = trpc.performance.updateMetric.useMutation();
@@ -1332,9 +1340,18 @@ export default function HomeScreen() {
         {/* Header */}
         <View className="flex-row items-center justify-between px-6 py-4 border-b border-border bg-surface">
           <View>
-            <Text className="text-2xl font-bold text-foreground">
-              {user?.name || "選手ダッシュボード"}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text className="text-2xl font-bold text-foreground">
+                {user?.name || "選手ダッシュボード"}
+              </Text>
+              {latest?.isAnomaly && (
+                <View style={{ backgroundColor: latest.isCorrected ? "#E2E8F0" : "#FEE2E2", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold", color: latest.isCorrected ? "#475569" : "#EF4444" }}>
+                    {latest.isCorrected ? "測定不良(補正済)" : "⚠️測定不良(要補正)"}
+                  </Text>
+                </View>
+              )}
+            </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
               <TouchableOpacity
                 onPress={() => {
@@ -1381,6 +1398,27 @@ export default function HomeScreen() {
 
         <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
           <View className="gap-5">
+            {latest?.isAnomaly && (
+              <View style={{
+                backgroundColor: latest.isCorrected ? "#F8FAFC" : "#FEF2F2",
+                borderColor: latest.isCorrected ? "#E2E8F0" : "#FCA5A5",
+                borderWidth: 1,
+                borderRadius: 16,
+                padding: 14,
+                gap: 6
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <IconSymbol size={16} name="exclamationmark.triangle.fill" color={latest.isCorrected ? "#64748B" : "#EF4444"} />
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: latest.isCorrected ? "#334155" : "#991B1B" }}>
+                    {latest.isCorrected ? "この日のデータは測定不良のためポジション平均値で補正されています" : "この日のデータは測定不良の疑いがあります"}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 10, color: latest.isCorrected ? "#64748B" : "#B91C1C", lineHeight: 14, paddingLeft: 24 }}>
+                  詳細: {latest.anomalyDetails}
+                </Text>
+              </View>
+            )}
+
             {/* タブナビゲーション */}
             <View style={{ flexDirection: "row", backgroundColor: "#E2E8F0", borderRadius: 14, padding: 3 }}>
               {([
@@ -1790,7 +1828,16 @@ export default function HomeScreen() {
                 <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "bold" }}>#{ath.jerseyNumber}</Text>
               </View>
               <View>
-                <Text style={{ fontSize: 15, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
+                  {ath.isAnomaly && (
+                    <View style={{ backgroundColor: ath.isCorrected ? "#E2E8F0" : "#FEE2E2", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 8, fontWeight: "bold", color: ath.isCorrected ? "#475569" : "#EF4444" }}>
+                        {ath.isCorrected ? "測定不良(補正済)" : "⚠️測定不良"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={{ fontSize: 11, color: "#64748B" }}>{ath.position}</Text>
               </View>
             </View>
@@ -1980,6 +2027,42 @@ export default function HomeScreen() {
           <View style={{ gap: 20 }}>
             {activeTab === "summary" && (
               <View style={{ gap: 16 }}>
+                {/* 測定不良（アノマリー）アラートバナー */}
+                {uncorrectedAnomalies && uncorrectedAnomalies.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setAnomalyModalOpen(true)}
+                    style={{
+                      backgroundColor: "#FEF2F2",
+                      borderColor: "#FCA5A5",
+                      borderWidth: 1,
+                      borderRadius: 16,
+                      padding: 16,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      shadowColor: "#EF4444",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+                      <IconSymbol size={24} name="exclamationmark.triangle.fill" color="#EF4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "bold", color: "#991B1B" }}>
+                          測定不良の疑いがあるデータが {uncorrectedAnomalies.length} 件あります
+                        </Text>
+                        <Text style={{ fontSize: 11, color: "#B91C1C", marginTop: 2 }}>
+                          タップして内容を確認し、ポジション平均値での補正・承認を行ってください。
+                        </Text>
+                      </View>
+                    </View>
+                    <IconSymbol size={16} name="chevron.right" color="#EF4444" />
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity 
                   onPress={handleExportCsv}
                   style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2E8F0", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
@@ -3238,6 +3321,100 @@ export default function HomeScreen() {
             )}
           </View>
         </ScrollView>
+
+        {/* アノマリー（測定不良データ）の補正・承認用モーダル */}
+        <Modal
+          visible={anomalyModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setAnomalyModalOpen(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setAnomalyModalOpen(false)}
+            style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", padding: 20 }}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 440, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <IconSymbol size={22} name="exclamationmark.triangle.fill" color="#EF4444" />
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>測定不良（異常値）の確認と承認</Text>
+              </View>
+
+              <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                Catapultデバイスの測定不良等により、通常の範囲を明らかに逸脱した異常値が検出されました。ポジション別のチーム平均値に補正して記録を承認できます。
+              </Text>
+
+              <ScrollView style={{ maxHeight: 250, marginVertical: 4 }}>
+                <View style={{ gap: 10 }}>
+                  {uncorrectedAnomalies && uncorrectedAnomalies.length > 0 ? (
+                    uncorrectedAnomalies.map((item: any) => (
+                      <View 
+                        key={item.id} 
+                        style={{ backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", padding: 14, gap: 8 }}
+                      >
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A" }}>
+                            {item.athleteName} (No.{item.jerseyNumber})
+                          </Text>
+                          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#64748B", backgroundColor: "#E2E8F0", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            {item.position}
+                          </Text>
+                        </View>
+
+                        <Text style={{ fontSize: 11, color: "#475569" }}>
+                          日付: {new Date(item.date).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
+                        </Text>
+
+                        <View style={{ backgroundColor: "#FEF2F2", padding: 8, borderRadius: 8, gap: 2 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#991B1B" }}>検出された異常値:</Text>
+                          <Text style={{ fontSize: 10, color: "#B91C1C", lineHeight: 14 }}>{item.anomalyDetails}</Text>
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={async () => {
+                            try {
+                              await correctAnomalyMutation.mutateAsync({ recordId: item.id });
+                              alert(`${item.athleteName} 選手の測定データをポジション平均値で補正・承認しました。`);
+                              refetchAnomalies();
+                              refetchTeam();
+                            } catch (e: any) {
+                              alert(`補正に失敗しました: ${e.message}`);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: "#0F172A",
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: "center",
+                            marginTop: 6
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#FFFFFF" }}>
+                            ポジション平均値で補正して承認
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", textAlign: "center", paddingVertical: 16 }}>
+                      未処理の測定不良データはありません。
+                    </Text>
+                  )}
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity 
+                onPress={() => setAnomalyModalOpen(false)}
+                style={{ borderWidth: 1, borderColor: "#CBD5E1", paddingVertical: 12, borderRadius: 12, alignItems: "center", marginTop: 4 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#475569" }}>閉じる</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {/* 日付選択カレンダーモーダル */}
         <Modal
