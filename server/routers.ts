@@ -426,8 +426,8 @@ export const appRouter = router({
       }),
     
     getAthleteAnalytics: protectedProcedure
-      .input(z.object({ athleteId: z.number() }))
-      .query(({ input }) => db.getAthleteAnalytics(input.athleteId)),
+      .input(z.object({ athleteId: z.number(), date: z.string().optional() }))
+      .query(({ input }) => db.getAthleteAnalytics(input.athleteId, input.date)),
 
     getTeamAnalytics: protectedProcedure
       .input(z.object({ teamId: z.number() }))

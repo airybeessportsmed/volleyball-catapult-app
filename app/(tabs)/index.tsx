@@ -9,6 +9,144 @@ import Svg, { Path, Circle, Rect, G, Text as SvgText, Line, Polyline } from "rea
 
 const MINI_CHART_HEIGHT = 80;
 
+export const ATHLETE_METRICS_MAP = [
+  { key: "totalJumps", label: "ジャンプ量", desc: "外的負荷: ジャンプ回数", unit: "回", polarity: "positive", category: "load_ext" },
+  { key: "sRPE", label: "sRPE(全体)", desc: "内の負荷: 練習強度×時間", unit: "AU", polarity: "positive", category: "load_int" },
+  { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "negative", category: "state_obj" },
+  { key: "wellnessSoreness", label: "筋肉痛 (DOMS)", desc: "主観状態: 筋肉の張りや痛み", unit: "1-7", polarity: "negative", category: "state_subj" },
+  { key: "wellnessSleep", label: "睡眠の質", desc: "主観状態: 睡眠休養度", unit: "1-5", polarity: "negative", category: "state_subj" },
+  { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: 全身疲労", unit: "1-7", polarity: "negative", category: "state_subj" },
+  { key: "totalDistance", label: "総走行距離", desc: "外的負荷: 移動距離", unit: "m", polarity: "positive", category: "load_ext" },
+  { key: "highIntensityDistance", label: "高速走行距離", desc: "外的負荷: 高速移動距離", unit: "m", polarity: "positive", category: "load_ext" },
+  { key: "avgHeartRate", label: "平均心拍数", desc: "客観負荷: 循環器系負荷", unit: "bpm", polarity: "positive", category: "load_int" },
+  { key: "physiologicalMarker", label: "生理学マーカー(CK)", desc: "客観状態: 血液生化学(筋肉損傷)", unit: "U/L", polarity: "positive", category: "state_obj" },
+] as const;
+
+function AthleteZScoreBar({ label, zScore, status, val, baselineMean, unit = "", history = [], polarity = "positive" }: {
+  label: string;
+  zScore: number;
+  status: "green" | "yellow" | "red";
+  val: number;
+  baselineMean: number;
+  unit?: string;
+  history?: number[];
+  polarity?: "positive" | "negative";
+}) {
+  const sparklineWidth = 55;
+  const sparklineHeight = 22;
+  let sparklinePoints = "";
+  
+  if (history.length > 1) {
+    const minVal = Math.min(...history);
+    const maxVal = Math.max(...history);
+    const valDiff = maxVal - minVal;
+    const stepX = sparklineWidth / (history.length - 1);
+    
+    const pts = history.map((v, idx) => {
+      const x = idx * stepX;
+      const y = sparklineHeight - 3 - (valDiff > 0 ? ((v - minVal) / valDiff) * (sparklineHeight - 6) : (sparklineHeight - 6) / 2);
+      return `${x},${y}`;
+    });
+    sparklinePoints = pts.join(" ");
+  }
+
+  const pinPercent = Math.min(100, Math.max(0, ((zScore + 3) / 6) * 100));
+  
+  let reliabilityText = "データ不足";
+  let reliabilityBg = "#E2E8F0";
+  let reliabilityColor = "#64748B";
+  
+  if (history.length >= 14) {
+    reliabilityText = "信頼性 高";
+    reliabilityBg = "#DBEAFE";
+    reliabilityColor = "#1D4ED8";
+  } else if (history.length >= 7) {
+    reliabilityText = "信頼性 中";
+    reliabilityBg = "#FEF3C7";
+    reliabilityColor = "#D97706";
+  } else if (history.length >= 3) {
+    reliabilityText = "信頼性 低";
+    reliabilityBg = "#FEE2E2";
+    reliabilityColor = "#DC2626";
+  }
+
+  const positiveColors = ["#D0E1FD", "#E2F0D9", "#E2F0D9", "#FFF2CC", "#FCE4D6"];
+  const negativeColors = ["#FCE4D6", "#FFF2CC", "#E2F0D9", "#E2F0D9", "#D0E1FD"];
+  const colors = polarity === "positive" ? positiveColors : negativeColors;
+
+  const getPinColor = (s: string) => {
+    if (s === "red") return "#C00000";
+    if (s === "yellow") return "#7F6000";
+    return "#385723";
+  };
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 6, paddingVertical: 4, borderBottomWidth: 1, borderColor: "#F1F5F9" }}>
+      <View style={{ width: 105, gap: 2 }}>
+        <Text style={{ fontSize: 12, color: "#1E293B", fontWeight: "bold" }}>{label}</Text>
+        {history.length > 1 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <Svg width={sparklineWidth} height={sparklineHeight}>
+              <Polyline
+                fill="none"
+                stroke="#FF6B35"
+                strokeWidth="1.5"
+                points={sparklinePoints}
+              />
+              <Circle
+                cx={sparklineWidth}
+                cy={sparklineHeight - 3 - (Math.max(...history) - Math.min(...history) > 0 ? ((history[history.length - 1] - Math.min(...history)) / (Math.max(...history) - Math.min(...history))) * (sparklineHeight - 6) : (sparklineHeight - 6) / 2)}
+                r="2.5"
+                fill="#FF6B35"
+              />
+            </Svg>
+          </View>
+        ) : (
+          <Text style={{ fontSize: 8, color: "#CBD5E1", fontStyle: "italic" }}>データ蓄積中</Text>
+        )}
+      </View>
+
+      <View style={{ width: 85, gap: 1 }}>
+        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#1E293B" }}>
+          {val % 1 === 0 ? val : val.toFixed(1)} <Text style={{ fontSize: 8, fontWeight: "normal", color: "#64748B" }}>{unit}</Text>
+        </Text>
+        <Text style={{ fontSize: 8, color: "#94A3B8" }}>
+          基準: {baselineMean.toFixed(1)}
+        </Text>
+      </View>
+
+      <View style={{ flex: 1, height: 26, justifyContent: "center", position: "relative" }}>
+        <View style={{ flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: "#E2E8F0" }}>
+          <View style={{ flex: 1.5, backgroundColor: colors[0] }} />
+          <View style={{ flex: 0.5, backgroundColor: colors[1] }} />
+          <View style={{ flex: 2, backgroundColor: colors[2] }} />
+          <View style={{ flex: 0.5, backgroundColor: colors[3] }} />
+          <View style={{ flex: 1.5, backgroundColor: colors[4] }} />
+        </View>
+
+        <View style={{ position: "absolute", left: "50%", top: 4, bottom: 4, width: 1.5, backgroundColor: "#64748B", zIndex: 1 }} />
+
+        <View style={{ position: "absolute", left: `${pinPercent}%`, marginLeft: -4, top: 2, width: 8, height: 16, zIndex: 10, alignItems: "center" }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getPinColor(status), borderWidth: 1.5, borderColor: "#FFFFFF" }} />
+          <View style={{ width: 1.5, height: 8, backgroundColor: getPinColor(status) }} />
+        </View>
+        
+        <Text style={{ position: "absolute", left: `${Math.min(80, Math.max(0, pinPercent - 15))}%`, bottom: -6, fontSize: 8, fontWeight: "bold", color: getPinColor(status) }}>
+          {zScore > 0 ? `+${zScore.toFixed(1)}` : zScore.toFixed(1)} SD
+        </Text>
+      </View>
+
+      <View style={{ width: 65, alignItems: "flex-end" }}>
+        <View style={{ backgroundColor: reliabilityBg, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+          <Text style={{ fontSize: 8, fontWeight: "bold", color: reliabilityColor }}>
+            {reliabilityText}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const DoughnutChart = ({ data, colors }: { data: { label: string, value: number }[], colors: string[] }) => {
   const total = data.reduce((sum, item) => sum + item.value, 0);
   if (total === 0) {
@@ -288,6 +426,9 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && user?.role === "athlete" }
   );
 
+  const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "jumps" | "menu">("summary");
+
+  // Fetch athlete info
   // Fetch performance data for selected date
   const { data: latestPerformance, isLoading: perfLoading } = trpc.performance.getByAthleteAndDate.useQuery(
     { athleteId: athlete?.id || 0, date: rawDate },
@@ -297,6 +438,12 @@ export default function HomeScreen() {
   // Fetch past performance data for mini trend chart
   const { data: pastPerformance } = trpc.performance.getByAthlete.useQuery(
     { athleteId: athlete?.id || 0, limit: 7 },
+    { enabled: !!athlete?.id }
+  );
+
+  // Fetch athlete analytics for athlete dashboard (date dependent)
+  const { data: analytics, isLoading: analyticsLoading } = trpc.performance.getAthleteAnalytics.useQuery(
+    { athleteId: athlete?.id || 0, date: rawDate },
     { enabled: !!athlete?.id }
   );
 
@@ -792,6 +939,360 @@ export default function HomeScreen() {
 
   // Athlete Dashboard
   if (user?.role === "athlete") {
+    if (athleteLoading || analyticsLoading) {
+      return (
+        <ScreenContainer className="flex items-center justify-center bg-background">
+          <ActivityIndicator size="large" color="#FF6B35" />
+        </ScreenContainer>
+      );
+    }
+
+    const latest = analytics?.latestSession;
+
+    // ACWR ゲージ描画ヘルパー
+    const renderACWRGauge = () => {
+      if (!analytics || !analytics.acwr) return null;
+      const acwrVal = analytics.acwr.acwr;
+      const acute = analytics.acwr.acute;
+      const chronic = analytics.acwr.chronic;
+      const status = analytics.acwr.status;
+
+      const clampedVal = Math.max(0.0, Math.min(2.0, acwrVal));
+      const percent = (clampedVal / 2.0) * 100;
+
+      let statusText = "適正負荷";
+      let statusDesc = "怪我のリスクが低く、効率良くトレーニングができています。";
+      let statusColor = "text-emerald-500";
+      let statusBg = "bg-emerald-500/10";
+
+      if (status === "underwork") {
+        statusText = "アンダーワーク";
+        statusDesc = "トレーニング負荷が不十分で、体力やパフォーマンスが低下するリスクがあります。";
+        statusColor = "text-amber-500";
+        statusBg = "bg-amber-500/10";
+      } else if (status === "danger") {
+        statusText = "オーバーワーク (危険)";
+        statusDesc = "急激な負荷の上昇が検出されました。怪我のリスクが極めて高い危険ゾーンです！";
+        statusColor = "text-red-500";
+        statusBg = "bg-red-500/10";
+      }
+
+      return (
+        <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-4">
+          <View className="flex-row justify-between items-center">
+            <View>
+              <Text className="text-sm font-bold text-foreground">ACWR (急慢性負荷比)</Text>
+              <Text className="text-[10px] text-muted font-medium">怪我予防のコンディショニング指標</Text>
+            </View>
+            <View className={`px-3 py-1 rounded-full ${statusBg}`}>
+              <Text className={`text-xs font-bold ${statusColor}`}>{statusText}</Text>
+            </View>
+          </View>
+
+          <View className="gap-2.5 my-2">
+            <View className="h-6 w-full bg-muted/30 rounded-full overflow-hidden flex-row border border-border/40 relative">
+              <View style={{ width: "40%" }} className="bg-amber-500/10 h-full border-r border-border/10 justify-center pl-2">
+                <Text className="text-[8px] text-amber-600 font-extrabold">低負荷</Text>
+              </View>
+              <View style={{ width: "35%" }} className="bg-emerald-500/20 h-full border-r border-border/10 justify-center pl-2">
+                <Text className="text-[8px] text-emerald-600 font-extrabold">適正ゾーン (0.8~1.5)</Text>
+              </View>
+              <View style={{ width: "25%" }} className="bg-red-500/10 h-full justify-center pl-2">
+                <Text className="text-[8px] text-red-600 font-extrabold">危険</Text>
+              </View>
+
+              <View 
+                style={{ left: `${percent}%` as any, transform: [{ translateX: -6 }] }} 
+                className="absolute -top-0.5 -bottom-0.5 w-3 bg-foreground border border-surface rounded-full shadow items-center justify-center"
+              />
+            </View>
+            
+            <View className="flex-row justify-between px-1">
+              <Text className="text-[9px] text-muted font-mono font-medium">0.0 (休息)</Text>
+              <Text className="text-[9px] text-muted font-mono font-medium">0.8</Text>
+              <Text className="text-[9px] text-muted font-mono font-medium">1.5</Text>
+              <Text className="text-[9px] text-muted font-mono font-medium">2.0+</Text>
+            </View>
+          </View>
+
+          <View className="flex-row justify-between items-center bg-muted/10 p-3 rounded-2xl border border-border/40">
+            <View className="items-center flex-1">
+              <Text className="text-[9px] text-muted font-bold mb-0.5">ACWRスコア</Text>
+              <Text className="text-xl font-extrabold text-foreground font-mono">{acwrVal.toFixed(2)}</Text>
+            </View>
+            <View className="w-[1px] h-8 bg-border" />
+            <View className="items-center flex-1">
+              <Text className="text-[9px] text-muted font-bold mb-0.5">急性的負荷 (7日間平均)</Text>
+              <Text className="text-base font-extrabold text-foreground font-mono">{acute}</Text>
+            </View>
+            <View className="w-[1px] h-8 bg-border" />
+            <View className="items-center flex-1">
+              <Text className="text-[9px] text-muted font-bold mb-0.5">慢性的負荷 (28日間平均)</Text>
+              <Text className="text-base font-extrabold text-foreground font-mono">{chronic}</Text>
+            </View>
+          </View>
+
+          <Text className="text-[11px] text-muted leading-relaxed font-normal">{statusDesc}</Text>
+
+          <View className="flex-row gap-3 mt-1">
+            <View className="flex-1 bg-surface border border-border p-3 rounded-2xl flex-row items-center justify-between">
+              <View className="gap-0.5">
+                <Text className="text-[9px] text-muted font-bold">単調度 (Monotony)</Text>
+                <Text className="text-[10px] text-muted font-normal">日々の練習負荷の偏り</Text>
+              </View>
+              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony.monotony}</Text>
+            </View>
+            
+            <View className="flex-1 bg-surface border border-border p-3 rounded-2xl flex-row items-center justify-between">
+              <View className="gap-0.5">
+                <Text className="text-[9px] text-muted font-bold">負担度 (Strain)</Text>
+                <Text className="text-[10px] text-muted font-normal">疲労の蓄積予測値</Text>
+              </View>
+              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony.strain}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    // ジャンプ分析描画ヘルパー
+    const renderJumpAnalytics = () => {
+      if (!latest) return null;
+      const z1 = latest.jumpZone1Count || 0;
+      const z2 = latest.jumpZone2Count || 0;
+      const z3 = latest.jumpZone3Count || 0;
+      const z4 = latest.jumpZone4Count || 0;
+      const z5 = latest.jumpZone5Count || 0;
+      
+      const zones = [
+        { name: "Zone 1 (~20)", count: z1, color: "bg-blue-500/20 text-blue-700" },
+        { name: "Zone 2 (20~30)", count: z2, color: "bg-cyan-500/20 text-cyan-700" },
+        { name: "Zone 3 (30~40)", count: z3, color: "bg-amber-500/20 text-amber-700" },
+        { name: "Zone 4 (40~50)", count: z4, color: "bg-orange-500/30 text-orange-700" },
+        { name: "Zone 5 (50+)", count: z5, color: "bg-red-500/30 text-red-700" },
+      ];
+      
+      const totalJumps = latest.totalJumps || 0;
+      const jumpsOver40 = latest.jumpsOver40cm || 0;
+      const ratio40 = totalJumps > 0 ? ((jumpsOver40 / totalJumps) * 100).toFixed(1) : "0.0";
+      
+      const maxCount = Math.max(...zones.map(z => z.count), 1);
+
+      return (
+        <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
+          <View>
+            <Text className="text-sm font-bold text-foreground">ジャンプ詳細分析</Text>
+            <Text className="text-[10px] text-muted font-medium">高さ別のジャンプ強度とボリューム</Text>
+          </View>
+
+          <View className="flex-row gap-3">
+            <View className="flex-1 bg-primary/5 border border-primary/10 p-3.5 rounded-2xl">
+              <Text className="text-[9px] text-muted font-bold mb-1">Jump Volume</Text>
+              <Text className="text-sm font-extrabold text-primary font-mono">
+                {latest.jumpVolume ? `${Number(latest.jumpVolume).toFixed(1)} m` : "--"}
+              </Text>
+            </View>
+            <View className="flex-1 bg-secondary/5 border border-secondary/10 p-3.5 rounded-2xl">
+              <Text className="text-[9px] text-muted font-bold mb-1">40cm以上の割合</Text>
+              <Text className="text-sm font-extrabold text-secondary font-mono">
+                {ratio40}%
+              </Text>
+            </View>
+            <View className="flex-1 bg-accent/5 border border-accent/10 p-3.5 rounded-2xl">
+              <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高</Text>
+              <Text className="text-sm font-extrabold text-accent font-mono">
+                {latest.avgJumpHeight ? `${Number(latest.avgJumpHeight).toFixed(1)} cm` : "--"}
+              </Text>
+            </View>
+          </View>
+
+          <View className="gap-3">
+            <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">Zone分けジャンプ回数</Text>
+            
+            <View className="gap-3 mt-1">
+              {zones.map((z, idx) => {
+                const barPercent = `${(z.count / maxCount) * 100}%`;
+                return (
+                  <View key={idx} className="flex-row items-center gap-3">
+                    <Text className="text-[10px] font-bold text-muted w-24">{z.name}</Text>
+                    <View className="flex-1 h-5 bg-muted/20 rounded-lg overflow-hidden relative justify-center">
+                      <View 
+                        style={{ width: barPercent as any }} 
+                        className={`h-full ${z.color.split(" ")[0]} rounded-lg absolute`}
+                      />
+                      <Text className="text-[9px] font-extrabold text-foreground pl-2.5 z-10 font-mono">
+                        {z.count} 回
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    // メニュー別負荷描画ヘルパー
+    const renderMenuLoadAnalytics = () => {
+      if (!latest) return null;
+      let menuLoads: Record<string, number> = {};
+      try {
+        if (latest.rawMenuData) {
+          menuLoads = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
+        }
+      } catch (e) {
+        console.warn("Failed to parse rawMenuData", e);
+      }
+
+      const menuItems = Object.entries(menuLoads).map(([name, val]) => ({
+        name,
+        load: Number(val)
+      })).sort((a, b) => b.load - a.load);
+
+      const totalLoadSum = menuItems.reduce((a, b) => a + b.load, 0) || 1;
+
+      return (
+        <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
+          <View>
+            <Text className="text-sm font-bold text-foreground">練習メニュー別運動量</Text>
+            <Text className="text-[10px] text-muted font-medium">メニューごとの負荷配分と自主練の数値</Text>
+          </View>
+
+          {menuItems.length > 0 ? (
+            <View className="gap-5">
+              <View className="h-6 w-full rounded-full overflow-hidden flex-row border border-border/30 bg-muted/20">
+                {menuItems.map((item, idx) => {
+                  const itemPercent = `${(item.load / totalLoadSum) * 100}%`;
+                  const colors = [
+                    "bg-primary",
+                    "bg-secondary",
+                    "bg-accent",
+                    "bg-emerald-500",
+                    "bg-indigo-500"
+                  ];
+                  const bgClass = colors[idx % colors.length];
+                  return (
+                    <View 
+                      key={idx} 
+                      style={{ width: itemPercent as any }} 
+                      className={`${bgClass} h-full`}
+                    />
+                  );
+                })}
+              </View>
+
+              <View className="gap-3">
+                {menuItems.map((item, idx) => {
+                  const percentVal = ((item.load / totalLoadSum) * 100).toFixed(1);
+                  const colors = [
+                    "bg-primary text-white",
+                    "bg-secondary text-white",
+                    "bg-accent text-foreground",
+                    "bg-emerald-500 text-white",
+                    "bg-indigo-500 text-white"
+                  ];
+                  const labelColorClass = colors[idx % colors.length];
+                  const isIndividual = item.name.toLowerCase().includes("individual") || item.name.includes("自主練");
+
+                  return (
+                    <View 
+                      key={idx} 
+                      className={`flex-row justify-between items-center p-3 rounded-2xl border ${
+                        isIndividual ? "bg-amber-500/5 border-amber-500/30 scale-[1.02]" : "border-border/60 bg-muted/5"
+                      }`}
+                    >
+                      <View className="flex-row items-center gap-2.5">
+                        <View className={`px-2.5 py-1 rounded-lg ${labelColorClass}`}>
+                          <Text className="text-[9px] font-extrabold">{idx + 1}</Text>
+                        </View>
+                        <View>
+                          <Text className="text-xs font-bold text-foreground">
+                            {item.name} {isIndividual && "🏋️ (自主練)"}
+                          </Text>
+                          <Text className="text-[9px] text-muted">割合: {percentVal}%</Text>
+                        </View>
+                      </View>
+                      
+                      <Text className="text-sm font-extrabold text-foreground font-mono">
+                        {item.load.toFixed(1)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <View className="py-8 items-center justify-center">
+              <Text className="text-xs text-muted">メニュー別負荷データがありません。</Text>
+            </View>
+          )}
+        </View>
+      );
+    };
+
+    const renderGuidanceAndAdvice = () => {
+      if (!analytics || !analytics.guidance) return null;
+      const guidance = analytics.guidance;
+      const advice = latest?.coachAdvice;
+
+      let guidanceBg = "bg-emerald-50";
+      let guidanceBorder = "border-emerald-200";
+      let guidanceText = "text-emerald-800";
+      let guidanceIcon = "checkmark.circle.fill";
+      let guidanceIconColor = "#10B981";
+
+      if (guidance.level === "danger") {
+        guidanceBg = "bg-red-50";
+        guidanceBorder = "border-red-200";
+        guidanceText = "text-red-800";
+        guidanceIcon = "exclamationmark.octagon.fill";
+        guidanceIconColor = "#EF4444";
+      } else if (guidance.level === "warning") {
+        guidanceBg = "bg-amber-50";
+        guidanceBorder = "border-amber-200";
+        guidanceText = "text-amber-800";
+        guidanceIcon = "exclamationmark.triangle.fill";
+        guidanceIconColor = "#F59E0B";
+      } else if (guidance.level === "underwork") {
+        guidanceBg = "bg-blue-50";
+        guidanceBorder = "border-blue-200";
+        guidanceText = "text-blue-800";
+        guidanceIcon = "arrow.down.circle.fill";
+        guidanceIconColor = "#3B82F6";
+      }
+
+      return (
+        <View className="gap-4">
+          {/* 自主練推奨ガイダンス */}
+          <View className={`rounded-3xl border ${guidanceBorder} ${guidanceBg} p-5 shadow-sm gap-2.5`}>
+            <View className="flex-row items-center gap-2">
+              <IconSymbol size={20} name={guidanceIcon as any} color={guidanceIconColor} />
+              <Text className={`text-sm font-extrabold ${guidanceText}`}>自主練推奨プラン: {guidance.title}</Text>
+            </View>
+            <Text className={`text-[11px] leading-relaxed ${guidanceText} opacity-90`}>
+              {guidance.desc}
+            </Text>
+          </View>
+
+          {/* コーチからのアドバイス */}
+          {advice && (
+            <View className="bg-purple-50 rounded-3xl border border-purple-200 p-5 shadow-sm gap-2.5">
+              <View className="flex-row items-center gap-2">
+                <IconSymbol size={20} name="message.fill" color="#8B5CF6" />
+                <Text className="text-sm font-extrabold text-purple-900">指導者（コーチ）からのアドバイス</Text>
+              </View>
+              <View className="bg-white/60 rounded-2xl p-3.5 border border-purple-100">
+                <Text className="text-xs text-purple-950 leading-relaxed font-semibold">
+                  「 {advice} 」
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      );
+    };
+
     return (
       <ScreenContainer className="bg-background">
         {/* Header */}
@@ -820,80 +1321,136 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
-          <View className="gap-6">
-            
-            {/* Loading State */}
-            {(athleteLoading || perfLoading) && (
-              <View className="flex items-center justify-center py-8">
-                <ActivityIndicator size="large" color="#FF6B35" />
+        <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+          <View className="gap-5">
+            {/* タブナビゲーション */}
+            <View style={{ flexDirection: "row", backgroundColor: "#E2E8F0", borderRadius: 14, padding: 3 }}>
+              {([
+                { id: "summary", label: "総合サマリー", icon: "doc.text.fill" },
+                { id: "jumps", label: "ジャンプ分析", icon: "arrow.up.circle.fill" },
+                { id: "menu", label: "メニュー別負荷", icon: "list.bullet.indent" }
+              ] as const).map(tab => {
+                const isSelected = athleteActiveTab === tab.id;
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
+                    onPress={() => setAthleteActiveTab(tab.id)}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 11, backgroundColor: isSelected ? "#FFFFFF" : "transparent" }}
+                  >
+                    <IconSymbol size={13} name={tab.icon} color={isSelected ? "#FF6B35" : "#64748B"} />
+                    <Text style={{ fontSize: 11, fontWeight: "bold", color: isSelected ? "#0F172A" : "#64748B" }}>
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 各タブの描画 */}
+            {athleteActiveTab === "summary" && (
+              <View className="gap-5">
+                {/* ACWR */}
+                {analytics && analytics.acwr && renderACWRGauge()}
+
+                {/* ZScore List */}
+                {analytics && analytics.signalLight && (
+                  <View style={{ gap: 16 }}>
+                    {/* コンディション判定バナー */}
+                    <View style={{
+                      backgroundColor: analytics.signalLight.status === "red" ? "#FDF2F2" : analytics.signalLight.status === "yellow" ? "#FFFDF5" : "#F4FBF7",
+                      borderColor: analytics.signalLight.status === "red" ? "#F8D7DA" : analytics.signalLight.status === "yellow" ? "#FFF3CD" : "#D1E7DD",
+                      borderWidth: 1, borderRadius: 16, padding: 16
+                    }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 18 }}>
+                          {analytics.signalLight.status === "red" ? "🔴" : analytics.signalLight.status === "yellow" ? "🟡" : "🟢"}
+                        </Text>
+                        <Text style={{ fontSize: 14, fontWeight: "bold", color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : "#0F5132" }}>
+                          本日のコンディション判定: {analytics.signalLight.status === "red" ? "要確認" : analytics.signalLight.status === "yellow" ? "注意" : "良好"}
+                        </Text>
+                      </View>
+                      <Text style={{
+                        fontSize: 12, fontWeight: "semibold",
+                        color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : "#0F5132",
+                        lineHeight: 18
+                      }}>
+                        {analytics.signalLight.statusText}
+                      </Text>
+                    </View>
+
+                    {/* ZScore リスト */}
+                    <View style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
+                        コンディション詳細明細 — 個人基準±SD
+                      </Text>
+                      
+                      {ATHLETE_METRICS_MAP
+                        .filter(m => (analytics.signalLight.enabledMetrics || []).includes(m.key))
+                        .map(m => {
+                          const base = analytics.signalLight.baselines?.[m.key];
+                          if (!base || base.val === null) return null;
+                          const z = base ? base.zScore : 0;
+                          const status = base ? base.status : "green";
+                          const val = base ? base.val : 0;
+                          const mean = base ? base.mean : 0;
+                          const history = analytics.signalLight.metricHistory?.[m.key] || [];
+                          return (
+                            <AthleteZScoreBar
+                              key={m.key}
+                              label={m.label}
+                              zScore={z}
+                              status={status}
+                              val={val}
+                              baselineMean={mean}
+                              unit={m.unit}
+                              history={history}
+                              polarity={m.polarity}
+                            />
+                          );
+                        })}
+                    </View>
+                  </View>
+                )}
+
+                {/* 指導者からのアドバイス & 自主練ガイダンス */}
+                {analytics && renderGuidanceAndAdvice()}
               </View>
             )}
 
-            {/* Performance Metrics */}
-            {metrics && (
-              <View className="gap-4">
-                <Text className="text-base font-bold text-foreground">本日の測定結果</Text>
-                
-                {/* Metrics Grid */}
-                <View className="gap-3">
-                  <View className="flex-row gap-3">
-                    {metrics.maxJumpHeight && (
-                      <View className="flex-1 bg-surface rounded-2xl p-4 border border-border shadow-sm">
-                        <Text className="text-[10px] text-muted mb-1">最大ジャンプ高</Text>
-                        <Text className="text-xl font-extrabold text-primary">
-                          {metrics.maxJumpHeight.toFixed(1)} cm
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {metrics.totalLoad && (
-                      <View className="flex-1 bg-surface rounded-2xl p-4 border border-border shadow-sm">
-                        <Text className="text-[10px] text-muted mb-1">総運動量</Text>
-                        <Text className="text-xl font-extrabold text-secondary">
-                          {metrics.totalLoad.toFixed(0)}
-                        </Text>
-                      </View>
-                    )}
+            {athleteActiveTab === "jumps" && (
+              <View className="gap-5">
+                {latest ? renderJumpAnalytics() : (
+                  <View className="bg-surface rounded-2xl p-8 border border-border items-center justify-center">
+                    <Text className="text-sm text-muted text-center font-bold">ジャンプデータが存在しません</Text>
                   </View>
-                  
-                  <View className="flex-row gap-3">
-                    {metrics.avgAcceleration && (
-                      <View className="flex-1 bg-surface rounded-2xl p-4 border border-border shadow-sm">
-                        <Text className="text-[10px] text-muted mb-1">平均加速度</Text>
-                        <Text className="text-xl font-extrabold text-foreground">
-                          {metrics.avgAcceleration.toFixed(2)} m/s²
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {metrics.totalDistance && (
-                      <View className="flex-1 bg-surface rounded-2xl p-4 border border-border shadow-sm">
-                        <Text className="text-[10px] text-muted mb-1">総移動距離</Text>
-                        <Text className="text-xl font-extrabold text-foreground">
-                          {(metrics.totalDistance / 1000).toFixed(2)} km
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
+                )}
               </View>
             )}
 
-            {/* Mini Trend Chart */}
-            {miniChartPath && (
+            {athleteActiveTab === "menu" && (
+              <View className="gap-5">
+                {latest ? renderMenuLoadAnalytics() : (
+                  <View className="bg-surface rounded-2xl p-8 border border-border items-center justify-center">
+                    <Text className="text-sm text-muted text-center font-bold">メニュー別負荷データが存在しません</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* トレンド履歴ミニプレビュー (sRPEなどの移動平均推移) */}
+            {pastPerformance && pastPerformance.length > 0 && (
               <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-3">
                 <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
                 <View className="py-2 items-center">
-                  <Svg width={windowWidth - 80} height={MINI_CHART_HEIGHT}>
+                  <Svg width={windowWidth - 72} height={MINI_CHART_HEIGHT}>
                     <Path 
-                      d={miniChartPath.path} 
+                      d={miniChartPath ? miniChartPath.path : ""} 
                       fill="none" 
                       stroke="#FF6B35" 
                       strokeWidth="3" 
                       strokeLinecap="round"
                     />
-                    {miniChartPath.points.map((p, idx) => (
+                    {miniChartPath && miniChartPath.points.map((p, idx) => (
                       <Circle 
                         key={idx} 
                         cx={p.x} 
@@ -909,50 +1466,17 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {!metrics && !perfLoading && (
-              <View className="bg-surface rounded-2xl p-8 border border-border items-center justify-center">
-                <Text className="text-base text-muted text-center font-semibold">
-                  まだパフォーマンスデータがありません。
-                </Text>
-                <Text className="text-xs text-muted text-center mt-2 leading-relaxed">
-                  コーチがCatapultのCSVデータをアップロードすると、ここにあなたの運動データが反映されます。
+            {/* アンケート入力への誘導リンク */}
+            <View className="bg-primary/5 border border-primary/10 rounded-3xl p-5 items-center gap-3">
+              <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
+                <IconSymbol size={18} name="pencil.and.outline" color="#FF6B35" />
+              </View>
+              <View className="gap-1 items-center">
+                <Text className="text-sm font-bold text-foreground text-center">Wellnessアンケートを回答する</Text>
+                <Text className="text-[10px] text-muted text-center leading-relaxed">
+                  毎朝のWellness項目と練習後のsRPEを登録して、コンディション精度を高めましょう。
                 </Text>
               </View>
-            )}
-
-            {/* Action Buttons */}
-            <View className="gap-3 mt-2">
-              <TouchableOpacity 
-                onPress={() => {
-                  if (latestPerformance) {
-                    router.push(`/performance/${latestPerformance.id}/detail`);
-                  }
-                }}
-                disabled={!latestPerformance}
-                className={`py-4 rounded-2xl items-center shadow-md active:opacity-90 flex-row justify-center gap-2 ${
-                  latestPerformance ? "bg-primary" : "bg-muted"
-                }`}
-              >
-                <IconSymbol size={18} name="doc.text.fill" color="#FFFFFF" />
-                <Text className="text-white font-bold text-base">詳細データを表示</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                onPress={() => {
-                  if (athlete) {
-                    router.push(`/athlete/${athlete.id}/analytics`);
-                  }
-                }}
-                disabled={!athlete}
-                className={`border py-4 rounded-2xl items-center active:bg-muted/10 flex-row justify-center gap-2 ${
-                  athlete ? "border-border bg-surface" : "border-muted bg-muted/10"
-                }`}
-              >
-                <IconSymbol size={18} name="chart.xyaxis.line" color={athlete ? "#1F2937" : "#9CA3AF"} />
-                <Text className={`font-bold text-base ${athlete ? "text-foreground" : "text-muted"}`}>
-                  トレンドグラフを表示
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>

@@ -2606,7 +2606,7 @@ export async function importPerformanceCsv(
   }
 }
 
-export async function getAthleteAnalytics(athleteId: number) {
+export async function getAthleteAnalytics(athleteId: number, targetDateStr?: string) {
   const db = await getDb();
   
   // 1. Get athlete profile and team details
@@ -2650,21 +2650,27 @@ export async function getAthleteAnalytics(athleteId: number) {
       .orderBy(desc(performanceData.date));
   }
 
-  // 3. Latest session data
-  const latestSession = allPerf.length > 0 ? allPerf[0] : null;
+  // 3. Target session data (default to newest if targetDateStr is not provided or not found)
+  let latestSession = null;
+  if (targetDateStr) {
+    latestSession = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStr) || null;
+  }
+  if (!latestSession && allPerf.length > 0) {
+    latestSession = allPerf[0];
+  }
 
   // 4. Calculate ACWR (Acute:Chronic Workload Ratio) based on Player Load
   const calculateACWR = () => {
     if (allPerf.length === 0) return { acwr: 1.0, acute: 0, chronic: 0, status: "normal" as const };
 
-    const today = new Date();
+    const today = latestSession ? new Date(latestSession.date) : new Date();
     const oneDay = 24 * 60 * 60 * 1000;
     
     // Create an array of loads for past 28 days
     const dailyLoads = Array(28).fill(0);
     for (let i = 0; i < 28; i++) {
-      const targetDateStr = formatDateKey(new Date(today.getTime() - i * oneDay));
-      const record = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStr);
+      const targetDateStrKey = formatDateKey(new Date(today.getTime() - i * oneDay));
+      const record = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStrKey);
       if (record && record.totalLoad) {
         dailyLoads[i] = Number(record.totalLoad);
       }
