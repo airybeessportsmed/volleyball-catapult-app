@@ -3072,19 +3072,19 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     metricDefinitions.forEach(m => {
       const pastVals = pastSessions
         .map(p => getVal(p, m.key))
-        .filter((v): v is number => v !== null && v > 0);
+        .filter((v): v is number => v !== null && !isNaN(v));
       const stats = calcMeanAndSd(pastVals);
       
       const latestVal = latestSession ? getVal(latestSession, m.key) : null;
       
       let zScore = 0;
-      if (stats.sd > 0 && latestVal !== null && latestVal > 0) {
+      if (stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         zScore = (latestVal - stats.mean) / stats.sd;
       }
       
       let status: "green" | "yellow" | "red" = "green";
       
-      if (!isDataAccumulating && stats.sd > 0 && latestVal !== null && latestVal > 0) {
+      if (!isDataAccumulating && stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         if (m.type === "load") {
           // 負荷や生理学マーカー（CK等）は高値で警告
           if (zScore > 1.5) status = "red";
@@ -3131,7 +3131,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       const vals = allPerf
         .slice(0, 14)
         .map(p => getVal(p, m.key))
-        .filter((v): v is number => v !== null && v > 0)
+        .filter((v): v is number => v !== null && !isNaN(v))
         .reverse();
       metricHistory[m.key] = vals;
     });
@@ -3391,35 +3391,39 @@ export async function getTeamAnalytics(teamId: number) {
       { key: "physiologicalMarker", name: "生理学マーカー(CK)", type: "load" as const },
     ];
 
-    const getVal = (p: any, key: string): number => {
-      if (!p) return 0;
+    const getVal = (p: any, key: string): number | null => {
+      if (!p) return null;
       if (key === "sRpeBall" || key === "sRpeSandC") {
         try {
           const menuData = p.rawMenuData ? JSON.parse(p.rawMenuData) : {};
-          return menuData[key] ? Number(menuData[key]) : 0;
+          const val = menuData[key];
+          return val !== undefined && val !== null ? Number(val) : null;
         } catch (e) {
-          return 0;
+          return null;
         }
       }
-      return p[key] ? Number(p[key]) : 0;
+      const val = p[key];
+      return val !== undefined && val !== null ? Number(val) : null;
     };
 
-    const baselines: Record<string, { mean: number; sd: number; val: number; zScore: number; status: "green" | "yellow" | "red" }> = {};
+    const baselines: Record<string, { mean: number; sd: number; val: number | null; zScore: number; status: "green" | "yellow" | "red" }> = {};
     const signals: Record<string, "green" | "yellow" | "red"> = {};
 
     metricDefinitions.forEach(m => {
-      const pastVals = pastSessions.map(p => getVal(p, m.key)).filter(v => v > 0);
+      const pastVals = pastSessions
+        .map(p => getVal(p, m.key))
+        .filter((v): v is number => v !== null && !isNaN(v));
       const stats = calcMeanAndSd(pastVals);
-      const latestVal = latestPerf ? getVal(latestPerf, m.key) : 0;
+      const latestVal = latestPerf ? getVal(latestPerf, m.key) : null;
       
       let zScore = 0;
-      if (stats.sd > 0 && latestVal > 0) {
+      if (stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         zScore = (latestVal - stats.mean) / stats.sd;
       }
       
       let status: "green" | "yellow" | "red" = "green";
       
-      if (!isDataAccumulating && stats.sd > 0 && latestVal > 0) {
+      if (!isDataAccumulating && stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         if (m.type === "load") {
           if (zScore > 1.5) status = "red";
           else if (zScore > 1.0) status = "yellow";
@@ -3464,11 +3468,11 @@ export async function getTeamAnalytics(teamId: number) {
 
     const metricHistory: Record<string, number[]> = {};
     metricDefinitions.forEach(m => {
-      // Get values for the past 14 days, filtering out zeros, and sort chronologically (oldest to newest)
+      // Get values for the past 14 days, filtering out nulls, and sort chronologically (oldest to newest)
       const vals = athletePerf
         .slice(0, 14)
         .map(p => getVal(p, m.key))
-        .filter(v => v > 0)
+        .filter((v): v is number => v !== null && !isNaN(v))
         .reverse();
       metricHistory[m.key] = vals;
     });
