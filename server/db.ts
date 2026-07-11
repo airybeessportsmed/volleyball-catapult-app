@@ -3036,6 +3036,12 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     // 全指標の定義
     const metricDefinitions = [
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
+      { key: "maxJumpHeight", name: "最高ジャンプ高", type: "load" as const },
+      { key: "avgJumpHeight", name: "平均ジャンプ高", type: "load" as const },
+      { key: "jumpVolume", name: "ジャンプボリューム", type: "load" as const },
+      { key: "totalLoad", name: "Player Load", type: "load" as const },
+      { key: "accelCount", name: "加速回数", type: "load" as const },
+      { key: "maxAcceleration", name: "最高加速度", type: "load" as const },
       { key: "sRPE", name: "sRPE", type: "load" as const },
       { key: "sRpeBall", name: "sRPE(Ball)", type: "load" as const },
       { key: "sRpeSandC", name: "sRPE(S&C)", type: "load" as const },
@@ -3380,6 +3386,12 @@ export async function getTeamAnalytics(teamId: number) {
 
     const metricDefinitions = [
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
+      { key: "maxJumpHeight", name: "最高ジャンプ高", type: "load" as const },
+      { key: "avgJumpHeight", name: "平均ジャンプ高", type: "load" as const },
+      { key: "jumpVolume", name: "ジャンプボリューム", type: "load" as const },
+      { key: "totalLoad", name: "Player Load", type: "load" as const },
+      { key: "accelCount", name: "加速回数", type: "load" as const },
+      { key: "maxAcceleration", name: "最高加速度", type: "load" as const },
       { key: "sRPE", name: "sRPE", type: "load" as const },
       { key: "sRpeBall", name: "sRPE(Ball)", type: "load" as const },
       { key: "sRpeSandC", name: "sRPE(S&C)", type: "load" as const },
