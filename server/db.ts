@@ -2233,29 +2233,29 @@ export async function importPerformanceCsv(
         const fHeight = (matchedAthlete as any).fingertipHeight ? Number((matchedAthlete as any).fingertipHeight) : null;
         const mReach = (matchedAthlete as any).maxReach ? Number((matchedAthlete as any).maxReach) : null;
         
+        // 1. 神経筋 (Top 5 平均値用の +15% 異常値フィルター)
         let filteredJumps = [...ig.jumps];
         if (fHeight !== null && mReach !== null && mReach > fHeight) {
           const reachHeight = mReach - fHeight;
           const errorThreshold = reachHeight * 1.15;
           filteredJumps = ig.jumps.filter(j => j < errorThreshold);
         }
-
         const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
         const top5Jumps = sortedJumps.slice(0, 5);
         const avgJumpHeight = top5Jumps.length > 0 
           ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
           : undefined;
 
-        const maxJumpHeight = filteredJumps.length > 0 ? Math.max(...filteredJumps) : undefined;
-        const totalJumps = filteredJumps.length;
-
-        const jumpVolume = filteredJumps.length > 0 ? filteredJumps.reduce((a, b) => a + b, 0) : 0;
-        const jumpsOver40cm = filteredJumps.filter(j => j >= 40).length;
-        const jumpZone1Count = filteredJumps.filter(j => j < 20).length;
-        const jumpZone2Count = filteredJumps.filter(j => j >= 20 && j < 30).length;
-        const jumpZone3Count = filteredJumps.filter(j => j >= 30 && j < 40).length;
-        const jumpZone4Count = filteredJumps.filter(j => j >= 40 && j < 50).length;
-        const jumpZone5Count = filteredJumps.filter(j => j >= 50).length;
+        // 2. その他の Catapult 運動量統計 (異常値除外を行わず、元の CSV 全データをそのまま利用)
+        const maxJumpHeight = ig.jumps.length > 0 ? Math.max(...ig.jumps) : undefined;
+        const totalJumps = ig.jumps.length;
+        const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) : 0;
+        const jumpsOver40cm = ig.jumps.filter(j => j >= 40).length;
+        const jumpZone1Count = ig.jumps.filter(j => j < 20).length;
+        const jumpZone2Count = ig.jumps.filter(j => j >= 20 && j < 30).length;
+        const jumpZone3Count = ig.jumps.filter(j => j >= 30 && j < 40).length;
+        const jumpZone4Count = ig.jumps.filter(j => j >= 40 && j < 50).length;
+        const jumpZone5Count = ig.jumps.filter(j => j >= 50).length;
 
         const maxAcceleration = ig.accelerations.length > 0 ? Math.max(...ig.accelerations) : undefined;
         const avgAcceleration = ig.accelerations.length > 0 ? ig.accelerations.reduce((a, b) => a + b, 0) / ig.accelerations.length : undefined;
@@ -2434,29 +2434,29 @@ export async function importPerformanceCsv(
         const fHeight = (matchedAthlete as any).fingertipHeight ? Number((matchedAthlete as any).fingertipHeight) : null;
         const mReach = (matchedAthlete as any).maxReach ? Number((matchedAthlete as any).maxReach) : null;
         
+        // 1. 神経筋 (Top 5 平均値用の +15% 異常値フィルター)
         let filteredJumps = [...agg.jumps];
         if (fHeight !== null && mReach !== null && mReach > fHeight) {
           const reachHeight = mReach - fHeight;
           const errorThreshold = reachHeight * 1.15;
           filteredJumps = agg.jumps.filter(j => j < errorThreshold);
         }
-
         const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
         const top5Jumps = sortedJumps.slice(0, 5);
         const avgJumpHeight = top5Jumps.length > 0 
           ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
           : undefined;
 
-        const maxJumpHeight = filteredJumps.length > 0 ? Math.max(...filteredJumps) : undefined;
-        const totalJumps = filteredJumps.length;
-
-        const jumpVolume = filteredJumps.length > 0 ? (filteredJumps.reduce((a, b) => a + b, 0) / 100) : 0;
-        const jumpsOver40cm = filteredJumps.filter(j => j >= 40).length;
-        const jumpZone1Count = filteredJumps.filter(j => j < 20).length;
-        const jumpZone2Count = filteredJumps.filter(j => j >= 20 && j < 30).length;
-        const jumpZone3Count = filteredJumps.filter(j => j >= 30 && j < 40).length;
-        const jumpZone4Count = filteredJumps.filter(j => j >= 40 && j < 50).length;
-        const jumpZone5Count = filteredJumps.filter(j => j >= 50).length;
+        // 2. その他の Catapult 運動量統計 (異常値除外を行わず、元の CSV 全データをそのまま利用)
+        const maxJumpHeight = agg.jumps.length > 0 ? Math.max(...agg.jumps) : undefined;
+        const totalJumps = agg.jumps.length;
+        const jumpVolume = agg.jumps.length > 0 ? (agg.jumps.reduce((a, b) => a + b, 0) / 100) : 0;
+        const jumpsOver40cm = agg.jumps.filter(j => j >= 40).length;
+        const jumpZone1Count = agg.jumps.filter(j => j < 20).length;
+        const jumpZone2Count = agg.jumps.filter(j => j >= 20 && j < 30).length;
+        const jumpZone3Count = agg.jumps.filter(j => j >= 30 && j < 40).length;
+        const jumpZone4Count = agg.jumps.filter(j => j >= 40 && j < 50).length;
+        const jumpZone5Count = agg.jumps.filter(j => j >= 50).length;
 
         const maxAcceleration = agg.accelerations.length > 0 ? Math.max(...agg.accelerations) : undefined;
         const avgAcceleration = agg.accelerations.length > 0 ? agg.accelerations.reduce((a, b) => a + b, 0) / agg.accelerations.length : undefined;
