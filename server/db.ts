@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, inArray, sql, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import fs from "fs";
@@ -555,6 +555,12 @@ export function loadMockStore() {
         createdAt: new Date(p.createdAt),
         updatedAt: new Date(p.updatedAt)
       }));
+      // 過去データの移行パッチ: top5JumpHeight が空のレコードに avgJumpHeight (旧仕様のTop5平均) を移行する
+      mockPerformanceData.forEach(p => {
+        if (p.top5JumpHeight === undefined || p.top5JumpHeight === null) {
+          p.top5JumpHeight = p.avgJumpHeight;
+        }
+      });
     }
   } catch (err) {
     console.error("Failed to load mock store from disk:", err);
@@ -4093,6 +4099,27 @@ export async function seedDatabase() {
       }
     }
     console.log("[Database] Seeding completed successfully!");
+    
+    // 5. 過去データの移行パッチ (PostgreSQL 向け)
+    // top5JumpHeight が null である過去レコードに対し、旧仕様で avgJumpHeight に入っていた値を top5JumpHeight カラムに移行する
+    try {
+      const recordsToPatch = await db.select().from(performanceData).where(isNull(performanceData.top5JumpHeight));
+      if (recordsToPatch.length > 0) {
+        console.log(`[Database] Patching ${recordsToPatch.length} legacy records to populate top5JumpHeight...`);
+        let patchedCount = 0;
+        for (const record of recordsToPatch) {
+          if (record.avgJumpHeight !== null) {
+            await db.update(performanceData)
+              .set({ top5JumpHeight: record.avgJumpHeight })
+              .where(eq(performanceData.id, record.id));
+            patchedCount++;
+          }
+        }
+        console.log(`[Database] Successfully patched ${patchedCount} legacy records.`);
+      }
+    } catch (patchError) {
+      console.error("[Database] Failed to run legacy top5JumpHeight migration patch:", patchError);
+    }
   } catch (error) {
     console.error("[Database] Seeding failed:", error);
   }
@@ -4327,7 +4354,7 @@ export async function bulkApproveAnomaliesWithoutCorrection(
 
 export async function correctPerformanceAnomaly(
   recordId: number, 
-  metricsToCorrect: string[] = ["totalLoad", "totalJumps", "avgJumpHeight", "accelCount"]
+  metricsToCorrect: string[] = ["totalLoad", "totalJumps", "avgJumpHeight", "top5JumpHeight", "accelCount"]
 ): Promise<void> {
   const db = await getDb();
   
@@ -4359,6 +4386,7 @@ export async function correctPerformanceAnomaly(
   let samePosLoads: number[] = [];
   let samePosJumps: number[] = [];
   let samePosJumpHeights: number[] = [];
+  let samePosTop5Heights: number[] = [];
   let samePosAccels: number[] = [];
   
   let samePosMaxHeights: number[] = [];
@@ -4382,6 +4410,7 @@ export async function correctPerformanceAnomaly(
     samePosLoads = normalRecords.map(p => Number(p.totalLoad || 0));
     samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
     samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
+    samePosTop5Heights = normalRecords.map(p => Number((p as any).top5JumpHeight || 0));
     samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
     
     samePosMaxHeights = normalRecords.map(p => Number(p.maxJumpHeight || 0));
@@ -4408,6 +4437,7 @@ export async function correctPerformanceAnomaly(
       samePosLoads = normalRecords.map(p => Number(p.totalLoad || 0));
       samePosJumps = normalRecords.map(p => Number(p.totalJumps || 0));
       samePosJumpHeights = normalRecords.map(p => Number(p.avgJumpHeight || 0));
+      samePosTop5Heights = normalRecords.map(p => Number(p.top5JumpHeight || 0));
       samePosAccels = normalRecords.map(p => Number(p.accelCount || 0));
 
       samePosMaxHeights = normalRecords.map(p => Number(p.maxJumpHeight || 0));
@@ -4434,6 +4464,7 @@ export async function correctPerformanceAnomaly(
   const correctedJumps = Math.round(avg(samePosJumps, fallbackJumps));
   const correctedLoad = Number(avg(samePosLoads, fallbackLoad).toFixed(2));
   const correctedHeight = Number(avg(samePosJumpHeights, fallbackHeight).toFixed(2));
+  const correctedTop5Height = Number(avg(samePosTop5Heights, fallbackHeight).toFixed(2));
   const correctedAccel = Math.round(avg(samePosAccels, fallbackAccel));
 
   const correctedMaxHeight = Number(avg(samePosMaxHeights, 45).toFixed(2));
@@ -4451,6 +4482,7 @@ export async function correctPerformanceAnomaly(
   const originalRawDataJson = record.originalRawData || JSON.stringify({
     totalJumps: record.totalJumps,
     avgJumpHeight: record.avgJumpHeight ? String(record.avgJumpHeight) : "0",
+    top5JumpHeight: record.top5JumpHeight ? String(record.top5JumpHeight) : "0",
     maxJumpHeight: record.maxJumpHeight ? String(record.maxJumpHeight) : "0",
     jumpVolume: record.jumpVolume ? String(record.jumpVolume) : "0",
     jumpsOver40cm: record.jumpsOver40cm,
@@ -4473,6 +4505,7 @@ export async function correctPerformanceAnomaly(
   const finalLoad = metricsToCorrect.includes("totalLoad") ? correctedLoad : Number(record.totalLoad || 0);
   const finalJumps = metricsToCorrect.includes("totalJumps") ? correctedJumps : record.totalJumps;
   const finalHeight = metricsToCorrect.includes("totalJumps") ? correctedHeight : Number(record.avgJumpHeight || 0);
+  const finalTop5Height = metricsToCorrect.includes("totalJumps") ? correctedTop5Height : Number(record.top5JumpHeight || 0);
   const finalAvgAcc = metricsToCorrect.includes("accelCount") ? correctedAvgAcc : Number(record.avgAcceleration || 0);
   const finalAccelCount = metricsToCorrect.includes("accelCount") ? correctedAccel : record.accelCount;
 
@@ -4480,6 +4513,7 @@ export async function correctPerformanceAnomaly(
   const updateFields = {
     totalJumps: finalJumps,
     avgJumpHeight: finalHeight.toFixed(2),
+    top5JumpHeight: finalTop5Height.toFixed(2),
     maxJumpHeight: metricsToCorrect.includes("totalJumps") ? correctedMaxHeight.toFixed(2) : record.maxJumpHeight,
     jumpVolume: ((finalJumps * finalHeight) / 100).toFixed(2),
     jumpsOver40cm: metricsToCorrect.includes("totalJumps") ? correctedOver40 : record.jumpsOver40cm,
@@ -4609,6 +4643,7 @@ export async function rollbackPerformanceAnomaly(recordId: number): Promise<void
   const rollbackFields = {
     totalJumps: orig.totalJumps,
     avgJumpHeight: orig.avgJumpHeight,
+    top5JumpHeight: orig.top5JumpHeight || null,
     maxJumpHeight: orig.maxJumpHeight,
     jumpVolume: orig.jumpVolume,
     jumpsOver40cm: orig.jumpsOver40cm,
