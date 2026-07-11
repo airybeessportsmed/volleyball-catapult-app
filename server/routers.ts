@@ -313,6 +313,8 @@ export const appRouter = router({
           position: z.string().nullable(),
           birthday: z.string().nullable(),
           height: z.number().nullable(),
+          fingertipHeight: z.number().nullable().optional(),
+          maxReach: z.number().nullable().optional(),
           csvNames: z.string().nullable().optional(),
           onetapName: z.string().nullable().optional(),
           catapultName: z.string().nullable().optional(),

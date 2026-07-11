@@ -3547,134 +3547,42 @@ export default function HomeScreen() {
                   <View style={{ gap: 10, marginTop: 8 }}>
                     {allAthletes.map((ath) => {
                       return (
-                        <View key={ath.athleteId} style={{ borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 14, marginBottom: 8, gap: 8 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
-                              <Text style={{ fontSize: 10, color: "#64748B" }}>No.{ath.jerseyNumber || "-"} / {ath.position || "-"}</Text>
-                            </View>
-                            
-                            <View style={{ flex: 2 }}>
-                              <TextInput
-                                defaultValue={(ath as any).csvNames || ""}
-                                placeholder="名寄せ名 (例: Yamashita, 1 Yamashita)"
-                                placeholderTextColor="#94A3B8"
-                                onBlur={async (e) => {
-                                  const text = (e as any).nativeEvent.text;
-                                  try {
-                                    await updateAthleteCsvNamesMutation.mutateAsync({
-                                      athleteId: ath.athleteId,
-                                      csvNames: text
-                                    });
-                                    refetchTeam();
-                                  } catch (err) {
-                                    console.error("Failed to update mapping", err);
-                                  }
-                                }}
-                                style={{
-                                  fontSize: 12,
-                                  borderWidth: 1,
-                                  borderColor: "#CBD5E1",
-                                  borderRadius: 8,
-                                  paddingVertical: 5,
-                                  paddingHorizontal: 10,
-                                  color: "#1E293B",
-                                  backgroundColor: "#FFFFFF",
-                                }}
-                              />
-                            </View>
+                        <View key={ath.athleteId} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 10, gap: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
+                            <Text style={{ fontSize: 10, color: "#64748B" }}>No.{ath.jerseyNumber || "-"} / {ath.position || "-"}</Text>
                           </View>
-
-                          {/* 指高・最高到達点入力 */}
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 4 }}>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                              <Text style={{ fontSize: 9, color: "#475569", fontWeight: "600" }}>指高:</Text>
-                              <TextInput
-                                defaultValue={(ath as any).fingertipHeight !== null && (ath as any).fingertipHeight !== undefined ? String((ath as any).fingertipHeight) : ""}
-                                placeholder="220"
-                                keyboardType="numeric"
-                                placeholderTextColor="#94A3B8"
-                                onBlur={async (e) => {
-                                  const valStr = (e as any).nativeEvent.text;
-                                  const val = valStr ? Number(valStr) : null;
-                                  try {
-                                    await updateAthleteReachHeightsMutation.mutateAsync({
-                                      athleteId: ath.athleteId,
-                                      fingertipHeight: val,
-                                      maxReach: (ath as any).maxReach ? Number((ath as any).maxReach) : null
-                                    });
-                                    refetchTeam();
-                                  } catch (err) {
-                                    console.error("Failed to update reach heights", err);
-                                  }
-                                }}
-                                style={{
-                                  fontSize: 11,
-                                  borderWidth: 1,
-                                  borderColor: "#CBD5E1",
-                                  borderRadius: 8,
-                                  paddingVertical: 3,
-                                  paddingHorizontal: 6,
-                                  width: 50,
-                                  textAlign: "center",
-                                  color: "#1E293B",
-                                  backgroundColor: "#FFFFFF",
-                                }}
-                              />
-                              <Text style={{ fontSize: 8, color: "#94A3B8" }}>cm</Text>
-                            </View>
-
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                              <Text style={{ fontSize: 9, color: "#475569", fontWeight: "600" }}>到達点:</Text>
-                              <TextInput
-                                defaultValue={(ath as any).maxReach !== null && (ath as any).maxReach !== undefined ? String((ath as any).maxReach) : ""}
-                                placeholder="310"
-                                keyboardType="numeric"
-                                placeholderTextColor="#94A3B8"
-                                onBlur={async (e) => {
-                                  const valStr = (e as any).nativeEvent.text;
-                                  const val = valStr ? Number(valStr) : null;
-                                  try {
-                                    await updateAthleteReachHeightsMutation.mutateAsync({
-                                      athleteId: ath.athleteId,
-                                      fingertipHeight: (ath as any).fingertipHeight ? Number((ath as any).fingertipHeight) : null,
-                                      maxReach: val
-                                    });
-                                    refetchTeam();
-                                  } catch (err) {
-                                    console.error("Failed to update reach heights", err);
-                                  }
-                                }}
-                                style={{
-                                  fontSize: 11,
-                                  borderWidth: 1,
-                                  borderColor: "#CBD5E1",
-                                  borderRadius: 8,
-                                  paddingVertical: 3,
-                                  paddingHorizontal: 6,
-                                  width: 50,
-                                  textAlign: "center",
-                                  color: "#1E293B",
-                                  backgroundColor: "#FFFFFF",
-                                }}
-                              />
-                              <Text style={{ fontSize: 8, color: "#94A3B8" }}>cm</Text>
-                            </View>
-
-                            {/* 計算跳躍高プレビュー */}
-                            {(() => {
-                              const f = (ath as any).fingertipHeight ? Number((ath as any).fingertipHeight) : null;
-                              const m = (ath as any).maxReach ? Number((ath as any).maxReach) : null;
-                              if (f && m && m > f) {
-                                const reach = m - f;
-                                return (
-                                  <Text style={{ fontSize: 9, color: "#2563EB", fontWeight: "bold", marginLeft: "auto" }}>
-                                    跳躍高: {reach}cm (閾値: {(reach * 1.15).toFixed(1)}cm)
-                                  </Text>
-                                );
-                              }
-                              return null;
-                            })()}
+                          
+                          <View style={{ flex: 2 }}>
+                            <TextInput
+                              defaultValue={(ath as any).csvNames || ""}
+                              placeholder="例: Haruna, Yamashita, 1 Yamashita"
+                              placeholderTextColor="#94A3B8"
+                              onBlur={async (e) => {
+                                const text = (e as any).nativeEvent.text;
+                                try {
+                                  await updateAthleteCsvNamesMutation.mutateAsync({
+                                    athleteId: ath.athleteId,
+                                    csvNames: text
+                                  });
+                                  refetchTeam();
+                                  alert("マッピングを更新しました。");
+                                } catch (err) {
+                                  console.error("Failed to update mapping", err);
+                                  alert("マッピングの保存に失敗しました。");
+                                }
+                              }}
+                              style={{
+                                fontSize: 12,
+                                borderWidth: 1,
+                                borderColor: "#CBD5E1",
+                                borderRadius: 8,
+                                paddingVertical: 6,
+                                paddingHorizontal: 10,
+                                color: "#1E293B",
+                                backgroundColor: "#FFFFFF",
+                              }}
+                            />
                           </View>
                         </View>
                       );

@@ -869,6 +869,8 @@ export interface BatchSaveAthleteInput {
   position: string | null;
   birthday: string | null;
   height: number | null;
+  fingertipHeight?: number | null;
+  maxReach?: number | null;
   csvNames?: string | null;
   onetapName?: string | null;
   catapultName?: string | null;
@@ -904,6 +906,8 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           athlete.position = item.position;
           athlete.birthday = item.birthday;
           athlete.height = item.height !== null ? String(item.height) as any : null;
+          athlete.fingertipHeight = item.fingertipHeight !== undefined && item.fingertipHeight !== null ? String(item.fingertipHeight) as any : null;
+          athlete.maxReach = item.maxReach !== undefined && item.maxReach !== null ? String(item.maxReach) as any : null;
           athlete.csvNames = item.csvNames || null;
           athlete.onetapName = item.onetapName || null;
           athlete.catapultName = item.catapultName || null;
@@ -1000,6 +1004,8 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
               position: item.position,
               birthday: item.birthday,
               height: item.height !== null ? String(item.height) as any : null,
+              fingertipHeight: item.fingertipHeight !== undefined && item.fingertipHeight !== null ? String(item.fingertipHeight) as any : null,
+              maxReach: item.maxReach !== undefined && item.maxReach !== null ? String(item.maxReach) as any : null,
               csvNames: item.csvNames || null,
               onetapName: item.onetapName || null,
               catapultName: item.catapultName || null,
@@ -1032,8 +1038,8 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           birthday: item.birthday,
           height: item.height !== null ? String(item.height) as any : null,
           csvNames: item.csvNames || null,
-          fingertipHeight: null,
-          maxReach: null,
+          fingertipHeight: item.fingertipHeight !== undefined && item.fingertipHeight !== null ? String(item.fingertipHeight) as any : null,
+          maxReach: item.maxReach !== undefined && item.maxReach !== null ? String(item.maxReach) as any : null,
           onetapName: item.onetapName || null,
           catapultName: item.catapultName || null,
           soxaiEmail: item.soxaiEmail || null,

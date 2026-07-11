@@ -14,6 +14,8 @@ interface EditableAthlete {
   position: string | null;
   birthday: string | null;
   height: number | null;
+  fingertipHeight: number | null;
+  maxReach: number | null;
   csvNames: string | null;
   onetapName: string | null;
   catapultName: string | null;
@@ -75,6 +77,8 @@ export default function CoachTeamScreen() {
           position: a.position,
           birthday: a.birthday || "",
           height: a.height ? Number(a.height) : null,
+          fingertipHeight: (a as any).fingertipHeight ? Number((a as any).fingertipHeight) : null,
+          maxReach: (a as any).maxReach ? Number((a as any).maxReach) : null,
           csvNames: a.csvNames || "",
           onetapName: a.onetapName || "",
           catapultName: a.catapultName || "",
@@ -100,6 +104,8 @@ export default function CoachTeamScreen() {
         position: "",
         birthday: "",
         height: null,
+        fingertipHeight: null,
+        maxReach: null,
         csvNames: "",
         onetapName: "",
         catapultName: "",
@@ -152,6 +158,8 @@ export default function CoachTeamScreen() {
         position: a.position ? a.position.trim() : null,
         birthday: a.birthday ? a.birthday.trim() : null,
         height: a.height,
+        fingertipHeight: a.fingertipHeight,
+        maxReach: a.maxReach,
         csvNames: a.csvNames ? a.csvNames.trim() : null,
         onetapName: a.onetapName ? a.onetapName.trim() : null,
         catapultName: a.catapultName ? a.catapultName.trim() : null,
@@ -280,6 +288,12 @@ export default function CoachTeamScreen() {
                     </View>
                     <View style={{ width: 100 }} className="justify-center px-2">
                       <Text className="font-bold text-xs text-muted">身長(cm)</Text>
+                    </View>
+                    <View style={{ width: 90 }} className="justify-center px-2">
+                      <Text className="font-bold text-xs text-muted">指高(cm)</Text>
+                    </View>
+                    <View style={{ width: 90 }} className="justify-center px-2">
+                      <Text className="font-bold text-xs text-muted">到達点(cm)</Text>
                     </View>
                   </View>
 
@@ -439,10 +453,36 @@ export default function CoachTeamScreen() {
                             className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm text-center"
                           />
                         </View>
+
+                        {/* 指高 */}
+                        <View style={{ width: 90 }} className="px-1">
+                          <TextInput
+                            value={athlete.fingertipHeight !== null && athlete.fingertipHeight !== undefined ? String(athlete.fingertipHeight) : ""}
+                            onChangeText={(val) => handleFieldChange(index, "fingertipHeight", val ? Number(val) : null)}
+                            placeholder="220"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="numeric"
+                            editable={!athlete.isDeleted}
+                            className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm text-center"
+                          />
+                        </View>
+
+                        {/* 到達点 */}
+                        <View style={{ width: 90 }} className="px-1">
+                          <TextInput
+                            value={athlete.maxReach !== null && athlete.maxReach !== undefined ? String(athlete.maxReach) : ""}
+                            onChangeText={(val) => handleFieldChange(index, "maxReach", val ? Number(val) : null)}
+                            placeholder="310"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="numeric"
+                            editable={!athlete.isDeleted}
+                            className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm text-center"
+                          />
+                        </View>
                       </View>
                     ))
                   ) : (
-                    <View style={{ width: 1550 }} className="py-8 items-center justify-center">
+                    <View style={{ width: 1730 }} className="py-8 items-center justify-center">
                       <Text className="text-sm text-muted">「行を追加」ボタンを押して、選手を登録してください。</Text>
                     </View>
                   )}
