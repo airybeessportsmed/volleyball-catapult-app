@@ -412,10 +412,19 @@ export default function AthleteAnalyticsScreen() {
               {ratio40}%
             </Text>
           </View>
+        </View>
+
+        <View className="flex-row gap-3">
           <View className="flex-1 bg-accent/5 border border-accent/10 p-3.5 rounded-2xl">
-            <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高</Text>
+            <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高 (全数)</Text>
             <Text className="text-base font-extrabold text-accent font-mono">
               {latest.avgJumpHeight ? `${Number(latest.avgJumpHeight).toFixed(1)} cm` : "--"}
+            </Text>
+          </View>
+          <View className="flex-1 bg-accent/5 border border-accent/10 p-3.5 rounded-2xl">
+            <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高 (Top5)</Text>
+            <Text className="text-base font-extrabold text-accent font-mono">
+              {(latest as any).top5JumpHeight ? `${Number((latest as any).top5JumpHeight).toFixed(1)} cm` : "--"}
             </Text>
           </View>
         </View>
@@ -613,7 +622,8 @@ export default function AthleteAnalyticsScreen() {
       { key: "totalLoad", title: "平均運動量", unit: "", isInt: true },
       { key: "totalJumps", title: "平均ジャンプ回数", unit: "回", isInt: true },
       { key: "jumpVolume", title: "平均総ジャンプ高 (Volume)", unit: "m", isInt: false },
-      { key: "avgJumpHeight", title: "平均ジャンプ高", unit: "cm", isInt: true },
+      { key: "avgJumpHeight", title: "平均ジャンプ高 (全数平均)", unit: "cm", isInt: true },
+      { key: "top5JumpHeight", title: "平均ジャンプ高 (Top5平均)", unit: "cm", isInt: true },
     ];
 
     return (
@@ -753,6 +763,7 @@ export default function AthleteAnalyticsScreen() {
           if (correctJumps) {
             metrics.push("totalJumps");
             metrics.push("avgJumpHeight");
+            metrics.push("top5JumpHeight");
           }
           if (correctAccel) metrics.push("accelCount");
         }

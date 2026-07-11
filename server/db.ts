@@ -174,9 +174,9 @@ export async function getTeamSettings(teamId: number): Promise<any> {
         teamId,
         baselineDays: 28,
         enabledMetrics: JSON.stringify([
-          "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
+          "totalJumps", "maxJumpHeight", "avgJumpHeight", "top5JumpHeight", "jumpVolume", "totalLoad", 
           "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
-          "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
+          "wellnessFatigue", "wellnessSoreness", "wellnessStress"
         ]),
         baseDateMode: "rolling",
         baseFixedDate: null,
@@ -196,9 +196,9 @@ export async function getTeamSettings(teamId: number): Promise<any> {
     teamId,
     baselineDays: 28,
     enabledMetrics: JSON.stringify([
-      "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
+      "totalJumps", "maxJumpHeight", "avgJumpHeight", "top5JumpHeight", "jumpVolume", "totalLoad", 
       "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
-      "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
+      "wellnessFatigue", "wellnessSoreness", "wellnessStress"
     ]),
     baseDateMode: "rolling",
     baseFixedDate: null
@@ -318,6 +318,7 @@ const generateDemoPerformanceData = () => {
       sessionType,
       maxJumpHeight: maxJumpHeightFinal.toFixed(2) as any,
       avgJumpHeight: sakuraAvgHeight.toFixed(2) as any,
+      top5JumpHeight: (sakuraAvgHeight * 1.1).toFixed(2) as any,
       totalJumps: sakuraJumpsFinal,
       jumpVolume: ((sakuraJumpsFinal * sakuraAvgHeight) / 100).toFixed(2) as any,
       jumpsOver40cm: sakuraJumpMetrics.over40,
@@ -396,6 +397,7 @@ const generateDemoPerformanceData = () => {
       sessionType,
       maxJumpHeight: (68 + Math.random() * 9).toFixed(2) as any,
       avgJumpHeight: hinataAvgHeight.toFixed(2) as any,
+      top5JumpHeight: (hinataAvgHeight * 1.1).toFixed(2) as any,
       totalJumps: hinataJumps,
       jumpVolume: ((hinataJumps * hinataAvgHeight) / 100).toFixed(2) as any,
       jumpsOver40cm: hinataJumpMetrics.over40,
@@ -465,6 +467,7 @@ const generateDemoPerformanceData = () => {
       sessionType,
       maxJumpHeight: (60 + Math.random() * 7).toFixed(2) as any,
       avgJumpHeight: mioAvgHeight.toFixed(2) as any,
+      top5JumpHeight: (mioAvgHeight * 1.1).toFixed(2) as any,
       totalJumps: mioJumps,
       jumpVolume: ((mioJumps * mioAvgHeight) / 100).toFixed(2) as any,
       jumpsOver40cm: mioJumpMetrics.over40,
@@ -1065,6 +1068,7 @@ export async function createPerformanceData(data: InsertPerformanceData) {
       sessionType: data.sessionType ?? "practice",
       maxJumpHeight: data.maxJumpHeight ? String(data.maxJumpHeight) as any : null,
       avgJumpHeight: data.avgJumpHeight ? String(data.avgJumpHeight) as any : null,
+      top5JumpHeight: data.top5JumpHeight ? String(data.top5JumpHeight) as any : null,
       totalJumps: data.totalJumps ?? null,
       
       jumpVolume: data.jumpVolume ? String(data.jumpVolume) as any : null,
@@ -1218,6 +1222,7 @@ export async function getImportStatusByMonth(teamId: number, year: number, month
     const hasImaFields = 
       record.maxJumpHeight !== null || 
       record.avgJumpHeight !== null || 
+      record.top5JumpHeight !== null || 
       record.totalJumps !== null || 
       record.avgAcceleration !== null || 
       record.maxAcceleration !== null;
@@ -1666,6 +1671,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
     maxJumpHeight: mergeMaxField(data.maxJumpHeight, existing?.maxJumpHeight),
     avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight, null),
+    top5JumpHeight: mergeField(data.top5JumpHeight, existing?.top5JumpHeight, null),
     totalJumps: mergeAdditiveField(data.totalJumps, existing?.totalJumps, calculatedSums.totalJumps),
     jumpVolume: mergeAdditiveField(data.jumpVolume, existing?.jumpVolume, calculatedSums.jumpVolume),
     jumpsOver40cm: mergeAdditiveField(data.jumpsOver40cm, existing?.jumpsOver40cm, calculatedSums.jumpsOver40cm),
@@ -2242,12 +2248,13 @@ export async function importPerformanceCsv(
         }
         const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
         const top5Jumps = sortedJumps.slice(0, 5);
-        const avgJumpHeight = top5Jumps.length > 0 
+        const top5JumpHeight = top5Jumps.length > 0 
           ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
           : undefined;
 
-        // 2. その他の Catapult 運動量統計 (異常値除外を行わず、元の CSV 全データをそのまま利用)
+        // 2. その coach/athlete 運動量統計 (異常値除外を行わず、元の CSV 全データをそのまま利用)
         const maxJumpHeight = ig.jumps.length > 0 ? Math.max(...ig.jumps) : undefined;
+        const avgJumpHeight = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) / ig.jumps.length : undefined;
         const totalJumps = ig.jumps.length;
         const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) : 0;
         const jumpsOver40cm = ig.jumps.filter(j => j >= 40).length;
@@ -2279,6 +2286,7 @@ export async function importPerformanceCsv(
           date: ig.dateObj,
           maxJumpHeight: maxJumpHeight ? maxJumpHeight.toFixed(2) : undefined,
           avgJumpHeight: avgJumpHeight ? avgJumpHeight.toFixed(2) : undefined,
+          top5JumpHeight: top5JumpHeight ? top5JumpHeight.toFixed(2) : undefined,
           totalJumps,
           jumpVolume: jumpVolume.toFixed(2),
           jumpsOver40cm,
@@ -2443,12 +2451,13 @@ export async function importPerformanceCsv(
         }
         const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
         const top5Jumps = sortedJumps.slice(0, 5);
-        const avgJumpHeight = top5Jumps.length > 0 
+        const top5JumpHeight = top5Jumps.length > 0 
           ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
           : undefined;
 
         // 2. その他の Catapult 運動量統計 (異常値除外を行わず、元の CSV 全データをそのまま利用)
         const maxJumpHeight = agg.jumps.length > 0 ? Math.max(...agg.jumps) : undefined;
+        const avgJumpHeight = agg.jumps.length > 0 ? agg.jumps.reduce((a, b) => a + b, 0) / agg.jumps.length : undefined;
         const totalJumps = agg.jumps.length;
         const jumpVolume = agg.jumps.length > 0 ? (agg.jumps.reduce((a, b) => a + b, 0) / 100) : 0;
         const jumpsOver40cm = agg.jumps.filter(j => j >= 40).length;
@@ -2476,6 +2485,7 @@ export async function importPerformanceCsv(
           date: agg.dateObj,
           maxJumpHeight: maxJumpHeight ? maxJumpHeight.toFixed(2) : undefined,
           avgJumpHeight: avgJumpHeight ? avgJumpHeight.toFixed(2) : undefined,
+          top5JumpHeight: top5JumpHeight ? top5JumpHeight.toFixed(2) : undefined,
           totalJumps,
           jumpVolume: jumpVolume.toFixed(2),
           jumpsOver40cm,
@@ -2908,6 +2918,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       jumpVolume: p.jumpVolume ? Number(p.jumpVolume) : 0,
       totalJumps: p.totalJumps ? Number(p.totalJumps) : 0,
       avgJumpHeight: p.avgJumpHeight ? Number(p.avgJumpHeight) : 0,
+      top5JumpHeight: p.top5JumpHeight ? Number(p.top5JumpHeight) : 0,
       sRPE: p.sRPE ? Number(p.sRPE) : 0,
       rpeValue: p.rpeValue ? Number(p.rpeValue) : 0,
       wellnessSleep: p.wellnessSleep ? Number(p.wellnessSleep) : 0,
@@ -2957,6 +2968,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       totalJumps: own28.reduce((sum, p) => sum + (p.totalJumps ? Number(p.totalJumps) : 0), 0) / ownCount,
       jumpVolume: own28.reduce((sum, p) => sum + (p.jumpVolume ? Number(p.jumpVolume) : 0), 0) / ownCount,
       avgJumpHeight: own28.reduce((sum, p) => sum + (p.avgJumpHeight ? Number(p.avgJumpHeight) : 0), 0) / ownCount,
+      top5JumpHeight: own28.reduce((sum, p) => sum + (p.top5JumpHeight ? Number(p.top5JumpHeight) : 0), 0) / ownCount,
     };
 
     if (!db) {
@@ -2984,6 +2996,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
         totalJumps: records.reduce((sum, p) => sum + (p.totalJumps ? Number(p.totalJumps) : 0), 0) / count,
         jumpVolume: records.reduce((sum, p) => sum + (p.jumpVolume ? Number(p.jumpVolume) : 0), 0) / count,
         avgJumpHeight: records.reduce((sum, p) => sum + (p.avgJumpHeight ? Number(p.avgJumpHeight) : 0), 0) / count,
+        top5JumpHeight: records.reduce((sum, p) => sum + (p.top5JumpHeight ? Number(p.top5JumpHeight) : 0), 0) / count,
       };
     };
 
@@ -2996,18 +3009,21 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
         totalJumps: Number(ownAvg.totalJumps.toFixed(1)),
         jumpVolume: Number(ownAvg.jumpVolume.toFixed(2)),
         avgJumpHeight: Number(ownAvg.avgJumpHeight.toFixed(1)),
+        top5JumpHeight: Number(ownAvg.top5JumpHeight.toFixed(1)),
       },
       team: {
         totalLoad: Number(teamAvg.totalLoad.toFixed(1)),
         totalJumps: Number(teamAvg.totalJumps.toFixed(1)),
         jumpVolume: Number(teamAvg.jumpVolume.toFixed(2)),
         avgJumpHeight: Number(teamAvg.avgJumpHeight.toFixed(1)),
+        top5JumpHeight: Number(teamAvg.top5JumpHeight.toFixed(1)),
       },
       position: {
         totalLoad: Number(posAvg.totalLoad.toFixed(1)),
         totalJumps: Number(posAvg.totalJumps.toFixed(1)),
         jumpVolume: Number(posAvg.jumpVolume.toFixed(2)),
         avgJumpHeight: Number(posAvg.avgJumpHeight.toFixed(1)),
+        top5JumpHeight: Number(posAvg.top5JumpHeight.toFixed(1)),
       }
     };
   };
@@ -3086,6 +3102,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
       { key: "maxJumpHeight", name: "最高ジャンプ高", type: "load" as const },
       { key: "avgJumpHeight", name: "平均ジャンプ高", type: "load" as const },
+      { key: "top5JumpHeight", name: "ジャンプ高(Top5平均)", type: "load" as const },
       { key: "jumpVolume", name: "ジャンプボリューム", type: "load" as const },
       { key: "totalLoad", name: "Player Load", type: "load" as const },
       { key: "accelCount", name: "加速回数", type: "load" as const },
@@ -3435,6 +3452,7 @@ export async function getTeamAnalytics(teamId: number) {
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
       { key: "maxJumpHeight", name: "最高ジャンプ高", type: "load" as const },
       { key: "avgJumpHeight", name: "平均ジャンプ高", type: "load" as const },
+      { key: "top5JumpHeight", name: "ジャンプ高(Top5平均)", type: "load" as const },
       { key: "jumpVolume", name: "ジャンプボリューム", type: "load" as const },
       { key: "totalLoad", name: "Player Load", type: "load" as const },
       { key: "accelCount", name: "加速回数", type: "load" as const },

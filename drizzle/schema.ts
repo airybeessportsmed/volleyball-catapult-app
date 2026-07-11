@@ -81,6 +81,7 @@ export const performanceData = pgTable("performanceData", {
   // Catapult metrics
   maxJumpHeight: numeric("maxJumpHeight", { precision: 10, scale: 2 }), // cm
   avgJumpHeight: numeric("avgJumpHeight", { precision: 10, scale: 2 }), // cm
+  top5JumpHeight: numeric("top5JumpHeight", { precision: 10, scale: 2 }), // cm (Top 5 平均値, 異常値除外あり)
   totalJumps: integer("totalJumps"),
   
   // New Jump Metrics

@@ -226,7 +226,8 @@ interface PerformanceMetrics {
 export const METRICS_MAP = [
   { key: "totalJumps", label: "総ジャンプ数", desc: "外的負荷: ジャンプの合計回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "maxJumpHeight", label: "最高ジャンプ高", desc: "外的負荷: 最高跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
-  { key: "avgJumpHeight", label: "平均ジャンプ高", desc: "外的負荷: 平均跳躍高", unit: "cm", polarity: "positive", category: "load_ext" },
+  { key: "avgJumpHeight", label: "平均ジャンプ高 (全数平均)", desc: "外的負荷: 全ジャンプの平均値", unit: "cm", polarity: "positive", category: "load_ext" },
+  { key: "top5JumpHeight", label: "平均ジャンプ高 (Top5平均)", desc: "神経筋: エラー除外後のTop5平均値", unit: "cm", polarity: "positive", category: "load_ext" },
   { key: "jumpVolume", label: "ジャンプボリューム", desc: "外的負荷: ジャンプの総高さ", unit: "cm", polarity: "positive", category: "load_ext" },
   { key: "totalLoad", label: "Player Load", desc: "外的負荷: 運動による総物理負荷", unit: "PL", polarity: "positive", category: "load_ext" },
   { key: "accelCount", label: "加速回数", desc: "外的負荷: 急加速の発生回数", unit: "回", polarity: "positive", category: "load_ext" },
@@ -407,6 +408,7 @@ const AnomalyItemRow = ({ item, onResolve, correctMutation }: { item: any; onRes
         if (correctJumps) {
           metrics.push("totalJumps");
           metrics.push("avgJumpHeight");
+          metrics.push("top5JumpHeight");
         }
         if (correctAccel) metrics.push("accelCount");
       }
@@ -634,6 +636,7 @@ export default function HomeScreen() {
     "totalJumps",
     "maxJumpHeight",
     "avgJumpHeight",
+    "top5JumpHeight",
     "jumpVolume",
     "totalLoad",
     "accelCount",
@@ -1349,10 +1352,19 @@ export default function HomeScreen() {
                 {ratio40}%
               </Text>
             </View>
+          </View>
+
+          <View className="flex-row gap-3">
             <View className="flex-1 bg-accent/5 border border-accent/10 p-3.5 rounded-2xl">
-              <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高</Text>
+              <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高 (全数)</Text>
               <Text className="text-sm font-extrabold text-accent font-mono">
                 {latest.avgJumpHeight ? `${Number(latest.avgJumpHeight).toFixed(1)} cm` : "--"}
+              </Text>
+            </View>
+            <View className="flex-1 bg-accent/5 border border-accent/10 p-3.5 rounded-2xl">
+              <Text className="text-[9px] text-muted font-bold mb-1">平均ジャンプ高 (Top5)</Text>
+              <Text className="text-sm font-extrabold text-accent font-mono">
+                {(latest as any).top5JumpHeight ? `${Number((latest as any).top5JumpHeight).toFixed(1)} cm` : "--"}
               </Text>
             </View>
           </View>
@@ -2414,7 +2426,7 @@ export default function HomeScreen() {
                     {(() => {
                       const categories = [
                         { label: "主観", keys: ["wellnessFatigue", "wellnessSoreness", "wellnessStress"] },
-                        { label: "神経筋", keys: ["avgJumpHeight"] },
+                        { label: "神経筋", keys: ["top5JumpHeight"] },
                         { label: "生理学マーカー", keys: ["physiologicalMarker"] },
                         { label: "体組成", keys: [] }
                       ];
@@ -2490,7 +2502,7 @@ export default function HomeScreen() {
                       {allAthletes.map((ath, idx) => {
                         const categories = [
                           { label: "主観", keys: ["wellnessFatigue", "wellnessSoreness", "wellnessStress"], polarity: "negative" as const },
-                          { label: "神経筋", keys: ["avgJumpHeight"], polarity: "positive" as const },
+                          { label: "神経筋", keys: ["top5JumpHeight"], polarity: "positive" as const },
                           { label: "生理学マーカー", keys: ["physiologicalMarker"], polarity: "positive" as const },
                           { label: "体組成", keys: [], polarity: "positive" as const }
                         ];

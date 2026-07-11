@@ -104,15 +104,24 @@ export default function PerformanceDetailScreen() {
                 </Text>
               </View>
               <View className="flex-1 bg-surface border border-border rounded-2xl p-4 shadow-sm">
-                <Text className="text-[10px] text-muted mb-1">平均ジャンプ高</Text>
+                <Text className="text-[10px] text-muted mb-1">総ジャンプ回数</Text>
+                <Text className="text-xl font-extrabold text-accent">
+                  {perf.totalJumps ? `${perf.totalJumps} 回` : "--"}
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row gap-3">
+              <View className="flex-1 bg-surface border border-border rounded-2xl p-4 shadow-sm">
+                <Text className="text-[10px] text-muted mb-1">平均ジャンプ高 (全数)</Text>
                 <Text className="text-xl font-extrabold text-foreground">
                   {perf.avgJumpHeight ? `${Number(perf.avgJumpHeight).toFixed(1)} cm` : "--"}
                 </Text>
               </View>
               <View className="flex-1 bg-surface border border-border rounded-2xl p-4 shadow-sm">
-                <Text className="text-[10px] text-muted mb-1">総ジャンプ回数</Text>
-                <Text className="text-xl font-extrabold text-accent">
-                  {perf.totalJumps ? `${perf.totalJumps} 回` : "--"}
+                <Text className="text-[10px] text-muted mb-1">平均ジャンプ高 (Top5)</Text>
+                <Text className="text-xl font-extrabold text-foreground">
+                  {(perf as any).top5JumpHeight ? `${Number((perf as any).top5JumpHeight).toFixed(1)} cm` : "--"}
                 </Text>
               </View>
             </View>
