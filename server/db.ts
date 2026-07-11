@@ -4186,6 +4186,39 @@ export function checkPerformanceAnomaly(data: any): { isAnomaly: boolean; detail
   return { isAnomaly: false, details: null };
 }
 
+export async function bulkApproveAnomaliesWithoutCorrection(
+  recordIds: number[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const db = await getDb();
+  if (recordIds.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  if (!db) {
+    let count = 0;
+    mockPerformanceData.forEach(p => {
+      if (recordIds.includes(p.id)) {
+        p.isCorrected = true;
+        count++;
+      }
+    });
+    saveMockStore();
+    return { success: true, count };
+  }
+
+  try {
+    await db.update(performanceData)
+      .set({
+        isCorrected: true
+      })
+      .where(inArray(performanceData.id, recordIds));
+    return { success: true, count: recordIds.length };
+  } catch (error: any) {
+    console.error("[Database] Failed to bulk approve anomalies:", error);
+    return { success: false, error: error.message || "Database bulk approve failure", count: 0 };
+  }
+}
+
 export async function correctPerformanceAnomaly(
   recordId: number, 
   metricsToCorrect: string[] = ["totalLoad", "totalJumps", "avgJumpHeight", "accelCount"]

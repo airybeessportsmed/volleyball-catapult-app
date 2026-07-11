@@ -589,6 +589,7 @@ export default function HomeScreen() {
   );
 
   const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
+  const bulkApproveAnomaliesMutation = trpc.performance.bulkApproveAnomaliesWithoutCorrection.useMutation();
   const [anomalyModalOpen, setAnomalyModalOpen] = useState(false);
 
   const saveAdviceMutation = trpc.performance.saveCoachAdvice.useMutation();
@@ -3647,6 +3648,31 @@ export default function HomeScreen() {
                   )}
                 </View>
               </ScrollView>
+
+              {uncorrectedAnomalies && uncorrectedAnomalies.length > 0 && (
+                <TouchableOpacity 
+                  onPress={async () => {
+                    const confirm = typeof window !== "undefined" && window.confirm 
+                      ? window.confirm("残りのすべての警告を、ポジション平均値に補正せず「元の生データのまま」で一括承認しますか？") 
+                      : true;
+                    if (confirm) {
+                      try {
+                        const ids = uncorrectedAnomalies.map((item: any) => item.id);
+                        await bulkApproveAnomaliesMutation.mutateAsync({ recordIds: ids });
+                        alert("残りのすべての異常値を補正なしで一括承認しました。");
+                        refetchAnomalies();
+                        refetchTeam();
+                        setAnomalyModalOpen(false);
+                      } catch (err: any) {
+                        alert(`一括承認に失敗しました: ${err.message || err}`);
+                      }
+                    }
+                  }}
+                  style={{ backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE", paddingVertical: 10, borderRadius: 12, alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1D4ED8" }}>✓ 残りのすべてを補正なしで一括承認</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity 
                 onPress={() => setAnomalyModalOpen(false)}

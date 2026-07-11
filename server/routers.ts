@@ -473,6 +473,17 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    bulkApproveAnomaliesWithoutCorrection: protectedProcedure
+      .input(z.object({ 
+        recordIds: z.array(z.number())
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can bulk approve anomalies");
+        }
+        return db.bulkApproveAnomaliesWithoutCorrection(input.recordIds);
+      }),
+
     rollbackAnomaly: protectedProcedure
       .input(z.object({ recordId: z.number() }))
       .mutation(async ({ input }) => {
