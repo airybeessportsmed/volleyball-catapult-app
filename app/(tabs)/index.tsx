@@ -615,6 +615,38 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
+  const SYSTEM_KEYS = useMemo(() => new Set([
+    "playerLoads",
+    "jumpVolumes",
+    "accelVolumes",
+    "sRpeBall",
+    "sRpeSandC",
+    "loads",
+    "ima",
+    "wellnessSleep",
+    "wellnessFatigue",
+    "wellnessStress",
+    "wellnessSoreness",
+    "hrv",
+    "avgHeartRate",
+    "highIntensityDistance",
+    "totalDistance",
+    "totalJumps",
+    "maxJumpHeight",
+    "avgJumpHeight",
+    "jumpVolume",
+    "totalLoad",
+    "accelCount",
+    "maxAcceleration",
+    "rpeValue",
+    "physiologicalMarker",
+    "duration",
+    "sessionType",
+    "sRPE",
+    "note",
+    "fileName"
+  ]), []);
+
   const catapultData = useMemo(() => {
     if (!allPerfData || allPerfData.length === 0) {
       return { athletes: [], menus: [], teamAverages: {}, positionAverages: {}, charts: { jump: [], accel: [], load: [] } };
@@ -649,7 +681,18 @@ export default function HomeScreen() {
         let rawJumps = (menuObj && menuObj.jumpVolumes) || {};
         let rawAccels = (menuObj && menuObj.accelVolumes) || {};
 
-        if (menuObj && !menuObj.playerLoads && !menuObj.jumpVolumes && !menuObj.accelVolumes && Object.keys(menuObj).length > 0) {
+        const hasSystemKey = 
+          menuObj && (
+            "playerLoads" in menuObj || 
+            "jumpVolumes" in menuObj || 
+            "accelVolumes" in menuObj || 
+            "sRpeBall" in menuObj || 
+            "sRpeSandC" in menuObj || 
+            "loads" in menuObj || 
+            "ima" in menuObj
+          );
+
+        if (menuObj && !hasSystemKey && Object.keys(menuObj).length > 0) {
           if (!menuObj.sRpeBall && !menuObj.sRpeSandC) {
             rawLoads = menuObj;
           }
@@ -675,9 +718,15 @@ export default function HomeScreen() {
         }
       }
 
-      Object.keys(playerLoads).forEach(m => menuSet.add(m));
-      Object.keys(jumpVolumes).forEach(m => menuSet.add(m));
-      Object.keys(accelVolumes).forEach(m => menuSet.add(m));
+      Object.keys(playerLoads).forEach(m => {
+        if (!SYSTEM_KEYS.has(m)) menuSet.add(m);
+      });
+      Object.keys(jumpVolumes).forEach(m => {
+        if (!SYSTEM_KEYS.has(m)) menuSet.add(m);
+      });
+      Object.keys(accelVolumes).forEach(m => {
+        if (!SYSTEM_KEYS.has(m)) menuSet.add(m);
+      });
 
       return {
         id: p.id,
