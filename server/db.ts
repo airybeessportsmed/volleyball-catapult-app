@@ -115,6 +115,8 @@ let mockAthletes: Athlete[] = [
     position: "セッター",
     birthday: "2008-05-12",
     height: "171.5" as any,
+    fingertipHeight: null,
+    maxReach: null,
     csvNames: "Sakura Miyashita, Miyashita S., 宮下",
     onetapName: "宮下 さくら",
     catapultName: "Sakura Miyashita",
@@ -130,6 +132,8 @@ let mockAthletes: Athlete[] = [
     position: "アウトサイドヒッター",
     birthday: "2008-11-23",
     height: "168.0" as any,
+    fingertipHeight: null,
+    maxReach: null,
     csvNames: "Hinata Hyuga, Hyuga H., 日向",
     onetapName: "日向 ひなた",
     catapultName: "Hinata Hyuga",
@@ -145,6 +149,8 @@ let mockAthletes: Athlete[] = [
     position: "ミドルブロッカー",
     birthday: "2009-02-05",
     height: "175.2" as any,
+    fingertipHeight: null,
+    maxReach: null,
     csvNames: "Mio Hasegawa, Hasegawa M., 長谷川",
     onetapName: "長谷川 みお",
     catapultName: "Mio Hasegawa",
@@ -769,6 +775,8 @@ export async function createAthlete(data: InsertAthlete) {
       birthday: data.birthday ?? null,
       height: data.height ?? null,
       csvNames: data.csvNames ?? null,
+      fingertipHeight: null,
+      maxReach: null,
       onetapName: null,
       catapultName: null,
       soxaiEmail: null,
@@ -940,6 +948,8 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           birthday: item.birthday,
           height: item.height !== null ? String(item.height) as any : null,
           csvNames: item.csvNames || null,
+          fingertipHeight: null,
+          maxReach: null,
           onetapName: item.onetapName || null,
           catapultName: item.catapultName || null,
           soxaiEmail: item.soxaiEmail || null,
@@ -1022,6 +1032,8 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           birthday: item.birthday,
           height: item.height !== null ? String(item.height) as any : null,
           csvNames: item.csvNames || null,
+          fingertipHeight: null,
+          maxReach: null,
           onetapName: item.onetapName || null,
           catapultName: item.catapultName || null,
           soxaiEmail: item.soxaiEmail || null,
@@ -2212,17 +2224,32 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        const maxJumpHeight = ig.jumps.length > 0 ? Math.max(...ig.jumps) : undefined;
-        const avgJumpHeight = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) / ig.jumps.length : undefined;
-        const totalJumps = ig.jumps.length;
+        const fHeight = (matchedAthlete as any).fingertipHeight ? Number((matchedAthlete as any).fingertipHeight) : null;
+        const mReach = (matchedAthlete as any).maxReach ? Number((matchedAthlete as any).maxReach) : null;
+        
+        let filteredJumps = [...ig.jumps];
+        if (fHeight !== null && mReach !== null && mReach > fHeight) {
+          const reachHeight = mReach - fHeight;
+          const errorThreshold = reachHeight * 1.15;
+          filteredJumps = ig.jumps.filter(j => j < errorThreshold);
+        }
 
-        const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) : 0;
-        const jumpsOver40cm = ig.jumps.filter(j => j >= 40).length;
-        const jumpZone1Count = ig.jumps.filter(j => j < 20).length;
-        const jumpZone2Count = ig.jumps.filter(j => j >= 20 && j < 30).length;
-        const jumpZone3Count = ig.jumps.filter(j => j >= 30 && j < 40).length;
-        const jumpZone4Count = ig.jumps.filter(j => j >= 40 && j < 50).length;
-        const jumpZone5Count = ig.jumps.filter(j => j >= 50).length;
+        const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
+        const top5Jumps = sortedJumps.slice(0, 5);
+        const avgJumpHeight = top5Jumps.length > 0 
+          ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
+          : undefined;
+
+        const maxJumpHeight = filteredJumps.length > 0 ? Math.max(...filteredJumps) : undefined;
+        const totalJumps = filteredJumps.length;
+
+        const jumpVolume = filteredJumps.length > 0 ? filteredJumps.reduce((a, b) => a + b, 0) : 0;
+        const jumpsOver40cm = filteredJumps.filter(j => j >= 40).length;
+        const jumpZone1Count = filteredJumps.filter(j => j < 20).length;
+        const jumpZone2Count = filteredJumps.filter(j => j >= 20 && j < 30).length;
+        const jumpZone3Count = filteredJumps.filter(j => j >= 30 && j < 40).length;
+        const jumpZone4Count = filteredJumps.filter(j => j >= 40 && j < 50).length;
+        const jumpZone5Count = filteredJumps.filter(j => j >= 50).length;
 
         const maxAcceleration = ig.accelerations.length > 0 ? Math.max(...ig.accelerations) : undefined;
         const avgAcceleration = ig.accelerations.length > 0 ? ig.accelerations.reduce((a, b) => a + b, 0) / ig.accelerations.length : undefined;
@@ -2398,17 +2425,32 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        const maxJumpHeight = agg.jumps.length > 0 ? Math.max(...agg.jumps) : undefined;
-        const avgJumpHeight = agg.jumps.length > 0 ? agg.jumps.reduce((a, b) => a + b, 0) / agg.jumps.length : undefined;
-        const totalJumps = agg.jumps.length;
+        const fHeight = (matchedAthlete as any).fingertipHeight ? Number((matchedAthlete as any).fingertipHeight) : null;
+        const mReach = (matchedAthlete as any).maxReach ? Number((matchedAthlete as any).maxReach) : null;
+        
+        let filteredJumps = [...agg.jumps];
+        if (fHeight !== null && mReach !== null && mReach > fHeight) {
+          const reachHeight = mReach - fHeight;
+          const errorThreshold = reachHeight * 1.15;
+          filteredJumps = agg.jumps.filter(j => j < errorThreshold);
+        }
 
-        const jumpVolume = agg.jumps.length > 0 ? agg.jumps.reduce((a, b) => a + b, 0) / 100 : 0;
-        const jumpsOver40cm = agg.jumps.filter(j => j >= 40).length;
-        const jumpZone1Count = agg.jumps.filter(j => j < 20).length;
-        const jumpZone2Count = agg.jumps.filter(j => j >= 20 && j < 30).length;
-        const jumpZone3Count = agg.jumps.filter(j => j >= 30 && j < 40).length;
-        const jumpZone4Count = agg.jumps.filter(j => j >= 40 && j < 50).length;
-        const jumpZone5Count = agg.jumps.filter(j => j >= 50).length;
+        const sortedJumps = [...filteredJumps].sort((a, b) => b - a);
+        const top5Jumps = sortedJumps.slice(0, 5);
+        const avgJumpHeight = top5Jumps.length > 0 
+          ? top5Jumps.reduce((a, b) => a + b, 0) / top5Jumps.length 
+          : undefined;
+
+        const maxJumpHeight = filteredJumps.length > 0 ? Math.max(...filteredJumps) : undefined;
+        const totalJumps = filteredJumps.length;
+
+        const jumpVolume = filteredJumps.length > 0 ? (filteredJumps.reduce((a, b) => a + b, 0) / 100) : 0;
+        const jumpsOver40cm = filteredJumps.filter(j => j >= 40).length;
+        const jumpZone1Count = filteredJumps.filter(j => j < 20).length;
+        const jumpZone2Count = filteredJumps.filter(j => j >= 20 && j < 30).length;
+        const jumpZone3Count = filteredJumps.filter(j => j >= 30 && j < 40).length;
+        const jumpZone4Count = filteredJumps.filter(j => j >= 40 && j < 50).length;
+        const jumpZone5Count = filteredJumps.filter(j => j >= 50).length;
 
         const maxAcceleration = agg.accelerations.length > 0 ? Math.max(...agg.accelerations) : undefined;
         const avgAcceleration = agg.accelerations.length > 0 ? agg.accelerations.reduce((a, b) => a + b, 0) / agg.accelerations.length : undefined;
@@ -3048,7 +3090,6 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       { key: "rpeValue", name: "主観強度(RPE)", type: "load" as const },
       { key: "hrv", name: "HRV", type: "state" as const },
       { key: "wellnessSoreness", name: "筋肉痛(DOMS)", type: "state" as const },
-      { key: "wellnessSleep", name: "睡眠の質", type: "state" as const },
       { key: "wellnessFatigue", name: "主観的疲労感", type: "state" as const },
       { key: "wellnessStress", name: "気分・モチベーション", type: "state" as const },
       { key: "totalDistance", name: "走行距離", type: "load" as const },
@@ -3398,7 +3439,6 @@ export async function getTeamAnalytics(teamId: number) {
       { key: "rpeValue", name: "主観強度(RPE)", type: "load" as const },
       { key: "hrv", name: "HRV", type: "state" as const },
       { key: "wellnessSoreness", name: "筋肉痛(DOMS)", type: "state" as const },
-      { key: "wellnessSleep", name: "睡眠の質", type: "state" as const },
       { key: "wellnessFatigue", name: "主観的疲労感", type: "state" as const },
       { key: "wellnessStress", name: "気分・モチベーション", type: "state" as const },
       { key: "totalDistance", name: "走行距離", type: "load" as const },
@@ -4168,6 +4208,36 @@ export async function updateAthleteCsvNames(athleteId: number, csvNames: string)
     return { success: true };
   } catch (error: any) {
     console.error("[Database] Failed to update athlete csvNames:", error);
+    return { success: false, error: error.message || "Database update failure" };
+  }
+}
+
+export async function updateAthleteReachHeights(
+  athleteId: number, 
+  fingertipHeight: number | null,
+  maxReach: number | null
+): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    const a = mockAthletes.find(item => item.id === athleteId);
+    if (a) {
+      (a as any).fingertipHeight = fingertipHeight;
+      (a as any).maxReach = maxReach;
+      saveMockStore();
+    }
+    return { success: true };
+  }
+
+  try {
+    await db.update(athletes)
+      .set({ 
+        fingertipHeight: fingertipHeight !== null ? fingertipHeight.toString() : null, 
+        maxReach: maxReach !== null ? maxReach.toString() : null 
+      })
+      .where(eq(athletes.id, athleteId));
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Database] Failed to update athlete reach heights:", error);
     return { success: false, error: error.message || "Database update failure" };
   }
 }

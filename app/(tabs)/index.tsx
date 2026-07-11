@@ -13,7 +13,6 @@ export const ATHLETE_METRICS_MAP = [
   { key: "totalJumps", label: "ジャンプ量", desc: "外的負荷: ジャンプ回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "sRPE", label: "sRPE(全体)", desc: "内の負荷: 練習強度×時間", unit: "AU", polarity: "positive", category: "load_int" },
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "negative", category: "state_obj" },
-  { key: "wellnessSleep", label: "睡眠の質", desc: "主観状態: 睡眠休養度", unit: "1-5", polarity: "negative", category: "state_subj" },
   { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: 全身疲労", unit: "1-7", polarity: "negative", category: "state_subj" },
   { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "1-7", polarity: "negative", category: "state_subj" },
   { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "1-7", polarity: "negative", category: "state_subj" },
@@ -239,7 +238,6 @@ export const METRICS_MAP = [
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
   { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度(低スコア推奨)", unit: "点", polarity: "negative", category: "state_subj" },
   { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "点", polarity: "positive", category: "state_subj" },
-  { key: "wellnessSleep", label: "睡眠の質", desc: "主観状態: 睡眠時間・質", unit: "点", polarity: "positive", category: "state_subj" },
   { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "点", polarity: "positive", category: "state_subj" },
 ] as const;
 
@@ -626,7 +624,6 @@ export default function HomeScreen() {
     "sRpeSandC",
     "loads",
     "ima",
-    "wellnessSleep",
     "wellnessFatigue",
     "wellnessStress",
     "wellnessSoreness",
@@ -882,6 +879,7 @@ export default function HomeScreen() {
 
   const updateMetricsBatchMutation = trpc.performance.updateMetricsBatch.useMutation();
   const updateAthleteCsvNamesMutation = trpc.performance.updateAthleteCsvNames.useMutation();
+  const updateAthleteReachHeightsMutation = trpc.performance.updateAthleteReachHeights.useMutation();
 
   useEffect(() => {
     if (latestPerformance) {
@@ -2415,8 +2413,8 @@ export default function HomeScreen() {
                     <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569" }}>カテゴリ別 チーム平均z (悪い方向が正)</Text>
                     {(() => {
                       const categories = [
-                        { label: "主観", keys: ["wellnessSleep", "wellnessFatigue", "wellnessSoreness"] },
-                        { label: "神経筋", keys: ["totalJumps"] },
+                        { label: "主観", keys: ["wellnessFatigue", "wellnessSoreness", "wellnessStress"] },
+                        { label: "神経筋", keys: ["avgJumpHeight"] },
                         { label: "生理学マーカー", keys: ["physiologicalMarker"] },
                         { label: "体組成", keys: [] }
                       ];
@@ -2491,8 +2489,8 @@ export default function HomeScreen() {
                       {/* Body */}
                       {allAthletes.map((ath, idx) => {
                         const categories = [
-                          { label: "主観", keys: ["wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"], polarity: "negative" as const },
-                          { label: "神経筋", keys: ["totalJumps"], polarity: "positive" as const },
+                          { label: "主観", keys: ["wellnessFatigue", "wellnessSoreness", "wellnessStress"], polarity: "negative" as const },
+                          { label: "神経筋", keys: ["avgJumpHeight"], polarity: "positive" as const },
                           { label: "生理学マーカー", keys: ["physiologicalMarker"], polarity: "positive" as const },
                           { label: "体組成", keys: [], polarity: "positive" as const }
                         ];
@@ -3264,7 +3262,7 @@ export default function HomeScreen() {
                     {/* 状態インジケータ */}
                     <View style={{ backgroundColor: "#E8F0FE", borderColor: "#B5D1F6", borderWidth: 1, borderRadius: 12, padding: 14 }}>
                       <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1C4587" }}>
-                        ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessSleep", "wellnessFatigue", "wellnessStress"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
+                        ✓ 客観 {METRICS_MAP.filter(m => ["totalJumps", "maxJumpHeight", "jumpVolume", "totalLoad", "accelCount", "hrv"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} / 主観 {METRICS_MAP.filter(m => ["wellnessFatigue", "wellnessStress", "wellnessSoreness"].includes(m.key) && JSON.parse(teamSettings.enabledMetrics).includes(m.key)).length} カテゴリ有効。バランス良好。
                       </Text>
                     </View>
 
@@ -3386,10 +3384,6 @@ export default function HomeScreen() {
                                     reliabilityText = "信頼性 中";
                                     reliabilityColor = "#D97706";
                                     reliabilityBg = "#FEF3C7";
-                                  } else if (m.key === "wellnessSleep") {
-                                    reliabilityText = "信頼性 低";
-                                    reliabilityColor = "#DC2626";
-                                    reliabilityBg = "#FEE2E2";
                                   }
 
                                   return (
@@ -3553,42 +3547,134 @@ export default function HomeScreen() {
                   <View style={{ gap: 10, marginTop: 8 }}>
                     {allAthletes.map((ath) => {
                       return (
-                        <View key={ath.athleteId} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 10, gap: 12 }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
-                            <Text style={{ fontSize: 10, color: "#64748B" }}>No.{ath.jerseyNumber || "-"} / {ath.position || "-"}</Text>
+                        <View key={ath.athleteId} style={{ borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 14, marginBottom: 8, gap: 8 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{ath.name}</Text>
+                              <Text style={{ fontSize: 10, color: "#64748B" }}>No.{ath.jerseyNumber || "-"} / {ath.position || "-"}</Text>
+                            </View>
+                            
+                            <View style={{ flex: 2 }}>
+                              <TextInput
+                                defaultValue={(ath as any).csvNames || ""}
+                                placeholder="名寄せ名 (例: Yamashita, 1 Yamashita)"
+                                placeholderTextColor="#94A3B8"
+                                onBlur={async (e) => {
+                                  const text = (e as any).nativeEvent.text;
+                                  try {
+                                    await updateAthleteCsvNamesMutation.mutateAsync({
+                                      athleteId: ath.athleteId,
+                                      csvNames: text
+                                    });
+                                    refetchTeam();
+                                  } catch (err) {
+                                    console.error("Failed to update mapping", err);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: 12,
+                                  borderWidth: 1,
+                                  borderColor: "#CBD5E1",
+                                  borderRadius: 8,
+                                  paddingVertical: 5,
+                                  paddingHorizontal: 10,
+                                  color: "#1E293B",
+                                  backgroundColor: "#FFFFFF",
+                                }}
+                              />
+                            </View>
                           </View>
-                          
-                          <View style={{ flex: 2 }}>
-                            <TextInput
-                              defaultValue={(ath as any).csvNames || ""}
-                              placeholder="例: Haruna, Yamashita, 1 Yamashita"
-                              placeholderTextColor="#94A3B8"
-                              onBlur={async (e) => {
-                                const text = (e as any).nativeEvent.text;
-                                try {
-                                  await updateAthleteCsvNamesMutation.mutateAsync({
-                                    athleteId: ath.athleteId,
-                                    csvNames: text
-                                  });
-                                  refetchTeam();
-                                  alert("マッピングを更新しました。");
-                                } catch (err) {
-                                  console.error("Failed to update mapping", err);
-                                  alert("マッピングの保存に失敗しました。");
-                                }
-                              }}
-                              style={{
-                                fontSize: 12,
-                                borderWidth: 1,
-                                borderColor: "#CBD5E1",
-                                borderRadius: 8,
-                                paddingVertical: 6,
-                                paddingHorizontal: 10,
-                                color: "#1E293B",
-                                backgroundColor: "#FFFFFF",
-                              }}
-                            />
+
+                          {/* 指高・最高到達点入力 */}
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 4 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Text style={{ fontSize: 9, color: "#475569", fontWeight: "600" }}>指高:</Text>
+                              <TextInput
+                                defaultValue={(ath as any).fingertipHeight !== null && (ath as any).fingertipHeight !== undefined ? String((ath as any).fingertipHeight) : ""}
+                                placeholder="220"
+                                keyboardType="numeric"
+                                placeholderTextColor="#94A3B8"
+                                onBlur={async (e) => {
+                                  const valStr = (e as any).nativeEvent.text;
+                                  const val = valStr ? Number(valStr) : null;
+                                  try {
+                                    await updateAthleteReachHeightsMutation.mutateAsync({
+                                      athleteId: ath.athleteId,
+                                      fingertipHeight: val,
+                                      maxReach: (ath as any).maxReach ? Number((ath as any).maxReach) : null
+                                    });
+                                    refetchTeam();
+                                  } catch (err) {
+                                    console.error("Failed to update reach heights", err);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: 11,
+                                  borderWidth: 1,
+                                  borderColor: "#CBD5E1",
+                                  borderRadius: 8,
+                                  paddingVertical: 3,
+                                  paddingHorizontal: 6,
+                                  width: 50,
+                                  textAlign: "center",
+                                  color: "#1E293B",
+                                  backgroundColor: "#FFFFFF",
+                                }}
+                              />
+                              <Text style={{ fontSize: 8, color: "#94A3B8" }}>cm</Text>
+                            </View>
+
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Text style={{ fontSize: 9, color: "#475569", fontWeight: "600" }}>到達点:</Text>
+                              <TextInput
+                                defaultValue={(ath as any).maxReach !== null && (ath as any).maxReach !== undefined ? String((ath as any).maxReach) : ""}
+                                placeholder="310"
+                                keyboardType="numeric"
+                                placeholderTextColor="#94A3B8"
+                                onBlur={async (e) => {
+                                  const valStr = (e as any).nativeEvent.text;
+                                  const val = valStr ? Number(valStr) : null;
+                                  try {
+                                    await updateAthleteReachHeightsMutation.mutateAsync({
+                                      athleteId: ath.athleteId,
+                                      fingertipHeight: (ath as any).fingertipHeight ? Number((ath as any).fingertipHeight) : null,
+                                      maxReach: val
+                                    });
+                                    refetchTeam();
+                                  } catch (err) {
+                                    console.error("Failed to update reach heights", err);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: 11,
+                                  borderWidth: 1,
+                                  borderColor: "#CBD5E1",
+                                  borderRadius: 8,
+                                  paddingVertical: 3,
+                                  paddingHorizontal: 6,
+                                  width: 50,
+                                  textAlign: "center",
+                                  color: "#1E293B",
+                                  backgroundColor: "#FFFFFF",
+                                }}
+                              />
+                              <Text style={{ fontSize: 8, color: "#94A3B8" }}>cm</Text>
+                            </View>
+
+                            {/* 計算跳躍高プレビュー */}
+                            {(() => {
+                              const f = (ath as any).fingertipHeight ? Number((ath as any).fingertipHeight) : null;
+                              const m = (ath as any).maxReach ? Number((ath as any).maxReach) : null;
+                              if (f && m && m > f) {
+                                const reach = m - f;
+                                return (
+                                  <Text style={{ fontSize: 9, color: "#2563EB", fontWeight: "bold", marginLeft: "auto" }}>
+                                    跳躍高: {reach}cm (閾値: {(reach * 1.15).toFixed(1)}cm)
+                                  </Text>
+                                );
+                              }
+                              return null;
+                            })()}
                           </View>
                         </View>
                       );

@@ -55,6 +55,8 @@ export const athletes = pgTable("athletes", {
   position: varchar("position", { length: 50 }), // e.g., "setter", "middle blocker", etc.
   birthday: varchar("birthday", { length: 50 }),
   height: numeric("height", { precision: 5, scale: 1 }),
+  fingertipHeight: numeric("fingertipHeight", { precision: 5, scale: 1 }), // 指高 (cm)
+  maxReach: numeric("maxReach", { precision: 5, scale: 1 }), // 最高到達点 (cm)
   csvNames: text("csvNames"),
   onetapName: varchar("onetapName", { length: 100 }),
   catapultName: varchar("catapultName", { length: 100 }),

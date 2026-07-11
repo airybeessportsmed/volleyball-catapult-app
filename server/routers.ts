@@ -250,7 +250,11 @@ export const appRouter = router({
         if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
           throw new Error("Only coaches can add athletes");
         }
-        return db.createAthlete(input);
+        return db.createAthlete({
+          ...input,
+          fingertipHeight: null,
+          maxReach: null,
+        });
       }),
     
     register: protectedProcedure
@@ -288,6 +292,8 @@ export const appRouter = router({
           teamId: input.teamId,
           jerseyNumber: input.jerseyNumber,
           position: input.position,
+          fingertipHeight: null,
+          maxReach: null,
         });
         return athleteId;
       }),
@@ -445,6 +451,19 @@ export const appRouter = router({
           throw new Error("Only coaches can update mappings");
         }
         return db.updateAthleteCsvNames(input.athleteId, input.csvNames);
+      }),
+
+    updateAthleteReachHeights: protectedProcedure
+      .input(z.object({
+        athleteId: z.number(),
+        fingertipHeight: z.number().nullable(),
+        maxReach: z.number().nullable()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can update reach heights");
+        }
+        return db.updateAthleteReachHeights(input.athleteId, input.fingertipHeight, input.maxReach);
       }),
     
     getAthleteAnalytics: protectedProcedure

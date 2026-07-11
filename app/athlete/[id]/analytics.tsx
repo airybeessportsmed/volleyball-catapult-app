@@ -11,7 +11,6 @@ export const METRICS_MAP = [
   { key: "totalJumps", label: "ジャンプ量", desc: "外的負荷: ジャンプ回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "sRPE", label: "sRPE(全体)", desc: "内の負荷: 練習強度×時間", unit: "AU", polarity: "positive", category: "load_int" },
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "negative", category: "state_obj" },
-  { key: "wellnessSleep", label: "睡眠の質", desc: "主観状態: 睡眠休養度", unit: "1-5", polarity: "negative", category: "state_subj" },
   { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: 全身疲労", unit: "1-7", polarity: "negative", category: "state_subj" },
   { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "1-7", polarity: "negative", category: "state_subj" },
   { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "1-7", polarity: "negative", category: "state_subj" },
@@ -1022,7 +1021,7 @@ export default function AthleteAnalyticsScreen() {
     if (trend.length === 0) return null;
 
     // Filter sessions that have wellness data
-    const wellnessTrend = trend.filter(t => t.wellnessSleep > 0);
+    const wellnessTrend = trend.filter(t => t.wellnessFatigue > 0 || t.wellnessSoreness > 0 || t.wellnessStress > 0);
     if (wellnessTrend.length === 0) {
       return (
         <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-2">
@@ -1056,7 +1055,7 @@ export default function AthleteAnalyticsScreen() {
       return paddingTop + graphHeight - ((clampedVal - 1) / 4) * graphHeight;
     };
 
-    const getLinePath = (key: "wellnessSleep" | "wellnessFatigue" | "wellnessSoreness" | "wellnessStress") => {
+    const getLinePath = (key: "wellnessFatigue" | "wellnessSoreness" | "wellnessStress") => {
       let path = "";
       wellnessTrend.forEach((t, index) => {
         const x = paddingLeft + (index * (wellnessTrend.length > 1 ? graphWidth / (wellnessTrend.length - 1) : graphWidth));
@@ -1078,18 +1077,14 @@ export default function AthleteAnalyticsScreen() {
         </View>
 
         {/* Legend */}
-        <View className="flex-row justify-between px-1 mt-1">
-          <View className="flex-row items-center gap-1">
-            <View style={{ backgroundColor: colors.sleep }} className="w-2 h-2 rounded-full" />
-            <Text className="text-[9px] text-muted font-bold">睡眠</Text>
-          </View>
+        <View className="flex-row justify-around px-1 mt-1">
           <View className="flex-row items-center gap-1">
             <View style={{ backgroundColor: colors.fatigue }} className="w-2 h-2 rounded-full" />
             <Text className="text-[9px] text-muted font-bold">疲労</Text>
           </View>
           <View className="flex-row items-center gap-1">
             <View style={{ backgroundColor: colors.soreness }} className="w-2 h-2 rounded-full" />
-            <Text className="text-[9px] text-muted font-bold">筋肉の張り</Text>
+            <Text className="text-[9px] text-muted font-bold">食欲</Text>
           </View>
           <View className="flex-row items-center gap-1">
             <View style={{ backgroundColor: colors.stress }} className="w-2 h-2 rounded-full" />
@@ -1157,7 +1152,6 @@ export default function AthleteAnalyticsScreen() {
             })}
 
             {/* Render Lines */}
-            <Path d={getLinePath("wellnessSleep")} fill="none" stroke={colors.sleep} strokeWidth="1.8" strokeLinecap="round" />
             <Path d={getLinePath("wellnessFatigue")} fill="none" stroke={colors.fatigue} strokeWidth="1.8" strokeLinecap="round" />
             <Path d={getLinePath("wellnessSoreness")} fill="none" stroke={colors.soreness} strokeWidth="1.8" strokeLinecap="round" />
             <Path d={getLinePath("wellnessStress")} fill="none" stroke={colors.stress} strokeWidth="1.8" strokeLinecap="round" />
