@@ -2491,7 +2491,7 @@ export default function HomeScreen() {
                       {/* Body */}
                       {allAthletes.map((ath, idx) => {
                         const categories = [
-                          { label: "主観", keys: ["wellnessSleep", "wellnessFatigue", "wellnessSoreness"], polarity: "negative" as const },
+                          { label: "主観", keys: ["wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"], polarity: "negative" as const },
                           { label: "神経筋", keys: ["totalJumps"], polarity: "positive" as const },
                           { label: "生理学マーカー", keys: ["physiologicalMarker"], polarity: "positive" as const },
                           { label: "体組成", keys: [], polarity: "positive" as const }
