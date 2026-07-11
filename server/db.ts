@@ -345,14 +345,14 @@ const generateDemoPerformanceData = () => {
       coachAdvice: getAdvice(1, i),
       sRPE: sakuraRpe * sakuraDurationMin,
       rpeValue: sakuraRpe,
-      hrv: (55 + Math.random() * 20).toFixed(2) as any,
+      hrv: null,
       highIntensityDistance: (150 + Math.random() * 100).toFixed(2) as any,
-      avgHeartRate: Math.floor(135 + Math.random() * 15),
-      physiologicalMarker: (100 + Math.random() * 50).toFixed(2) as any,
-      wellnessSleep: Math.floor(4 + Math.random() * 2), // 4-5 Good
-      wellnessFatigue: Math.floor(4 + Math.random() * 2),
-      wellnessSoreness: Math.floor(4 + Math.random() * 2),
-      wellnessStress: Math.floor(4 + Math.random() * 2),
+      avgHeartRate: null,
+      physiologicalMarker: null,
+      wellnessSleep: null,
+      wellnessFatigue: null,
+      wellnessSoreness: null,
+      wellnessStress: null,
       rawCsvData: null,
       originalRawData: null,
       createdAt: new Date(),
@@ -423,14 +423,14 @@ const generateDemoPerformanceData = () => {
       coachAdvice: getAdvice(2, i),
       sRPE: hinataRpe * hinataDurationMin,
       rpeValue: hinataRpe,
-      hrv: (i <= 3 ? 30 + Math.random() * 8 : 50 + Math.random() * 25).toFixed(2) as any,
+      hrv: null,
       highIntensityDistance: (i <= 5 ? 300 + Math.random() * 150 : 120 + Math.random() * 80).toFixed(2) as any,
-      avgHeartRate: i <= 5 ? Math.floor(155 + Math.random() * 15) : Math.floor(135 + Math.random() * 15),
-      physiologicalMarker: (i <= 3 ? 350 + Math.random() * 150 : 120 + Math.random() * 60).toFixed(2) as any,
-      wellnessSleep: hinataSleep,
-      wellnessFatigue: hinataFatigue,
-      wellnessSoreness: hinataSoreness,
-      wellnessStress: Math.floor(3 + Math.random() * 2),
+      avgHeartRate: null,
+      physiologicalMarker: null,
+      wellnessSleep: null,
+      wellnessFatigue: null,
+      wellnessSoreness: null,
+      wellnessStress: null,
       rawCsvData: null,
       isAnomaly: false,
       anomalyDetails: null,
@@ -492,14 +492,14 @@ const generateDemoPerformanceData = () => {
       coachAdvice: getAdvice(3, i),
       sRPE: mioRpe * mioDurationMin,
       rpeValue: mioRpe,
-      hrv: (60 + Math.random() * 15).toFixed(2) as any,
+      hrv: null,
       highIntensityDistance: (80 + Math.random() * 50).toFixed(2) as any,
-      avgHeartRate: Math.floor(130 + Math.random() * 10),
-      physiologicalMarker: (90 + Math.random() * 40).toFixed(2) as any,
-      wellnessSleep: 4,
-      wellnessFatigue: 4,
-      wellnessSoreness: 4,
-      wellnessStress: 4,
+      avgHeartRate: null,
+      physiologicalMarker: null,
+      wellnessSleep: null,
+      wellnessFatigue: null,
+      wellnessSoreness: null,
+      wellnessStress: null,
       rawCsvData: null,
       isAnomaly: false,
       anomalyDetails: null,
@@ -1927,17 +1927,17 @@ export async function importPerformanceCsv(
         }
 
         const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue) : undefined;
-        const sleepVal = wg.sleep !== undefined ? Math.round(wg.sleep) : undefined;
         const stressVal = wg.motivation !== undefined ? Math.round(wg.motivation) : undefined;
+        const appetiteVal = wg.appetite !== undefined ? Math.round(wg.appetite) : undefined;
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
           date: wg.dateObj,
           wellnessFatigue: fatigueVal,
-          wellnessSleep: sleepVal,
+          wellnessSleep: undefined,
           wellnessStress: stressVal,
-          wellnessSoreness: null,
+          wellnessSoreness: appetiteVal,
           sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
         });
@@ -3886,7 +3886,7 @@ export async function seedDatabase() {
     const metricsToEnable = JSON.stringify([
       "totalJumps", "maxJumpHeight", "avgJumpHeight", "jumpVolume", "totalLoad", 
       "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
-      "wellnessSleep", "wellnessFatigue", "wellnessStress"
+      "wellnessSleep", "wellnessFatigue", "wellnessSoreness", "wellnessStress"
     ]);
     const existingSettings = await db.select().from(teamSettings).where(eq(teamSettings.teamId, 1)).limit(1);
     if (existingSettings.length === 0) {
