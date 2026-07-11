@@ -413,6 +413,28 @@ export const appRouter = router({
         return db.deleteCsvUpload(input.uploadId);
       }),
 
+    clearAllCsvUploads: protectedProcedure
+      .input(z.object({ teamId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can clear uploads");
+        }
+        return db.clearAllCsvUploads(input.teamId);
+      }),
+
+    deleteCsvUploadsByRange: protectedProcedure
+      .input(z.object({ 
+        teamId: z.number(),
+        startDateStr: z.string(),
+        endDateStr: z.string()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can delete CSV imports by range");
+        }
+        return db.deleteCsvUploadsByRange(input.teamId, input.startDateStr, input.endDateStr);
+      }),
+
     updateAthleteCsvNames: protectedProcedure
       .input(z.object({
         athleteId: z.number(),

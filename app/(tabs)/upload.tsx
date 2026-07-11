@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Modal, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "@/hooks/use-auth";
@@ -73,6 +73,15 @@ export default function CoachUploadScreen() {
   
   const importMutation = trpc.performance.importCsv.useMutation();
   const deleteUploadMutation = trpc.performance.deleteCsvUpload.useMutation();
+  
+  const clearAllUploadsMutation = trpc.performance.clearAllCsvUploads.useMutation();
+  const deleteUploadsByRangeMutation = trpc.performance.deleteCsvUploadsByRange.useMutation();
+
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleteMode, setBulkDeleteMode] = useState<"all" | "range">("all");
+  const [bulkStartDate, setBulkStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString("sv-SE"));
+  const [bulkEndDate, setBulkEndDate] = useState(new Date().toLocaleDateString("sv-SE"));
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const addFiles = (newFiles: { name: string; size?: number; text: string }[]) => {
     const items: UploadFileItem[] = newFiles.map(f => ({
@@ -146,6 +155,42 @@ export default function CoachUploadScreen() {
         setIsSuccess(false);
         setFilesToUpload([]);
       }, 3000);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      if (bulkDeleteMode === "all") {
+        const confirm = typeof window !== "undefined" && window.confirm 
+          ? window.confirm("本当にすべてのインポート履歴およびそれに紐づくパフォーマンスデータを一括削除しますか？\n(この操作は取り消せません)") 
+          : true;
+        if (confirm) {
+          const res = await clearAllUploadsMutation.mutateAsync({ teamId });
+          alert(`すべてのインポート履歴（${res.count}ファイル分）を削除しました。`);
+          setIsBulkDeleteModalOpen(false);
+        }
+      } else {
+        const confirm = typeof window !== "undefined" && window.confirm 
+          ? window.confirm(`${bulkStartDate} 〜 ${bulkEndDate} の期間内にアップロードされたインポート履歴とパフォーマンスデータを削除しますか？`) 
+          : true;
+        if (confirm) {
+          const res = await deleteUploadsByRangeMutation.mutateAsync({
+            teamId,
+            startDateStr: bulkStartDate,
+            endDateStr: bulkEndDate
+          });
+          alert(`${bulkStartDate} 〜 ${bulkEndDate} のインポート履歴（${res.count}ファイル分）を削除しました。`);
+          setIsBulkDeleteModalOpen(false);
+        }
+      }
+      refetchUploads();
+      refetchStatus();
+    } catch (err: any) {
+      console.error("Bulk delete failed", err);
+      alert(`一括削除に失敗しました: ${err.message || err}`);
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -740,9 +785,27 @@ export default function CoachUploadScreen() {
             <View className="gap-4 mt-4">
               <View className="flex-row justify-between items-center">
                 <Text className="text-lg font-bold text-foreground">インポート履歴</Text>
-                <TouchableOpacity onPress={() => refetchUploads()} className="p-2 rounded-full bg-muted/10">
-                  <IconSymbol size={16} name="arrow.clockwise" color="#6B7280" />
-                </TouchableOpacity>
+                <View className="flex-row items-center gap-2">
+                  <TouchableOpacity
+                    onPress={() => setIsBulkDeleteModalOpen(true)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: "#FEE2E2",
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      gap: 4
+                    }}
+                  >
+                    <IconSymbol size={12} name="trash" color="#DC2626" />
+                    <Text style={{ fontSize: 11, fontWeight: "bold", color: "#DC2626" }}>一括削除・整理</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => refetchUploads()} className="p-2 rounded-full bg-muted/10">
+                    <IconSymbol size={16} name="arrow.clockwise" color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {uploadsLoading ? (
@@ -838,6 +901,109 @@ export default function CoachUploadScreen() {
             </View>
           </View>
         </ScrollView>
+        <Modal
+          visible={isBulkDeleteModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsBulkDeleteModalOpen(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setIsBulkDeleteModalOpen(false)}
+            style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", padding: 20 }}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 420, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <IconSymbol size={22} name="trash.fill" color="#DC2626" />
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>インポート履歴の一括削除・整理</Text>
+              </View>
+
+              <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+                アップロードされた履歴を削除し、紐づくパフォーマンスデータをクリアします。
+              </Text>
+
+              {/* Toggle bulk delete mode */}
+              <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 3, borderRadius: 8, gap: 4 }}>
+                <TouchableOpacity
+                  onPress={() => setBulkDeleteMode("all")}
+                  style={{
+                    flex: 1, paddingVertical: 8, borderRadius: 6,
+                    backgroundColor: bulkDeleteMode === "all" ? "#FFFFFF" : "transparent",
+                    alignItems: "center"
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: bulkDeleteMode === "all" ? "#0F172A" : "#64748B" }}>
+                    すべて削除（全リセット）
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setBulkDeleteMode("range")}
+                  style={{
+                    flex: 1, paddingVertical: 8, borderRadius: 6,
+                    backgroundColor: bulkDeleteMode === "range" ? "#FFFFFF" : "transparent",
+                    alignItems: "center"
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: bulkDeleteMode === "range" ? "#0F172A" : "#64748B" }}>
+                    期間を指定して削除
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {bulkDeleteMode === "range" && (
+                <View style={{ gap: 10, paddingVertical: 4 }}>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>開始日 (YYYY-MM-DD)</Text>
+                    <TextInput
+                      value={bulkStartDate}
+                      onChangeText={setBulkStartDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#94A3B8"
+                      style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 8, color: "#1E293B" }}
+                    />
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>終了日 (YYYY-MM-DD)</Text>
+                    <TextInput
+                      value={bulkEndDate}
+                      onChangeText={setBulkEndDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor="#94A3B8"
+                      style={{ fontSize: 12, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 8, color: "#1E293B" }}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setIsBulkDeleteModalOpen(false)}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: "#CBD5E1", alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#475569" }}>キャンセル</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleBulkDelete}
+                  disabled={isBulkDeleting}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: "#DC2626", alignItems: "center", opacity: isBulkDeleting ? 0.6 : 1 }}
+                >
+                  {isBulkDeleting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
+                      {bulkDeleteMode === "all" ? "すべてクリアする" : "指定期間を削除する"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );

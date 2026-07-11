@@ -4060,6 +4060,80 @@ export async function deleteCsvUpload(uploadId: number): Promise<{ success: bool
   }
 }
 
+export async function clearAllCsvUploads(teamId: number): Promise<{ success: boolean; count: number; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    const count = mockCsvUploads.length;
+    mockCsvUploads = [];
+    mockPerformanceData = [];
+    saveMockStore();
+    return { success: true, count };
+  }
+
+  try {
+    const uploads = await db.select().from(csvUploads).where(eq(csvUploads.teamId, teamId));
+    await db.delete(performanceData).where(eq(performanceData.teamId, teamId));
+    await db.delete(csvUploads).where(eq(csvUploads.teamId, teamId));
+    return { success: true, count: uploads.length };
+  } catch (error: any) {
+    console.error("[Database] Failed to clear all CSV uploads:", error);
+    return { success: false, error: error.message || "Database clear failure", count: 0 };
+  }
+}
+
+export async function deleteCsvUploadsByRange(
+  teamId: number,
+  startDateStr: string,
+  endDateStr: string
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const db = await getDb();
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  end.setHours(23, 59, 59, 999);
+
+  if (!db) {
+    const uploadsToDelete = mockCsvUploads.filter(c => {
+      const d = new Date(c.createdAt);
+      return d >= start && d <= end;
+    });
+    const fileNames = uploadsToDelete.map(c => c.fileName);
+    mockCsvUploads = mockCsvUploads.filter(c => !fileNames.includes(c.fileName));
+    mockPerformanceData = mockPerformanceData.filter(p => {
+      try {
+        const raw = JSON.parse(p.rawCsvData || "{}");
+        return !fileNames.includes(raw.fileName);
+      } catch {
+        return true;
+      }
+    });
+    saveMockStore();
+    return { success: true, count: uploadsToDelete.length };
+  }
+
+  try {
+    const uploads = await db.select().from(csvUploads)
+      .where(sql`${csvUploads.teamId} = ${teamId} AND ${csvUploads.createdAt} >= ${start} AND ${csvUploads.createdAt} <= ${end}`);
+      
+    if (uploads.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    let deletedCount = 0;
+    for (const upload of uploads) {
+      const fileName = upload.fileName;
+      await db.delete(performanceData)
+        .where(sql`${performanceData.rawCsvData} LIKE ${`%"fileName":"${fileName}"%`}`);
+      await db.delete(csvUploads).where(eq(csvUploads.id, upload.id));
+      deletedCount++;
+    }
+
+    return { success: true, count: deletedCount };
+  } catch (error: any) {
+    console.error("[Database] Failed to delete CSV uploads by range:", error);
+    return { success: false, error: error.message || "Database range delete failure", count: 0 };
+  }
+}
+
 export async function updateAthleteCsvNames(athleteId: number, csvNames: string): Promise<{ success: boolean; error?: string }> {
   const db = await getDb();
   if (!db) {
