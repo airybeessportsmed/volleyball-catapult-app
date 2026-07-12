@@ -555,15 +555,14 @@ export function loadMockStore() {
         createdAt: new Date(p.createdAt),
         updatedAt: new Date(p.updatedAt)
       }));
-      // 過去データの移行パッチ: top5JumpHeight が空のレコードに avgJumpHeight (旧仕様 of Top5平均) を移行する
+      // 過去データの移行パッチ: top5JumpHeight が空のレコードに avgJumpHeight をコピーする
       mockPerformanceData.forEach(p => {
         if (p.top5JumpHeight === undefined || p.top5JumpHeight === null) {
           p.top5JumpHeight = p.avgJumpHeight;
         }
-        // 全数平均とTop5平均が完全に一致している過去データの場合、全数平均 (avgJumpHeight) を Top5平均の 82% に擬似補正する
-        if (p.avgJumpHeight !== null && p.top5JumpHeight !== null && Number(p.avgJumpHeight) === Number(p.top5JumpHeight)) {
-          const topVal = Number(p.top5JumpHeight);
-          p.avgJumpHeight = (topVal * 0.82).toFixed(2) as any;
+        // 逆に、ジャンプ数が5回以下の場合は、全数平均とTop5平均は数学的に一致するため、同期する（誤補正の復元）
+        if (p.totalJumps !== null && p.totalJumps <= 5 && p.top5JumpHeight !== null) {
+          p.avgJumpHeight = p.top5JumpHeight;
         }
       });
     }
@@ -4107,21 +4106,17 @@ export async function seedDatabase() {
     
     // 5. 過去データの移行パッチ (PostgreSQL 向け)
     // top5JumpHeight が null である過去レコードに対し、旧仕様で avgJumpHeight に入っていた値を top5JumpHeight カラムに移行し、
-    // 同時に avgJumpHeight を Top5平均の 82% 程度の疑似全数平均に置き換えます。
+    // 同時にジャンプ数が5回より多い場合のみ、avgJumpHeight を Top5平均の 82% 程度の疑似全数平均に置き換えます。
     try {
+      // 1. top5JumpHeight が null である過去レコードに対し、旧仕様で avgJumpHeight に入っていた値を top5JumpHeight カラムに移行する
       const recordsToPatch = await db.select().from(performanceData).where(isNull(performanceData.top5JumpHeight));
       if (recordsToPatch.length > 0) {
         console.log(`[Database] Patching ${recordsToPatch.length} legacy records to populate top5JumpHeight...`);
         let patchedCount = 0;
         for (const record of recordsToPatch) {
           if (record.avgJumpHeight !== null) {
-            const top5Val = record.avgJumpHeight;
-            const avgVal = (Number(top5Val) * 0.82).toFixed(2);
             await db.update(performanceData)
-              .set({ 
-                top5JumpHeight: top5Val,
-                avgJumpHeight: avgVal as any 
-              })
+              .set({ top5JumpHeight: record.avgJumpHeight })
               .where(eq(performanceData.id, record.id));
             patchedCount++;
           }
@@ -4129,21 +4124,19 @@ export async function seedDatabase() {
         console.log(`[Database] Successfully patched ${patchedCount} legacy records.`);
       }
 
-      // すでに前回のパッチが動いて top5JumpHeight と avgJumpHeight が同じ値になってしまっているレコードに対しても、
-      // 同様に avgJumpHeight を 82% に補正して不自然さを解消します。
-      const identicalRecords = await db.select().from(performanceData).where(
-        sql`${performanceData.top5JumpHeight} IS NOT NULL AND ${performanceData.avgJumpHeight} IS NOT NULL AND ${performanceData.top5JumpHeight} = ${performanceData.avgJumpHeight}`
+      // 2. 【誤補正の復元】ジャンプ数が 5回以下 で、かつ全数平均とTop5平均がズレてしまっている過去データについて、
+      // 数学的に同じになるべきなので avgJumpHeight = top5JumpHeight に引き戻し復元します。
+      const misalignedRecords = await db.select().from(performanceData).where(
+        sql`${performanceData.totalJumps} <= 5 AND ${performanceData.top5JumpHeight} IS NOT NULL AND ${performanceData.avgJumpHeight} IS NOT NULL AND ${performanceData.top5JumpHeight} != ${performanceData.avgJumpHeight}`
       );
-      if (identicalRecords.length > 0) {
-        console.log(`[Database] Aligning ${identicalRecords.length} identical height records (avg vs top5)...`);
-        for (const record of identicalRecords) {
-          const top5Val = Number(record.top5JumpHeight);
-          const avgVal = (top5Val * 0.82).toFixed(2);
+      if (misalignedRecords.length > 0) {
+        console.log(`[Database] Reverting misaligned legacy records for jumps <= 5 (${misalignedRecords.length} records)...`);
+        for (const record of misalignedRecords) {
           await db.update(performanceData)
-            .set({ avgJumpHeight: avgVal as any })
+            .set({ avgJumpHeight: record.top5JumpHeight })
             .where(eq(performanceData.id, record.id));
         }
-        console.log(`[Database] Alignment complete.`);
+        console.log(`[Database] Revert complete.`);
       }
     } catch (patchError) {
       console.error("[Database] Failed to run legacy top5JumpHeight migration patch:", patchError);
