@@ -2952,6 +2952,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     .map(p => ({
       date: p.date,
       dateStr: new Date(p.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }),
+      sessionType: p.sessionType,
       totalLoad: p.totalLoad ? Number(p.totalLoad) : 0,
       jumpVolume: p.jumpVolume ? Number(p.jumpVolume) : 0,
       totalJumps: p.totalJumps ? Number(p.totalJumps) : 0,
@@ -2964,8 +2965,10 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       wellnessSoreness: p.wellnessSoreness ? Number(p.wellnessSoreness) : 0,
       wellnessStress: p.wellnessStress ? Number(p.wellnessStress) : 0,
       hrv: p.hrv ? Number(p.hrv) : 0,
+      totalDistance: p.totalDistance ? Number(p.totalDistance) : 0,
       highIntensityDistance: p.highIntensityDistance ? Number(p.highIntensityDistance) : 0,
       avgHeartRate: p.avgHeartRate ? Number(p.avgHeartRate) : 0,
+      accelCount: p.accelCount ? Number(p.accelCount) : 0,
       physiologicalMarker: p.physiologicalMarker ? Number(p.physiologicalMarker) : 0,
       coachAdvice: p.coachAdvice || null,
       rawMenuData: p.rawMenuData ? JSON.parse(p.rawMenuData) : null

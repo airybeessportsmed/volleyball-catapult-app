@@ -554,7 +554,7 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && user?.role === "athlete" }
   );
 
-  const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "jumps" | "menu">("summary");
+  const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings">("summary");
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
   const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
 
@@ -1170,6 +1170,7 @@ export default function HomeScreen() {
     }
 
     const latest = analytics?.latestSession;
+    const trendData = analytics?.trend || [];
 
     // ACWR ゲージ描画ヘルパー
     const renderACWRGauge = () => {
@@ -1295,7 +1296,7 @@ export default function HomeScreen() {
                 <Text className="text-[9px] text-muted font-bold">単調度 (Monotony)</Text>
                 <Text className="text-[10px] text-muted font-normal">日々の練習負荷の偏り</Text>
               </View>
-              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony.monotony}</Text>
+              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony?.monotony || 0}</Text>
             </View>
             
             <View className="flex-1 bg-surface border border-border p-3 rounded-2xl flex-row items-center justify-between">
@@ -1303,7 +1304,7 @@ export default function HomeScreen() {
                 <Text className="text-[9px] text-muted font-bold">負担度 (Strain)</Text>
                 <Text className="text-[10px] text-muted font-normal">疲労の蓄積予測値</Text>
               </View>
-              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony.strain}</Text>
+              <Text className="text-sm font-extrabold text-foreground font-mono">{analytics.monotony?.strain || 0}</Text>
             </View>
           </View>
         </View>
@@ -1660,62 +1661,46 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
-          <View className="gap-5">
-            {latest?.isAnomaly && (
-              <View style={{
-                backgroundColor: latest.isCorrected ? "#F8FAFC" : "#FEF2F2",
-                borderColor: latest.isCorrected ? "#E2E8F0" : "#FCA5A5",
-                borderWidth: 1,
-                borderRadius: 16,
-                padding: 14,
-                gap: 6
-              }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <IconSymbol size={16} name="exclamationmark.triangle.fill" color={latest.isCorrected ? "#64748B" : "#EF4444"} />
-                  <Text style={{ fontSize: 12, fontWeight: "bold", color: latest.isCorrected ? "#334155" : "#991B1B" }}>
-                    {latest.isCorrected ? "この日のデータは測定不良のためポジション平均値で補正されています" : "この日のデータは測定不良の疑いがあります"}
+        {/* タブナビゲーション */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, backgroundColor: "#FFFFFF" }}>
+          <View style={{ flexDirection: "row", backgroundColor: "#F1F5F9", padding: 4, borderRadius: 12 }}>
+            {[
+              { id: "summary", label: "🚥 サマリー" },
+              { id: "dashboard", label: "📊 分析" },
+              { id: "raw", label: "📝 生データ" },
+              { id: "catapult", label: "🛰️ Catapult" },
+              { id: "settings", label: "⚙️ 設定" }
+            ].map(tab => {
+              const isSelected = athleteActiveTab === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => setAthleteActiveTab(tab.id as any)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    backgroundColor: isSelected ? "#FFFFFF" : "transparent",
+                    borderRadius: 8,
+                    alignItems: "center"
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: isSelected ? "#0F172A" : "#64748B" }}>
+                    {tab.label}
                   </Text>
-                </View>
-                <Text style={{ fontSize: 10, color: latest.isCorrected ? "#64748B" : "#B91C1C", lineHeight: 14, paddingLeft: 24 }}>
-                  詳細: {latest.anomalyDetails}
-                </Text>
-              </View>
-            )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
 
-            {/* タブナビゲーション */}
-            <View style={{ flexDirection: "row", backgroundColor: "#E2E8F0", borderRadius: 14, padding: 3 }}>
-              {([
-                { id: "summary", label: "総合サマリー", icon: "doc.text.fill" },
-                { id: "jumps", label: "ジャンプ分析", icon: "arrow.up.circle.fill" },
-                { id: "menu", label: "メニュー別負荷", icon: "list.bullet.indent" }
-              ] as const).map(tab => {
-                const isSelected = athleteActiveTab === tab.id;
-                return (
-                  <TouchableOpacity
-                    key={tab.id}
-                    onPress={() => setAthleteActiveTab(tab.id)}
-                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 11, backgroundColor: isSelected ? "#FFFFFF" : "transparent" }}
-                  >
-                    <IconSymbol size={13} name={tab.icon} color={isSelected ? "#FF6B35" : "#64748B"} />
-                    <Text style={{ fontSize: 11, fontWeight: "bold", color: isSelected ? "#0F172A" : "#64748B" }}>
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* 各タブの描画 */}
+        <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
+          <View style={{ gap: 20 }}>
+            {/* 🚥 サマリー */}
             {athleteActiveTab === "summary" && (
-              <View className="gap-5">
-                {/* ACWR */}
-                {analytics && analytics.acwr && renderACWRGauge()}
-
-                {/* ZScore List */}
+              <View style={{ gap: 16 }}>
                 {analytics && analytics.signalLight && (
                   <View style={{ gap: 16 }}>
-                    {/* コンディション判定バナー */}
+                    {/* コンディション自動要約バナー */}
                     <View style={{
                       backgroundColor: analytics.signalLight.status === "red" ? "#FDF2F2" : analytics.signalLight.status === "yellow" ? "#FFFDF5" : "#F4FBF7",
                       borderColor: analytics.signalLight.status === "red" ? "#F8D7DA" : analytics.signalLight.status === "yellow" ? "#FFF3CD" : "#D1E7DD",
@@ -1738,36 +1723,71 @@ export default function HomeScreen() {
                       </Text>
                     </View>
 
-                    {/* ZScore リスト */}
-                    <View style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
-                        コンディション詳細明細 — 個人基準±SD
-                      </Text>
-                      
-                      {ATHLETE_METRICS_MAP
-                        .filter(m => (analytics.signalLight.enabledMetrics || []).includes(m.key))
-                        .map(m => {
-                          const base = analytics.signalLight.baselines?.[m.key];
-                          if (!base || base.val === null) return null;
-                          const z = base ? base.zScore : 0;
-                          const status = base ? base.status : "green";
-                          const val = base ? base.val : 0;
-                          const mean = base ? base.mean : 0;
-                          const history = analytics.signalLight.metricHistory?.[m.key] || [];
-                          return (
-                            <AthleteZScoreBar
-                              key={m.key}
-                              label={m.label}
-                              zScore={z}
-                              status={status}
-                              val={val}
-                              baselineMean={mean}
-                              unit={m.unit}
-                              history={history}
-                              polarity={m.polarity}
-                            />
-                          );
-                        })}
+                    {/* LOAD と STATE の二カラム並列表示 */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
+                      {/* LOAD カラム */}
+                      <View style={{ flex: 1, minWidth: 320, backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
+                          負荷を確認 LOAD — 外的 / 内的応答
+                        </Text>
+                        
+                        {ATHLETE_METRICS_MAP
+                          .filter(m => (m.category === "load_ext" || m.category === "load_int") && (analytics.signalLight.enabledMetrics || []).includes(m.key))
+                          .map(m => {
+                            const base = analytics.signalLight.baselines?.[m.key];
+                            if (!base || base.val === null) return null;
+                            const z = base ? base.zScore : 0;
+                            const status = base ? base.status : "green";
+                            const val = base ? base.val : 0;
+                            const mean = base ? base.mean : 0;
+                            const history = analytics.signalLight.metricHistory?.[m.key] || [];
+                            return (
+                              <AthleteZScoreBar
+                                key={m.key}
+                                label={m.label}
+                                zScore={z}
+                                status={status}
+                                val={val}
+                                baselineMean={mean}
+                                unit={m.unit}
+                                history={history}
+                                polarity={m.polarity}
+                              />
+                            );
+                          })}
+                      </View>
+
+                      {/* STATE カラム */}
+                      <View style={{ flex: 1, minWidth: 320, backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
+                          状態 / レディネス STATE — 個人基準±SD
+                        </Text>
+                        
+                        {ATHLETE_METRICS_MAP
+                          .filter(m => (m.category === "state_subj" || m.category === "state_obj") && (analytics.signalLight.enabledMetrics || []).includes(m.key))
+                          .map(m => {
+                            const base = analytics.signalLight.baselines?.[m.key];
+                            if (!base || base.val === null) return null;
+                            const z = base ? base.zScore : 0;
+                            const status = base ? base.status : "green";
+                            const val = base ? base.val : 0;
+                            const mean = base ? base.mean : 0;
+                            const history = analytics.signalLight.metricHistory?.[m.key] || [];
+                            return (
+                              <AthleteZScoreBar
+                                key={m.key}
+                                label={m.label}
+                                zScore={z}
+                                status={status}
+                                val={val}
+                                baselineMean={mean}
+                                unit={m.unit}
+                                history={history}
+                                polarity={m.polarity}
+                              />
+                            );
+                          })}
+                      </View>
                     </View>
                   </View>
                 )}
@@ -1777,71 +1797,245 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {athleteActiveTab === "jumps" && (
-              <View className="gap-5">
+            {/* 📊 分析 */}
+            {athleteActiveTab === "dashboard" && (
+              <View style={{ gap: 16 }}>
+                {analytics && analytics.acwr && renderACWRGauge()}
                 {latest ? renderJumpAnalytics() : (
                   <View className="bg-surface rounded-2xl p-8 border border-border items-center justify-center">
                     <Text className="text-sm text-muted text-center font-bold">ジャンプデータが存在しません</Text>
                   </View>
                 )}
-              </View>
-            )}
-
-            {athleteActiveTab === "menu" && (
-              <View className="gap-5">
                 {latest ? renderMenuLoadAnalytics() : (
                   <View className="bg-surface rounded-2xl p-8 border border-border items-center justify-center">
                     <Text className="text-sm text-muted text-center font-bold">メニュー別負荷データが存在しません</Text>
                   </View>
                 )}
+
+                {/* トレンドグラフ */}
+                {pastPerformance && pastPerformance.length > 0 && (
+                  <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-3">
+                    <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
+                    <View className="py-2 items-center">
+                      <Svg width={windowWidth - 72} height={MINI_CHART_HEIGHT}>
+                        <Path 
+                          d={miniChartPath ? miniChartPath.path : ""} 
+                          fill="none" 
+                          stroke="#FF6B35" 
+                          strokeWidth="3" 
+                          strokeLinecap="round"
+                        />
+                        {miniChartPath && miniChartPath.points.map((p, idx) => (
+                          <Circle 
+                            key={idx} 
+                            cx={p.x} 
+                            cy={p.y} 
+                            r="3.5" 
+                            fill="#FFFFFF" 
+                            stroke="#FF6B35" 
+                            strokeWidth="2" 
+                          />
+                        ))}
+                      </Svg>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
-            {/* トレンド履歴ミニプレビュー (sRPEなどの移動平均推移) */}
-            {pastPerformance && pastPerformance.length > 0 && (
-              <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-3">
-                <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
-                <View className="py-2 items-center">
-                  <Svg width={windowWidth - 72} height={MINI_CHART_HEIGHT}>
-                    <Path 
-                      d={miniChartPath ? miniChartPath.path : ""} 
-                      fill="none" 
-                      stroke="#FF6B35" 
-                      strokeWidth="3" 
-                      strokeLinecap="round"
-                    />
-                    {miniChartPath && miniChartPath.points.map((p, idx) => (
-                      <Circle 
-                        key={idx} 
-                        cx={p.x} 
-                        cy={p.y} 
-                        r="3.5" 
-                        fill="#FFFFFF" 
-                        stroke="#FF6B35" 
-                        strokeWidth="2" 
+            {/* 📝 生データ (自分だけの履歴スプレッドシートテーブル) */}
+            {athleteActiveTab === "raw" && (
+              <View style={{ gap: 16 }}>
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 12 }}>コンディション＆運動量 履歴 (直近30測定分)</Text>
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9" }}>
+                    <View style={{ minWidth: 800 }}>
+                      {/* Header */}
+                      <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 40, alignItems: "center" }}>
+                        <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
+                        </View>
+                        <View style={{ width: 100, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>セッション</Text>
+                        </View>
+                        {ATHLETE_METRICS_MAP.map(m => (
+                          <View key={m.key} style={{ width: 90, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Body */}
+                      {trendData.map((record, idx) => {
+                        const dateString = new Date(record.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
+                        const sessionLabel = record.sessionType === "practice" ? "全体練習" : (record.sessionType === "individual" ? "自主練習" : "試合");
+                        
+                        return (
+                          <View key={idx} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
+                            <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateString}</Text>
+                            </View>
+                            <View style={{ width: 100, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                              <Text style={{ fontSize: 11, color: "#64748B" }}>{sessionLabel}</Text>
+                            </View>
+
+                            {ATHLETE_METRICS_MAP.map(m => {
+                              const val = (record as any)[m.key];
+                              const displayVal = val !== undefined && val !== null ? Number(val).toFixed((m.key as string) === "jumpVolume" ? 2 : (m.key.startsWith("wellness") || (m.key as string) === "totalJumps" || (m.key as string) === "accelCount" ? 0 : 1)) : "--";
+                              return (
+                                <View key={m.key} style={{ width: 90, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#334155" }}>
+                                    {displayVal}
+                                    <Text style={{ fontSize: 9, fontWeight: "normal", color: "#94A3B8", marginLeft: 1 }}>{displayVal !== "--" ? m.unit : ""}</Text>
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+              </View>
+            )}
+
+            {/* 🛰️ Catapult */}
+            {athleteActiveTab === "catapult" && (
+              <View style={{ gap: 16 }}>
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 12 }}>Catapult 運動量・ジャンプ履歴 (直近30測定分)</Text>
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9" }}>
+                    <View style={{ minWidth: 900 }}>
+                      {/* Header */}
+                      <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 40, alignItems: "center" }}>
+                        <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
+                        </View>
+                        {[
+                          { key: "totalJumps", label: "ジャンプ回数", unit: "回" },
+                          { key: "jumpVolume", label: "Jump Volume", unit: "m" },
+                          { key: "avgJumpHeight", label: "平均ジャンプ高(全数)", unit: "cm" },
+                          { key: "top5JumpHeight", label: "平均ジャンプ高(Top5)", unit: "cm" },
+                          { key: "totalLoad", label: "PlayerLoad", unit: "" },
+                          { key: "accelCount", label: "加速回数(IMA)", unit: "回" }
+                        ].map(m => (
+                          <View key={m.key} style={{ width: 120, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Body */}
+                      {trendData.map((record, idx) => {
+                        const dateString = new Date(record.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
+                        
+                        return (
+                          <View key={idx} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
+                            <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateString}</Text>
+                            </View>
+
+                            {[
+                              { key: "totalJumps", unit: "回", scale: 0 },
+                              { key: "jumpVolume", unit: "m", scale: 2 },
+                              { key: "avgJumpHeight", unit: "cm", scale: 1 },
+                              { key: "top5JumpHeight", unit: "cm", scale: 1 },
+                              { key: "totalLoad", unit: "", scale: 1 },
+                              { key: "accelCount", unit: "回", scale: 0 }
+                            ].map(m => {
+                              const val = (record as any)[m.key];
+                              const displayVal = val !== undefined && val !== null ? Number(val).toFixed(m.scale) : "--";
+                              return (
+                                <View key={m.key} style={{ width: 120, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#334155" }}>
+                                    {displayVal}
+                                    <Text style={{ fontSize: 9, fontWeight: "normal", color: "#94A3B8", marginLeft: 1 }}>{displayVal !== "--" ? m.unit : ""}</Text>
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+              </View>
+            )}
+
+            {/* ⚙️ 設定 */}
+            {athleteActiveTab === "settings" && (
+              <View style={{ gap: 16 }}>
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 16 }}>パスワード変更</Text>
+                  
+                  <View style={{ gap: 12 }}>
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>新しいパスワード</Text>
+                      <TextInput
+                        value={newPasswordVal}
+                        onChangeText={setNewPasswordVal}
+                        secureTextEntry={true}
+                        placeholder="新しいパスワードを入力"
+                        placeholderTextColor="#94A3B8"
+                        style={{ borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, fontSize: 12, color: "#1E293B" }}
                       />
-                    ))}
-                  </Svg>
+                    </View>
+
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>新しいパスワード (確認)</Text>
+                      <TextInput
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry={true}
+                        placeholder="もう一度入力"
+                        placeholderTextColor="#94A3B8"
+                        style={{ borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 10, fontSize: 12, color: "#1E293B" }}
+                      />
+                    </View>
+
+                    {passwordError && (
+                      <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "bold" }}>⚠️ {passwordError}</Text>
+                    )}
+                    {passwordSuccess && (
+                      <Text style={{ fontSize: 11, color: "#10B981", fontWeight: "bold" }}>✅ {passwordSuccess}</Text>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={handleChangePassword}
+                      disabled={isChangingPassword}
+                      style={{ backgroundColor: "#0F172A", paddingVertical: 12, borderRadius: 8, alignItems: "center", marginTop: 8 }}
+                    >
+                      {isChangingPassword ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={{ color: "#FFFFFF", fontWeight: "bold", fontSize: 12 }}>パスワードを更新</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
 
             {/* アンケート入力への誘導リンク */}
-            <View className="bg-primary/5 border border-primary/10 rounded-3xl p-5 items-center gap-3">
-              <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
-                <IconSymbol size={18} name="pencil.and.outline" color="#FF6B35" />
+            {(athleteActiveTab === "summary" || athleteActiveTab === "dashboard") && (
+              <View className="bg-primary/5 border border-primary/10 rounded-3xl p-5 items-center gap-3">
+                <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
+                  <IconSymbol size={18} name="pencil.and.outline" color="#FF6B35" />
+                </View>
+                <View className="gap-1 items-center">
+                  <Text className="text-sm font-bold text-foreground text-center">Wellnessアンケートを回答する</Text>
+                  <Text className="text-[10px] text-muted text-center leading-relaxed">
+                    毎朝のWellness項目と練習後のsRPEを登録して、コンディション精度を高めましょう。
+                  </Text>
+                </View>
               </View>
-              <View className="gap-1 items-center">
-                <Text className="text-sm font-bold text-foreground text-center">Wellnessアンケートを回答する</Text>
-                <Text className="text-[10px] text-muted text-center leading-relaxed">
-                  毎朝のWellness項目と練習後のsRPEを登録して、コンディション精度を高めましょう。
-                </Text>
-              </View>
-            </View>
+            )}
           </View>
         </ScrollView>
 
-        {/* 日付選択カレンダーモーダル (選手用) */}
+        {/* 日付選択カレンダーモーダル */}
         <Modal
           visible={calendarModalOpen}
           transparent={true}
@@ -1869,7 +2063,6 @@ export default function HomeScreen() {
                 elevation: 5
               }}
             >
-              {/* カレンダーヘッダー */}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <TouchableOpacity 
                   onPress={() => {
