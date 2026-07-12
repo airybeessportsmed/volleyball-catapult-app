@@ -1850,9 +1850,9 @@ export default function HomeScreen() {
                 <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 12 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                     <View>
-                      <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>本日（選択日付）の生データ直接入力・編集</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>生データ直接入力・編集 (直近1週間)</Text>
                       <Text style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>
-                        カレンダーで選択した日付（{rawDate}）の自分のデータを直接入力して保存できます。
+                        選択日（{rawDate}）から遡る過去7日間のデータを直接入力して一括保存できます。
                       </Text>
                     </View>
                     <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
@@ -1872,7 +1872,7 @@ export default function HomeScreen() {
                       {/* Header */}
                       <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 40, alignItems: "center" }}>
                         <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>選手名</Text>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
                         </View>
                         {METRICS_MAP
                           .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
@@ -1883,68 +1883,91 @@ export default function HomeScreen() {
                           ))}
                       </View>
 
-                      {/* Body */}
-                      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
-                        <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 11, color: "#64748B" }}>{athlete?.position || ""}</Text>
-                          <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{user?.name || ""}</Text>
-                        </View>
+                      {/* Body (datesToShow) */}
+                      {(() => {
+                        const datesToShow = Array.from({ length: 7 }).map((_, i) => {
+                          const d = new Date(rawDate);
+                          d.setDate(d.getDate() - i);
+                          return d.toLocaleDateString("sv-SE");
+                        });
 
-                        {METRICS_MAP
-                          .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
-                          .map(m => {
-                            const pendingKey = `${athlete?.id || 0}_${m.key}`;
-                            
-                            let dbVal = null;
-                            if (latestPerformance) {
-                              if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
-                                try {
-                                  const menuData = latestPerformance.rawMenuData ? (typeof latestPerformance.rawMenuData === "string" ? JSON.parse(latestPerformance.rawMenuData) : latestPerformance.rawMenuData) : {};
-                                  dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
-                                } catch (e) {
-                                  dbVal = null;
-                                }
-                              } else {
-                                dbVal = (latestPerformance as any)[m.key];
-                              }
-                            }
-                            
-                            const base = analytics?.signalLight?.baselines?.[m.key];
-                            const liveVal = pendingUpdates[pendingKey] !== undefined ? pendingUpdates[pendingKey] : dbVal;
-                            
-                            let liveZ = 0;
-                            if (liveVal !== null && base && base.sd > 0) {
-                              liveZ = (liveVal - base.mean) / base.sd;
-                            }
-                            
-                            const cellStyle = liveVal === null ? { bg: "#FFFFFF", text: "#1E293B" } : getCellStyle(liveZ, m.polarity);
+                        return datesToShow.map(dateStr => {
+                          const dateObj = new Date(dateStr);
+                          const dateLabel = dateObj.toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" });
 
-                            return (
-                              <View key={m.key} style={{ width: 90, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", padding: 4, backgroundColor: cellStyle.bg, justifyContent: "center" }}>
-                                <TextInput
-                                  defaultValue={dbVal !== null ? String(dbVal) : ""}
-                                  value={liveVal !== null ? String(liveVal) : ""}
-                                  onChangeText={(text) => {
-                                    const parsed = text === "" ? null : Number(text);
-                                    setPendingUpdates(prev => ({
-                                      ...prev,
-                                      [pendingKey]: isNaN(parsed as any) ? null : parsed
-                                    }));
-                                  }}
-                                  keyboardType="numeric"
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: "bold",
-                                    color: cellStyle.text,
-                                    textAlign: "center",
-                                    width: "100%",
-                                    height: "100%"
-                                  }}
-                                />
+                          // Find DB record from trendData
+                          const dbRecord = trendData.find(t => {
+                            try {
+                              return new Date(t.date).toLocaleDateString("sv-SE") === dateStr;
+                            } catch (e) {
+                              return false;
+                            }
+                          });
+
+                          return (
+                            <View key={dateStr} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
+                              <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateLabel}</Text>
                               </View>
-                            );
-                          })}
-                      </View>
+
+                              {METRICS_MAP
+                                .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
+                                .map(m => {
+                                  const pendingKey = `${dateStr}_${m.key}`;
+
+                                  let dbVal = null;
+                                  if (dbRecord) {
+                                    if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
+                                      try {
+                                        const menuData = dbRecord.rawMenuData ? (typeof dbRecord.rawMenuData === "string" ? JSON.parse(dbRecord.rawMenuData) : dbRecord.rawMenuData) : {};
+                                        dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
+                                      } catch (e) {
+                                        dbVal = null;
+                                      }
+                                    } else {
+                                      dbVal = (dbRecord as any)[m.key];
+                                    }
+                                  }
+
+                                  const base = analytics?.signalLight?.baselines?.[m.key];
+                                  const liveVal = pendingUpdates[pendingKey] !== undefined ? pendingUpdates[pendingKey] : dbVal;
+
+                                  let liveZ = 0;
+                                  if (liveVal !== null && base && base.sd > 0) {
+                                    liveZ = (liveVal - base.mean) / base.sd;
+                                  }
+
+                                  const cellStyle = liveVal === null ? { bg: "#FFFFFF", text: "#1E293B" } : getCellStyle(liveZ, m.polarity);
+
+                                  return (
+                                    <View key={m.key} style={{ width: 90, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", padding: 4, backgroundColor: cellStyle.bg, justifyContent: "center" }}>
+                                      <TextInput
+                                        defaultValue={dbVal !== null ? String(dbVal) : ""}
+                                        value={liveVal !== null ? String(liveVal) : ""}
+                                        onChangeText={(text) => {
+                                          const parsed = text === "" ? null : Number(text);
+                                          setPendingUpdates(prev => ({
+                                            ...prev,
+                                            [pendingKey]: isNaN(parsed as any) ? null : parsed
+                                          }));
+                                        }}
+                                        keyboardType="numeric"
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: "bold",
+                                          color: cellStyle.text,
+                                          textAlign: "center",
+                                          width: "100%",
+                                          height: "100%"
+                                        }}
+                                      />
+                                    </View>
+                                  );
+                                })}
+                            </View>
+                          );
+                        });
+                      })()}
                     </View>
                   </ScrollView>
                 </View>
@@ -1953,29 +1976,39 @@ export default function HomeScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "flex-start", gap: 12, marginTop: 4 }}>
                   <TouchableOpacity
                     onPress={async () => {
-                      const updatesArray = Object.entries(pendingUpdates).map(([key, val]) => {
-                        const [athIdStr, metricKey] = key.split("_");
-                        return {
-                          athleteId: Number(athIdStr),
+                      const updatesByDate: Record<string, { athleteId: number; metricKey: string; value: number | null }[]> = {};
+
+                      Object.entries(pendingUpdates).forEach(([key, val]) => {
+                        const [dateStr, metricKey] = key.split("_");
+                        if (!updatesByDate[dateStr]) {
+                          updatesByDate[dateStr] = [];
+                        }
+                        updatesByDate[dateStr].push({
+                          athleteId: athlete?.id || 0,
                           metricKey,
                           value: val
-                        };
+                        });
                       });
 
-                      if (updatesArray.length === 0) return;
+                      const datesToSave = Object.keys(updatesByDate);
+                      if (datesToSave.length === 0) return;
 
                       try {
-                        await updateMetricsBatchMutation.mutateAsync({
-                          teamId: user?.teamId || 1,
-                          dateStr: rawDate,
-                          updates: updatesArray
-                        });
+                        await Promise.all(
+                          datesToSave.map(dStr =>
+                            updateMetricsBatchMutation.mutateAsync({
+                              teamId: user?.teamId || 1,
+                              dateStr: dStr,
+                              updates: updatesByDate[dStr]
+                            })
+                          )
+                        );
                         setPendingUpdates({});
                         refetchLatest();
                         refetchAnalytics();
                         alert("変更を保存しました。");
                       } catch (err) {
-                        console.error("Batch save failed for athlete", err);
+                        console.error("Batch save failed for athlete across dates", err);
                         alert("保存に失敗しました。");
                       }
                     }}
