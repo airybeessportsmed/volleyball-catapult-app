@@ -1465,15 +1465,13 @@ export default function HomeScreen() {
         ...Object.keys(menuIma)
       ])).filter(m => !SYSTEM_KEYS.has(m));
 
-      const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6"];
-      const menuColorMap: Record<string, string> = {};
-      athleteMenus.forEach((m, idx) => {
-        menuColorMap[m] = colors[idx % colors.length];
-      });
+      const jumpPalette = ["#0284C7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd", "#e0f2fe", "#0369a1", "#075985", "#0c4a6e"];
+      const accelPalette = ["#DC2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca", "#fee2e2", "#b91c1c", "#991b1b", "#7f1d1d"];
+      const loadPalette = ["#16A34A", "#22c55e", "#4ade80", "#86efac", "#bbf7d0", "#d1fae5", "#15803d", "#166534", "#14532d"];
 
-      const renderDonutChart = (title: string, values: Record<string, number>, themeColor: string, unit: string) => {
+      const renderDonutChart = (title: string, values: Record<string, number>, themeColor: string, unit: string, colorPalette: string[]) => {
         const chartData = athleteMenus
-          .map(m => ({ name: m, value: values[m] || 0, color: menuColorMap[m] }))
+          .map((m, idx) => ({ name: m, value: values[m] || 0, color: colorPalette[idx % colorPalette.length] }))
           .filter(d => d.value > 0);
 
         const total = chartData.reduce((a, b) => a + b.value, 0) || 0;
@@ -1540,16 +1538,20 @@ export default function HomeScreen() {
             <View style={{ gap: 20 }}>
               {/* 3つの円グラフの並列表示 */}
               <View style={{ flexDirection: "row", justifyContent: "space-around", paddingVertical: 8, borderBottomWidth: 1, borderColor: "#F1F5F9" }}>
-                {renderDonutChart("ジャンプ(m)", menuJumps, "#0284C7", "m")}
-                {renderDonutChart("加速(回)", menuIma, "#DC2626", "回")}
-                {renderDonutChart("運動量(PL)", menuLoads, "#16A34A", "PL")}
+                {renderDonutChart("ジャンプ(m)", menuJumps, "#0284C7", "m", jumpPalette)}
+                {renderDonutChart("加速(回)", menuIma, "#DC2626", "回", accelPalette)}
+                {renderDonutChart("運動量(PL)", menuLoads, "#16A34A", "PL", loadPalette)}
               </View>
 
               {/* カラー凡例 */}
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", paddingBottom: 4 }}>
-                {athleteMenus.map(m => (
+                {athleteMenus.map((m, idx) => (
                   <View key={m} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: menuColorMap[m] }} />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 1.5 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: jumpPalette[idx % jumpPalette.length] }} />
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: accelPalette[idx % accelPalette.length] }} />
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: loadPalette[idx % loadPalette.length] }} />
+                    </View>
                     <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>{m}</Text>
                   </View>
                 ))}
@@ -1566,7 +1568,7 @@ export default function HomeScreen() {
                 </View>
 
                 {/* Body */}
-                {athleteMenus.map(m => {
+                {athleteMenus.map((m, idx) => {
                   const load = menuLoads[m] || 0;
                   const jump = menuJumps[m] || 0;
                   const ima = menuIma[m] || 0;
@@ -1574,8 +1576,13 @@ export default function HomeScreen() {
 
                   return (
                     <View key={m} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#F1F5F9", height: 42, alignItems: "center", backgroundColor: isIndividual ? "#FFF9E6" : "#FFFFFF" }}>
-                      <View style={{ flex: 2, paddingHorizontal: 12 }}>
-                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }} numberOfLines={1}>
+                      <View style={{ flex: 2, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ flexDirection: "row", gap: 1 }}>
+                          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: jumpPalette[idx % jumpPalette.length] }} />
+                          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: accelPalette[idx % accelPalette.length] }} />
+                          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: loadPalette[idx % loadPalette.length] }} />
+                        </View>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A", flex: 1 }} numberOfLines={1}>
                           {m} {isIndividual && "🏋️"}
                         </Text>
                       </View>
