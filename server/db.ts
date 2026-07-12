@@ -1680,8 +1680,36 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     ...data,
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
     maxJumpHeight: mergeMaxField(data.maxJumpHeight, existing?.maxJumpHeight),
-    avgJumpHeight: mergeField(data.avgJumpHeight, existing?.avgJumpHeight, null),
-    top5JumpHeight: mergeField(data.top5JumpHeight, existing?.top5JumpHeight, null),
+    avgJumpHeight: (() => {
+      const newVal = data.avgJumpHeight !== undefined && data.avgJumpHeight !== null ? parseFloat(data.avgJumpHeight) : null;
+      const existVal = existing?.avgJumpHeight !== undefined && existing?.avgJumpHeight !== null ? parseFloat(existing.avgJumpHeight) : null;
+      const newJumps = data.totalJumps ? Number(data.totalJumps) : 0;
+      const existJumps = existing?.totalJumps ? Number(existing.totalJumps) : 0;
+
+      if (newVal !== null && !isNaN(newVal) && existVal !== null && !isNaN(existVal)) {
+        if (newJumps + existJumps > 0) {
+          const weightedAvg = (newVal * newJumps + existVal * existJumps) / (newJumps + existJumps);
+          return weightedAvg.toFixed(2);
+        }
+      }
+      return newVal !== null && !isNaN(newVal) ? newVal.toFixed(2) : (existVal !== null && !isNaN(existVal) ? existVal.toFixed(2) : null);
+    })(),
+    top5JumpHeight: (() => {
+      const newVal = data.top5JumpHeight !== undefined && data.top5JumpHeight !== null ? parseFloat(data.top5JumpHeight) : null;
+      const existVal = existing?.top5JumpHeight !== undefined && existing?.top5JumpHeight !== null ? parseFloat(existing.top5JumpHeight) : null;
+      const newJumps = data.totalJumps ? Number(data.totalJumps) : 0;
+      const existJumps = existing?.totalJumps ? Number(existing.totalJumps) : 0;
+
+      if (newVal !== null && !isNaN(newVal) && existVal !== null && !isNaN(existVal)) {
+        const newWeight = Math.min(newJumps, 5);
+        const existWeight = Math.min(existJumps, 5);
+        if (newWeight + existWeight > 0) {
+          const blendedTop5 = (newVal * newWeight + existVal * existWeight) / (newWeight + existWeight);
+          return blendedTop5.toFixed(2);
+        }
+      }
+      return newVal !== null && !isNaN(newVal) ? newVal.toFixed(2) : (existVal !== null && !isNaN(existVal) ? existVal.toFixed(2) : null);
+    })(),
     totalJumps: mergeAdditiveField(data.totalJumps, existing?.totalJumps, calculatedSums.totalJumps),
     jumpVolume: mergeAdditiveField(data.jumpVolume, existing?.jumpVolume, calculatedSums.jumpVolume),
     jumpsOver40cm: mergeAdditiveField(data.jumpsOver40cm, existing?.jumpsOver40cm, calculatedSums.jumpsOver40cm),
