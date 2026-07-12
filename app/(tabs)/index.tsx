@@ -1731,7 +1731,7 @@ export default function HomeScreen() {
                           負荷を確認 LOAD — 外的 / 内的応答
                         </Text>
                         
-                        {ATHLETE_METRICS_MAP
+                        {METRICS_MAP
                           .filter(m => (m.category === "load_ext" || m.category === "load_int") && (analytics.signalLight.enabledMetrics || []).includes(m.key))
                           .map(m => {
                             const base = analytics.signalLight.baselines?.[m.key];
@@ -1763,7 +1763,7 @@ export default function HomeScreen() {
                           状態 / レディネス STATE — 個人基準±SD
                         </Text>
                         
-                        {ATHLETE_METRICS_MAP
+                        {METRICS_MAP
                           .filter(m => (m.category === "state_subj" || m.category === "state_obj") && (analytics.signalLight.enabledMetrics || []).includes(m.key))
                           .map(m => {
                             const base = analytics.signalLight.baselines?.[m.key];
