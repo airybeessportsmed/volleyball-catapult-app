@@ -1401,129 +1401,193 @@ export default function HomeScreen() {
     const renderMenuLoadAnalytics = () => {
       if (!latest) return null;
       let menuLoads: Record<string, number> = {};
+      let menuJumps: Record<string, number> = {};
       let menuIma: Record<string, number> = {};
       
       try {
         if (latest.rawMenuData) {
-          const parsed = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
-          if (parsed && parsed.loads) {
-            menuLoads = parsed.loads;
-            menuIma = parsed.ima || {};
-          } else {
-            // 互換用: すべてを load と見なす
-            menuLoads = parsed || {};
-            // ima は load の比率から適当に分配
-            const totalIma = latest.accelCount || 0;
-            const totalLoad = latest.totalLoad ? Number(latest.totalLoad) : 1;
-            Object.entries(menuLoads).forEach(([name, val]) => {
-              menuIma[name] = Math.round((Number(val) / totalLoad) * totalIma);
-            });
+          const menuObj = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
+          if (menuObj) {
+            if (menuObj.loads) {
+              menuLoads = menuObj.loads;
+              menuIma = menuObj.ima || {};
+              
+              const totalJumpsVol = latest.jumpVolume ? Number(latest.jumpVolume) : 0;
+              const totalLoadVal = latest.totalLoad ? Number(latest.totalLoad) : 1;
+              Object.entries(menuLoads).forEach(([m, val]) => {
+                menuJumps[m] = (Number(val) / totalLoadVal) * totalJumpsVol;
+              });
+            } else {
+              const rawLoads = menuObj.playerLoads || menuObj;
+              const rawJumps = menuObj.jumpVolumes || {};
+              const rawAccels = menuObj.accelVolumes || {};
+
+              Object.entries(rawLoads).forEach(([m, val]) => {
+                if (!SYSTEM_KEYS.has(m)) {
+                  menuLoads[m] = Number(val);
+                }
+              });
+              Object.entries(rawJumps).forEach(([m, val]) => {
+                if (!SYSTEM_KEYS.has(m)) {
+                  menuJumps[m] = Number(val);
+                }
+              });
+              Object.entries(rawAccels).forEach(([m, val]) => {
+                if (!SYSTEM_KEYS.has(m)) {
+                  menuIma[m] = Number(val);
+                }
+              });
+
+              if (Object.keys(menuIma).length === 0) {
+                const totalIma = latest.accelCount || 0;
+                const totalLoadVal = latest.totalLoad ? Number(latest.totalLoad) : 1;
+                Object.entries(menuLoads).forEach(([m, val]) => {
+                  menuIma[m] = (Number(val) / totalLoadVal) * totalIma;
+                });
+              }
+              if (Object.keys(menuJumps).length === 0) {
+                const totalJumpsVol = latest.jumpVolume ? Number(latest.jumpVolume) : 0;
+                const totalLoadVal = latest.totalLoad ? Number(latest.totalLoad) : 1;
+                Object.entries(menuLoads).forEach(([m, val]) => {
+                  menuJumps[m] = (Number(val) / totalLoadVal) * totalJumpsVol;
+                });
+              }
+            }
           }
         }
       } catch (e) {
-        console.warn("Failed to parse rawMenuData", e);
+        console.warn("Failed to parse rawMenuData for athlete", e);
       }
 
-      const isLoad = menuMetric === "load";
-      const targetData = isLoad ? menuLoads : menuIma;
-      
-      const menuItems = Object.entries(targetData).map(([name, val]) => ({
-        name,
-        value: Number(val)
-      })).sort((a, b) => b.value - a.value);
+      const athleteMenus = Array.from(new Set([
+        ...Object.keys(menuLoads),
+        ...Object.keys(menuJumps),
+        ...Object.keys(menuIma)
+      ])).filter(m => !SYSTEM_KEYS.has(m));
 
-      const totalSum = menuItems.reduce((a, b) => a + b.value, 0) || 1;
+      const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6"];
+      const menuColorMap: Record<string, string> = {};
+      athleteMenus.forEach((m, idx) => {
+        menuColorMap[m] = colors[idx % colors.length];
+      });
+
+      const renderDonutChart = (title: string, values: Record<string, number>, themeColor: string, unit: string) => {
+        const chartData = athleteMenus
+          .map(m => ({ name: m, value: values[m] || 0, color: menuColorMap[m] }))
+          .filter(d => d.value > 0);
+
+        const total = chartData.reduce((a, b) => a + b.value, 0) || 0;
+        let cumPercent = 0;
+
+        return (
+          <View style={{ flex: 1, alignItems: "center", gap: 6, minWidth: 90 }}>
+            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{title}</Text>
+            <View style={{ position: "relative", width: 70, height: 70, justifyContent: "center", alignItems: "center" }}>
+              <Svg width={70} height={70} viewBox="0 0 32 32">
+                {chartData.length > 0 && total > 0 ? (
+                  chartData.map((item, idx) => {
+                    const percent = item.value / total;
+                    const strokeDash = `${percent * 100} ${100 - percent * 100}`;
+                    const strokeOffset = 100 - (cumPercent * 100) + 25;
+                    cumPercent += percent;
+
+                    return (
+                      <Circle
+                        key={idx}
+                        cx="16"
+                        cy="16"
+                        r="12"
+                        fill="transparent"
+                        stroke={item.color}
+                        strokeWidth="4"
+                        strokeDasharray={strokeDash}
+                        strokeDashoffset={strokeOffset}
+                      />
+                    );
+                  })
+                ) : (
+                  <Circle
+                    cx="16"
+                    cy="16"
+                    r="12"
+                    fill="transparent"
+                    stroke="#E2E8F0"
+                    strokeWidth="4"
+                  />
+                )}
+              </Svg>
+              <View style={{ position: "absolute", justifyContent: "center", alignItems: "center" }}>
+                <Text style={{ fontSize: 8, fontWeight: "bold", color: themeColor }}>
+                  {total > 0 ? total.toFixed(total > 100 ? 0 : 1) : "-"}
+                </Text>
+                {total > 0 && unit !== "" && (
+                  <Text style={{ fontSize: 6, color: "#64748B", fontWeight: "bold" }}>{unit}</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        );
+      };
 
       return (
         <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
-          <View className="flex-row justify-between items-start">
-            <View>
-              <Text className="text-sm font-bold text-foreground">
-                {isLoad ? "練習メニュー別運動量 (PlayerLoad)" : "練習メニュー別加速回数 (IMA)"}
-              </Text>
-              <Text className="text-[10px] text-muted font-medium">
-                {isLoad ? "メニューごとの負荷配分と自主練の数値" : "メニューごとの加速・動作アクションの回数"}
-              </Text>
-            </View>
-
-            {/* 指標切り替えセグメントトグル */}
-            <View className="flex-row bg-muted/30 p-0.5 rounded-xl border border-border/40">
-              <TouchableOpacity
-                onPress={() => setMenuMetric("load")}
-                className={`px-3 py-1.5 rounded-lg ${isLoad ? "bg-surface shadow-xs" : ""}`}
-              >
-                <Text className={`text-[10px] font-bold ${isLoad ? "text-foreground" : "text-muted"}`}>運動量</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setMenuMetric("ima")}
-                className={`px-3 py-1.5 rounded-lg ${!isLoad ? "bg-surface shadow-xs" : ""}`}
-              >
-                <Text className={`text-[10px] font-bold ${!isLoad ? "text-foreground" : "text-muted"}`}>IMA加速</Text>
-              </TouchableOpacity>
-            </View>
+          <View>
+            <Text className="text-sm font-bold text-foreground">練習メニュー別運動量・詳細配分</Text>
+            <Text className="text-[10px] text-muted font-medium">メニューごとの外的負荷（ジャンプ、加速、運動量）の配分</Text>
           </View>
 
-          {menuItems.length > 0 ? (
-            <View className="gap-5">
-              <View className="h-6 w-full rounded-full overflow-hidden flex-row border border-border/30 bg-muted/20">
-                {menuItems.map((item, idx) => {
-                  const itemPercent = `${(item.value / totalSum) * 100}%`;
-                  const colors = [
-                    "bg-primary",
-                    "bg-secondary",
-                    "bg-accent",
-                    "bg-emerald-500",
-                    "bg-indigo-500"
-                  ];
-                  const bgClass = colors[idx % colors.length];
-                  return (
-                    <View 
-                      key={idx} 
-                      style={{ width: itemPercent as any }} 
-                      className={`${bgClass} h-full`}
-                    />
-                  );
-                })}
+          {athleteMenus.length > 0 ? (
+            <View style={{ gap: 20 }}>
+              {/* 3つの円グラフの並列表示 */}
+              <View style={{ flexDirection: "row", justifyContent: "space-around", paddingVertical: 8, borderBottomWidth: 1, borderColor: "#F1F5F9" }}>
+                {renderDonutChart("ジャンプ(m)", menuJumps, "#0284C7", "m")}
+                {renderDonutChart("加速(回)", menuIma, "#DC2626", "回")}
+                {renderDonutChart("運動量(PL)", menuLoads, "#16A34A", "PL")}
               </View>
 
-              <View className="gap-3">
-                {menuItems.map((item, idx) => {
-                  const percentVal = ((item.value / totalSum) * 100).toFixed(1);
-                  const colors = [
-                    "bg-primary text-white",
-                    "bg-secondary text-white",
-                    "bg-accent text-foreground",
-                    "bg-emerald-500 text-white",
-                    "bg-indigo-500 text-white"
-                  ];
-                  const labelColorClass = colors[idx % colors.length];
-                  const isIndividual = item.name.toLowerCase().includes("individual") || item.name.includes("自主練");
+              {/* カラー凡例 */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", paddingBottom: 4 }}>
+                {athleteMenus.map(m => (
+                  <View key={m} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: menuColorMap[m] }} />
+                    <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* メニュー別スプレッドシートテーブル */}
+              <View style={{ borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden", backgroundColor: "#FFFFFF" }}>
+                {/* Header */}
+                <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 38, alignItems: "center" }}>
+                  <View style={{ flex: 2, paddingHorizontal: 12 }}><Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>練習メニュー名</Text></View>
+                  <View style={{ flex: 1, alignItems: "center" }}><Text style={{ fontSize: 10, fontWeight: "bold", color: "#0284C7" }}>Jump (m)</Text></View>
+                  <View style={{ flex: 1, alignItems: "center" }}><Text style={{ fontSize: 10, fontWeight: "bold", color: "#DC2626" }}>IMA (回)</Text></View>
+                  <View style={{ flex: 1, alignItems: "center" }}><Text style={{ fontSize: 10, fontWeight: "bold", color: "#16A34A" }}>PL (運動量)</Text></View>
+                </View>
+
+                {/* Body */}
+                {athleteMenus.map(m => {
+                  const load = menuLoads[m] || 0;
+                  const jump = menuJumps[m] || 0;
+                  const ima = menuIma[m] || 0;
+                  const isIndividual = m.toLowerCase().includes("individual") || m.includes("自主練");
 
                   return (
-                    <View 
-                      key={idx} 
-                      className={`flex-row justify-between items-center p-3 rounded-2xl border ${
-                        isIndividual ? "bg-amber-500/5 border-amber-500/30 scale-[1.02]" : "border-border/60 bg-muted/5"
-                      }`}
-                    >
-                      <View className="flex-row items-center gap-2.5">
-                        <View className={`px-2.5 py-1 rounded-lg ${labelColorClass}`}>
-                          <Text className="text-[9px] font-extrabold">{idx + 1}</Text>
-                        </View>
-                        <View>
-                          <Text className="text-xs font-bold text-foreground">
-                            {item.name} {isIndividual && "🏋️ (自主練)"}
-                          </Text>
-                          <Text className="text-[9px] text-muted">割合: {percentVal}%</Text>
-                        </View>
-                      </View>
-                      
-                      <Text className="text-sm font-extrabold text-foreground font-mono">
-                        {item.value.toFixed(isLoad ? 1 : 0)}
-                        <Text className="text-[10px] font-normal text-muted ml-0.5">
-                          {isLoad ? "" : "回"}
+                    <View key={m} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#F1F5F9", height: 42, alignItems: "center", backgroundColor: isIndividual ? "#FFF9E6" : "#FFFFFF" }}>
+                      <View style={{ flex: 2, paddingHorizontal: 12 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }} numberOfLines={1}>
+                          {m} {isIndividual && "🏋️"}
                         </Text>
-                      </Text>
+                      </View>
+                      <View style={{ flex: 1, alignItems: "center" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0284C7" }}>{jump.toFixed(1)}</Text>
+                      </View>
+                      <View style={{ flex: 1, alignItems: "center" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#DC2626" }}>{ima.toFixed(0)}</Text>
+                      </View>
+                      <View style={{ flex: 1, alignItems: "center" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#16A34A" }}>{load.toFixed(1)}</Text>
+                      </View>
                     </View>
                   );
                 })}
@@ -1531,7 +1595,7 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View className="py-8 items-center justify-center">
-              <Text className="text-xs text-muted">メニュー別負荷データがありません。</Text>
+              <Text className="text-xs text-muted">練習メニュー別のデータがありません。</Text>
             </View>
           )}
         </View>
