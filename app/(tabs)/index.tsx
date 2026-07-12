@@ -560,7 +560,7 @@ export default function HomeScreen() {
 
   // Fetch athlete info
   // Fetch performance data for selected date
-  const { data: latestPerformance, isLoading: perfLoading } = trpc.performance.getByAthleteAndDate.useQuery(
+  const { data: latestPerformance, isLoading: perfLoading, refetch: refetchLatest } = trpc.performance.getByAthleteAndDate.useQuery(
     { athleteId: athlete?.id || 0, date: rawDate },
     { enabled: !!athlete?.id }
   );
@@ -572,7 +572,7 @@ export default function HomeScreen() {
   );
 
   // Fetch athlete analytics for athlete dashboard (date dependent)
-  const { data: analytics, isLoading: analyticsLoading } = trpc.performance.getAthleteAnalytics.useQuery(
+  const { data: analytics, isLoading: analyticsLoading, refetch: refetchAnalytics } = trpc.performance.getAthleteAnalytics.useQuery(
     { athleteId: athlete?.id || 0, date: rawDate, acwrMetric },
     { enabled: !!athlete?.id }
   );
@@ -1846,56 +1846,150 @@ export default function HomeScreen() {
             {/* 📝 生データ (自分だけの履歴スプレッドシートテーブル) */}
             {athleteActiveTab === "raw" && (
               <View style={{ gap: 16 }}>
+                {/* 1. 操作説明 ＆ カラー凡例 */}
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 12 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>本日（選択日付）の生データ直接入力・編集</Text>
+                      <Text style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>
+                        カレンダーで選択した日付（{rawDate}）の自分のデータを直接入力して保存できます。
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 10, height: 10, backgroundColor: "#C9DAF8" }} /><Text style={{ fontSize: 8, color: "#64748B" }}>改善 2SD超</Text></View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 10, height: 10, backgroundColor: "#E8F0FE" }} /><Text style={{ fontSize: 8, color: "#64748B" }}>改善 1-2SD</Text></View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 10, height: 10, backgroundColor: "#FFF" }} /><Text style={{ fontSize: 8, color: "#64748B" }}>基準域</Text></View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 10, height: 10, backgroundColor: "#FFF2CC" }} /><Text style={{ fontSize: 8, color: "#64748B" }}>悪化 1-2SD</Text></View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 10, height: 10, backgroundColor: "#FCE4D6" }} /><Text style={{ fontSize: 8, color: "#64748B" }}>悪化 2SD超</Text></View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 2. 生データ スプレッドシートテーブル */}
                 <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 12 }}>コンディション＆運動量 履歴 (直近30測定分)</Text>
                   <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9" }}>
                     <View style={{ minWidth: 800 }}>
                       {/* Header */}
                       <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 40, alignItems: "center" }}>
                         <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
+                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>選手名</Text>
                         </View>
-                        <View style={{ width: 100, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>セッション</Text>
-                        </View>
-                        {ATHLETE_METRICS_MAP.map(m => (
-                          <View key={m.key} style={{ width: 90, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
-                          </View>
-                        ))}
+                        {METRICS_MAP
+                          .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
+                          .map(m => (
+                            <View key={m.key} style={{ width: 90, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                              <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
+                            </View>
+                          ))}
                       </View>
 
                       {/* Body */}
-                      {trendData.map((record, idx) => {
-                        const dateString = new Date(record.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
-                        const sessionLabel = record.sessionType === "practice" ? "全体練習" : (record.sessionType === "individual" ? "自主練習" : "試合");
-                        
-                        return (
-                          <View key={idx} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
-                            <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateString}</Text>
-                            </View>
-                            <View style={{ width: 100, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                              <Text style={{ fontSize: 11, color: "#64748B" }}>{sessionLabel}</Text>
-                            </View>
+                      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
+                        <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 11, color: "#64748B" }}>{athlete?.position || ""}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{user?.name || ""}</Text>
+                        </View>
 
-                            {ATHLETE_METRICS_MAP.map(m => {
-                              const val = (record as any)[m.key];
-                              const displayVal = val !== undefined && val !== null ? Number(val).toFixed((m.key as string) === "jumpVolume" ? 2 : (m.key.startsWith("wellness") || (m.key as string) === "totalJumps" || (m.key as string) === "accelCount" ? 0 : 1)) : "--";
-                              return (
-                                <View key={m.key} style={{ width: 90, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
-                                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#334155" }}>
-                                    {displayVal}
-                                    <Text style={{ fontSize: 9, fontWeight: "normal", color: "#94A3B8", marginLeft: 1 }}>{displayVal !== "--" ? m.unit : ""}</Text>
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        );
-                      })}
+                        {METRICS_MAP
+                          .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
+                          .map(m => {
+                            const pendingKey = `${athlete?.id || 0}_${m.key}`;
+                            
+                            let dbVal = null;
+                            if (latestPerformance) {
+                              if (m.key === "sRpeBall" || m.key === "sRpeSandC") {
+                                try {
+                                  const menuData = latestPerformance.rawMenuData ? (typeof latestPerformance.rawMenuData === "string" ? JSON.parse(latestPerformance.rawMenuData) : latestPerformance.rawMenuData) : {};
+                                  dbVal = menuData[m.key] !== undefined ? menuData[m.key] : null;
+                                } catch (e) {
+                                  dbVal = null;
+                                }
+                              } else {
+                                dbVal = (latestPerformance as any)[m.key];
+                              }
+                            }
+                            
+                            const base = analytics?.signalLight?.baselines?.[m.key];
+                            const liveVal = pendingUpdates[pendingKey] !== undefined ? pendingUpdates[pendingKey] : dbVal;
+                            
+                            let liveZ = 0;
+                            if (liveVal !== null && base && base.sd > 0) {
+                              liveZ = (liveVal - base.mean) / base.sd;
+                            }
+                            
+                            const cellStyle = liveVal === null ? { bg: "#FFFFFF", text: "#1E293B" } : getCellStyle(liveZ, m.polarity);
+
+                            return (
+                              <View key={m.key} style={{ width: 90, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", padding: 4, backgroundColor: cellStyle.bg, justifyContent: "center" }}>
+                                <TextInput
+                                  defaultValue={dbVal !== null ? String(dbVal) : ""}
+                                  value={liveVal !== null ? String(liveVal) : ""}
+                                  onChangeText={(text) => {
+                                    const parsed = text === "" ? null : Number(text);
+                                    setPendingUpdates(prev => ({
+                                      ...prev,
+                                      [pendingKey]: isNaN(parsed as any) ? null : parsed
+                                    }));
+                                  }}
+                                  keyboardType="numeric"
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: "bold",
+                                    color: cellStyle.text,
+                                    textAlign: "center",
+                                    width: "100%",
+                                    height: "100%"
+                                  }}
+                                />
+                              </View>
+                            );
+                          })}
+                      </View>
                     </View>
                   </ScrollView>
+                </View>
+
+                {/* 3. 保存 ＆ 破棄アクションボタン */}
+                <View style={{ flexDirection: "row", justifyContent: "flex-start", gap: 12, marginTop: 4 }}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const updatesArray = Object.entries(pendingUpdates).map(([key, val]) => {
+                        const [athIdStr, metricKey] = key.split("_");
+                        return {
+                          athleteId: Number(athIdStr),
+                          metricKey,
+                          value: val
+                        };
+                      });
+
+                      if (updatesArray.length === 0) return;
+
+                      try {
+                        await updateMetricsBatchMutation.mutateAsync({
+                          teamId: user?.teamId || 1,
+                          dateStr: rawDate,
+                          updates: updatesArray
+                        });
+                        setPendingUpdates({});
+                        refetchLatest();
+                        refetchAnalytics();
+                        alert("変更を保存しました。");
+                      } catch (err) {
+                        console.error("Batch save failed for athlete", err);
+                        alert("保存に失敗しました。");
+                      }
+                    }}
+                    style={{ backgroundColor: "#2F80ED", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
+                  >
+                    <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "bold" }}>変更を保存</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setPendingUpdates({})}
+                    style={{ backgroundColor: "#FFFFFF", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0" }}
+                  >
+                    <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "bold" }}>キャンセル</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
