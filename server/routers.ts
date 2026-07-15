@@ -77,6 +77,7 @@ export const appRouter = router({
       .input(z.object({
         role: z.enum(["coach", "viewer", "athlete"]),
         athleteId: z.number().optional(),
+        isEnglish: z.boolean().optional(),
         password: z.string()
       }))
       .mutation(async ({ input }) => {
@@ -93,10 +94,17 @@ export const appRouter = router({
             name = "スタッフ (管理者)";
             email = "admin@example.com";
           } else if (input.role === "viewer") {
-            openId = "demoviewer";
-            expectedPassword = "viewer123";
-            name = "スタッフ (閲覧用)";
-            email = "viewer@example.com";
+            if (input.isEnglish) {
+              openId = "demoviewer_en";
+              expectedPassword = "viewer123";
+              name = "Staff (Viewer - EN)";
+              email = "viewer_en@example.com";
+            } else {
+              openId = "demoviewer";
+              expectedPassword = "viewer123";
+              name = "スタッフ (閲覧用)";
+              email = "viewer@example.com";
+            }
           } else {
             if (!input.athleteId) throw new Error("選手が選択されていません。");
             const mockAth = (await db.getAthletesByTeamId(1)).find(a => a.id === input.athleteId);
@@ -125,7 +133,11 @@ export const appRouter = router({
           userObj = await database.select().from(users).where(eq(users.role, "coach")).limit(1).then(r => r[0]);
           defaultPass = "admin123";
         } else if (input.role === "viewer") {
-          userObj = await database.select().from(users).where(eq(users.role, "viewer")).limit(1).then(r => r[0]);
+          if (input.isEnglish) {
+            userObj = await database.select().from(users).where(eq(users.openId, "demoviewer_en")).limit(1).then(r => r[0]);
+          } else {
+            userObj = await database.select().from(users).where(eq(users.openId, "demoviewer")).limit(1).then(r => r[0]);
+          }
           defaultPass = "viewer123";
         } else {
           if (!input.athleteId) throw new Error("選手が選択されていません。");

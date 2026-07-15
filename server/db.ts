@@ -56,6 +56,19 @@ let mockUsers: User[] = [
     lastSignedIn: new Date(),
   },
   {
+    id: 15,
+    openId: "demoviewer_en",
+    name: "Staff (Viewer - EN)",
+    email: "viewer_en@example.com",
+    loginMethod: "manus",
+    teamId: 1,
+    role: "viewer",
+    password: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  },
+  {
     id: 2,
     openId: "demoathlete1",
     name: "宮下 さくら",
@@ -4065,6 +4078,20 @@ export async function seedDatabase() {
         openId: "demoviewer",
         name: "スタッフ (閲覧用)",
         email: "viewer@example.com",
+        loginMethod: "manus",
+        role: "viewer",
+        teamId: 1,
+      });
+    }
+
+    const existingViewerEn = await db.select().from(users).where(eq(users.openId, "demoviewer_en")).limit(1);
+    if (existingViewerEn.length === 0) {
+      console.log("[Database] Seeding English viewer user...");
+      await db.insert(users).values({
+        id: 15,
+        openId: "demoviewer_en",
+        name: "Staff (Viewer - EN)",
+        email: "viewer_en@example.com",
         loginMethod: "manus",
         role: "viewer",
         teamId: 1,

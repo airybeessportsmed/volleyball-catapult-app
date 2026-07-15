@@ -525,6 +525,10 @@ const AnomalyItemRow = ({ item, onResolve, correctMutation }: { item: any; onRes
 export default function HomeScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { user, isAuthenticated, loading, logout } = useAuth();
+  const isEnglish = user?.email === "viewer_en@example.com" || user?.openId === "demoviewer_en";
+  const t = (ja: string, en: string) => {
+    return isEnglish ? en : ja;
+  };
   const router = useRouter();
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
   const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
@@ -538,6 +542,7 @@ export default function HomeScreen() {
   const changePasswordMutation = trpc.auth.changePassword.useMutation();
 
   const [selectedUserType, setSelectedUserType] = useState<"coach" | "viewer" | "athlete" | null>(null);
+  const [isDemoEnglish, setIsDemoEnglish] = useState(false);
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -979,6 +984,7 @@ export default function HomeScreen() {
         const { token, user: loggedUser } = await loginMutation.mutateAsync({
           role,
           athleteId,
+          isEnglish: isDemoEnglish,
           password,
         });
 
@@ -1040,21 +1046,42 @@ export default function HomeScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* スタッフ (閲覧用) */}
+              {/* スタッフ (閲覧用 - 日本語版) */}
               <TouchableOpacity 
                 onPress={() => {
                   setSelectedUserType("viewer");
+                  setIsDemoEnglish(false);
                   setSelectedAthleteId(null);
                   setLoginError(null);
                   setPassword("");
                 }}
-                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" && !isDemoEnglish ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
               >
                 <View className="flex-row items-center gap-3">
-                  <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" ? "#FF6B35" : "#6B7280"} />
-                  <Text className={`font-bold text-sm ${selectedUserType === "viewer" ? "text-primary" : "text-foreground"}`}>スタッフ (閲覧用)</Text>
+                  <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" && !isDemoEnglish ? "#FF6B35" : "#6B7280"} />
+                  <Text className={`font-bold text-sm ${selectedUserType === "viewer" && !isDemoEnglish ? "text-primary" : "text-foreground"}`}>スタッフ (閲覧用 - 日本語)</Text>
                 </View>
-                {selectedUserType === "viewer" && (
+                {selectedUserType === "viewer" && !isDemoEnglish && (
+                  <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
+                )}
+              </TouchableOpacity>
+
+              {/* スタッフ (閲覧用 - 英語版) */}
+              <TouchableOpacity 
+                onPress={() => {
+                  setSelectedUserType("viewer");
+                  setIsDemoEnglish(true);
+                  setSelectedAthleteId(null);
+                  setLoginError(null);
+                  setPassword("");
+                }}
+                className={`w-full p-4 rounded-2xl flex-row justify-between items-center border active:opacity-90 ${selectedUserType === "viewer" && isDemoEnglish ? "bg-primary/5 border-primary" : "bg-background border-border/80"}`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <IconSymbol size={18} name="person.fill" color={selectedUserType === "viewer" && isDemoEnglish ? "#FF6B35" : "#6B7280"} />
+                  <Text className={`font-bold text-sm ${selectedUserType === "viewer" && isDemoEnglish ? "text-primary" : "text-foreground"}`}>Staff (Viewer - English)</Text>
+                </View>
+                {selectedUserType === "viewer" && isDemoEnglish && (
                   <IconSymbol size={14} name="checkmark.circle.fill" color="#FF6B35" />
                 )}
               </TouchableOpacity>
@@ -2642,9 +2669,9 @@ export default function HomeScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }}>
           <View>
             <Text style={{ fontSize: 20, fontWeight: "bold", color: "#0F172A" }}>
-              チームコンディショニング
+              {t("チームコンディショニング", "Team Conditioning")}
             </Text>
-            <Text style={{ fontSize: 12, color: "#64748B" }}>指導者: {user?.name}</Text>
+            <Text style={{ fontSize: 12, color: "#64748B" }}>{t("指導者: ", "Staff: ")}{user?.name}</Text>
           </View>
           <TouchableOpacity 
             onPress={logout}
@@ -2662,7 +2689,13 @@ export default function HomeScreen() {
               }
               return true;
             }).map(tab => {
-              const tabLabels = { summary: "🚥 サマリー", dashboard: "📊 分析", raw: "📝 生データ", catapult: "🛰️ Catapult", settings: "⚙️ 設定" };
+              const tabLabels = { 
+                summary: t("🚥 サマリー", "🚥 Summary"), 
+                dashboard: t("📊 分析", "📊 Analytics"), 
+                raw: t("📝 生データ", "📝 Raw Data"), 
+                catapult: t("🛰️ Catapult", "🛰️ Catapult"), 
+                settings: t("⚙️ 設定", "⚙️ Settings") 
+              };
               const isActive = activeTab === tab;
               return (
                 <TouchableOpacity
@@ -2730,33 +2763,33 @@ export default function HomeScreen() {
                   style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2E8F0", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
                 >
                   <IconSymbol size={16} name="square.and.arrow.up" color="#0F172A" />
-                  <Text style={{ color: "#0F172A", fontWeight: "bold", fontSize: 13 }}>コンディションレポート出力 (CSV)</Text>
+                  <Text style={{ color: "#0F172A", fontWeight: "bold", fontSize: 13 }}>{t("コンディションレポート出力 (CSV)", "Export Condition Report (CSV)")}</Text>
                 </TouchableOpacity>
 
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#EF4444", marginBottom: 10 }}>🔴 要確認 ({redAthletes.length}名)</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#EF4444", marginBottom: 10 }}>{t("🔴 要確認 (", "🔴 Check (")}{redAthletes.length}{t("名)", " athletes)")}</Text>
                   {redAthletes.length > 0 ? (
                     redAthletes.map(ath => renderSummaryAthleteCard(ath))
                   ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>該当選手はいません。</Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
                   )}
                 </View>
 
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#F59E0B", marginBottom: 10 }}>🟡 注意 ({yellowAthletes.length}名)</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#F59E0B", marginBottom: 10 }}>{t("🟡 注意 (", "🟡 Caution (")}{yellowAthletes.length}{t("名)", " athletes)")}</Text>
                   {yellowAthletes.length > 0 ? (
                     yellowAthletes.map(ath => renderSummaryAthleteCard(ath))
                   ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>該当選手はいません。</Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
                   )}
                 </View>
 
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#10B981", marginBottom: 10 }}>🟢 良好 ({greenAthletes.length}名)</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#10B981", marginBottom: 10 }}>{t("🟢 良好 (", "🟢 Good (")}{greenAthletes.length}{t("名)", " athletes)")}</Text>
                   {greenAthletes.length > 0 ? (
                     greenAthletes.map(ath => renderSummaryAthleteCard(ath))
                   ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>該当選手はいません。</Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
                   )}
                 </View>
               </View>
