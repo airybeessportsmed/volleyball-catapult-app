@@ -169,15 +169,19 @@ export default function AthleteAnalyticsScreen() {
   );
 
   // Fetch full analytics dashboard data for this athlete
-  const { data: analytics, isLoading: analyticsLoading, refetch } = trpc.performance.getAthleteAnalytics.useQuery(
+  const { data: analytics, isLoading: analyticsLoading, isFetching, refetch } = trpc.performance.getAthleteAnalytics.useQuery(
     { athleteId: athleteId || 0, date: rawDate, acwrMetric },
-    { enabled: !!athleteId }
+    { 
+      enabled: !!athleteId,
+      placeholderData: (prev) => prev
+    }
   );
 
   const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
   const rollbackAnomalyMutation = trpc.performance.rollbackAnomaly.useMutation();
 
-  if (athleteLoading || analyticsLoading) {
+  // Show full screen indicator only on initial load (when we don't have any analytics data yet)
+  if (athleteLoading || (analyticsLoading && !analytics)) {
     return (
       <ScreenContainer className="flex items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#FF6B35" />
@@ -1445,9 +1449,14 @@ export default function AthleteAnalyticsScreen() {
 
         <TouchableOpacity 
           onPress={() => refetch()}
-          className="p-2.5 bg-muted/20 rounded-full active:bg-muted/30"
+          className="p-2 bg-muted/20 rounded-full active:bg-muted/30 justify-center items-center"
+          disabled={isFetching}
         >
-          <IconSymbol size={14} name="arrow.clockwise" color="#4B5563" />
+          {isFetching ? (
+            <ActivityIndicator size="small" color="#4B5563" style={{ width: 14, height: 14, transform: [{ scale: 0.7 }] }} />
+          ) : (
+            <IconSymbol size={14} name="arrow.clockwise" color="#4B5563" />
+          )}
         </TouchableOpacity>
       </View>
 

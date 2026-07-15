@@ -572,9 +572,12 @@ export default function HomeScreen() {
   );
 
   // Fetch athlete analytics for athlete dashboard (date dependent)
-  const { data: analytics, isLoading: analyticsLoading, refetch: refetchAnalytics } = trpc.performance.getAthleteAnalytics.useQuery(
+  const { data: analytics, isLoading: analyticsLoading, isFetching: analyticsFetching, refetch: refetchAnalytics } = trpc.performance.getAthleteAnalytics.useQuery(
     { athleteId: athlete?.id || 0, date: rawDate, acwrMetric },
-    { enabled: !!athlete?.id }
+    { 
+      enabled: !!athlete?.id,
+      placeholderData: (prev) => prev
+    }
   );
 
   // Fetch team analytics for coach/viewer
@@ -1161,7 +1164,7 @@ export default function HomeScreen() {
 
   // Athlete Dashboard
   if (user?.role === "athlete") {
-    if (athleteLoading || analyticsLoading) {
+    if (athleteLoading || (analyticsLoading && !analytics)) {
       return (
         <ScreenContainer className="flex items-center justify-center bg-background">
           <ActivityIndicator size="large" color="#FF6B35" />
@@ -1708,7 +1711,11 @@ export default function HomeScreen() {
                 <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
                   {new Date(rawDate).toLocaleDateString("ja-JP", { month: "short", day: "numeric", weekday: "short" })}
                 </Text>
-                <IconSymbol size={10} name="chevron.down" color="#64748B" />
+                {analyticsFetching ? (
+                  <ActivityIndicator size="small" color="#64748B" style={{ width: 10, height: 10, transform: [{ scale: 0.6 }] }} />
+                ) : (
+                  <IconSymbol size={10} name="chevron.down" color="#64748B" />
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
