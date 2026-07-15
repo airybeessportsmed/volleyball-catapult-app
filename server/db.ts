@@ -189,7 +189,15 @@ export async function getTeamSettings(teamId: number): Promise<any> {
 
   const res = await db.select().from(teamSettings).where(eq(teamSettings.teamId, teamId)).limit(1);
   if (res.length > 0) {
-    return res[0];
+    const settings = res[0];
+    try {
+      const metrics = JSON.parse(settings.enabledMetrics) as string[];
+      if (!metrics.includes("top5JumpHeight")) {
+        metrics.push("top5JumpHeight");
+        settings.enabledMetrics = JSON.stringify(metrics);
+      }
+    } catch (e) {}
+    return settings;
   }
 
   const newSettings = {
@@ -2957,6 +2965,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       jumpVolume: p.jumpVolume ? Number(p.jumpVolume) : 0,
       totalJumps: p.totalJumps ? Number(p.totalJumps) : 0,
       avgJumpHeight: p.avgJumpHeight ? Number(p.avgJumpHeight) : 0,
+      maxJumpHeight: p.maxJumpHeight ? Number(p.maxJumpHeight) : 0,
       top5JumpHeight: p.top5JumpHeight ? Number(p.top5JumpHeight) : 0,
       sRPE: p.sRPE ? Number(p.sRPE) : 0,
       rpeValue: p.rpeValue ? Number(p.rpeValue) : 0,
@@ -2969,6 +2978,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       highIntensityDistance: p.highIntensityDistance ? Number(p.highIntensityDistance) : 0,
       avgHeartRate: p.avgHeartRate ? Number(p.avgHeartRate) : 0,
       accelCount: p.accelCount ? Number(p.accelCount) : 0,
+      maxAcceleration: p.maxAcceleration ? Number(p.maxAcceleration) : 0,
       physiologicalMarker: p.physiologicalMarker ? Number(p.physiologicalMarker) : 0,
       coachAdvice: p.coachAdvice || null,
       rawMenuData: p.rawMenuData ? JSON.parse(p.rawMenuData) : null

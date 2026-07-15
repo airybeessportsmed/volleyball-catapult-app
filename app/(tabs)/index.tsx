@@ -1953,7 +1953,7 @@ export default function HomeScreen() {
                           <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
                         </View>
                         {METRICS_MAP
-                          .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
+                          .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key) || m.key === "top5JumpHeight")
                           .map(m => (
                             <View key={m.key} style={{ width: 90, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
                               <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
@@ -1989,7 +1989,7 @@ export default function HomeScreen() {
                               </View>
 
                               {METRICS_MAP
-                                .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key))
+                                .filter(m => (analytics?.signalLight?.enabledMetrics || []).includes(m.key) || m.key === "top5JumpHeight")
                                 .map(m => {
                                   const pendingKey = `${dateStr}_${m.key}`;
 
