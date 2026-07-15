@@ -1364,7 +1364,7 @@ export async function getCsvUploadsByTeamId(teamId: number, limit: number = 20) 
   
   return db.select().from(csvUploads)
     .where(eq(csvUploads.teamId, teamId))
-    .orderBy((table) => table.createdAt)
+    .orderBy(desc(csvUploads.createdAt))
     .limit(limit);
 }
 

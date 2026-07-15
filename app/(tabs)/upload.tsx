@@ -54,7 +54,7 @@ export default function CoachUploadScreen() {
 
   // Query to fetch CSV uploads history
   const { data: uploads, isLoading: uploadsLoading, refetch: refetchUploads } = trpc.csvUpload.getByTeam.useQuery(
-    { teamId, limit: 10 },
+    { teamId, limit: 30 },
     { enabled: isAuthenticated && !!user?.teamId }
   );
 
