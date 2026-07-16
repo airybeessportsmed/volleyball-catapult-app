@@ -155,6 +155,26 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
   );
 }
 
+const getYesterday = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString("sv-SE");
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+const formatDateLabel = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function AthleteAnalyticsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams();
@@ -991,7 +1011,7 @@ export default function AthleteAnalyticsScreen() {
           {/* 左カラム: 負荷を確認 (LOAD) */}
           <View style={{ flex: 1, minWidth: 320, backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
             <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
-              負荷を確認 LOAD — 外的 / 内的応答
+              負荷を確認 LOAD — 前日 ({formatDateLabel(getYesterday(rawDate))}) の応答
             </Text>
             
             {METRICS_MAP
@@ -1023,7 +1043,7 @@ export default function AthleteAnalyticsScreen() {
           {/* 右カラム: 状態／レディネス明細 (STATE) */}
           <View style={{ flex: 1, minWidth: 320, backgroundColor: "#FFFFFF", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
             <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 6 }}>
-              状態 / レディネス 明細 STATE — 個人基準±SD
+              状態 / レディネス STATE — 当日 ({formatDateLabel(rawDate)}) の明細
             </Text>
             
             {METRICS_MAP

@@ -3067,17 +3067,6 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
   let latestSession = null;
   if (targetDateStr) {
     latestSession = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStr) || null;
-    
-    // If the target session has no Catapult data (totalJumps & totalLoad are null or 0),
-    // fallback to the most recent session that actually contains training/Catapult data.
-    if (latestSession && 
-        (latestSession.totalJumps === null || Number(latestSession.totalJumps) === 0) && 
-        (latestSession.totalLoad === null || Number(latestSession.totalLoad) === 0)) {
-      const realSession = allPerf.find(p => p.totalJumps !== null && Number(p.totalJumps) > 0);
-      if (realSession) {
-        latestSession = realSession;
-      }
-    }
   }
   if (!latestSession && allPerf.length > 0) {
     latestSession = allPerf[0];
@@ -3421,17 +3410,50 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     const baselines: Record<string, { mean: number; sd: number; val: number | null; zScore: number; status: "green" | "yellow" | "red" }> = {};
     const signals: Record<string, "green" | "yellow" | "red"> = {};
     
-    let isDataAccumulating = pastSessions.length < 3;
+    // Determine the base "today" date string for state metrics
+    const todayStr = targetDateStr || (allPerf.length > 0 ? formatDateKey(new Date(allPerf[0].date)) : formatDateKey(new Date()));
+    
+    // Determine the "yesterday" date string for load metrics
+    const todayObj = new Date(todayStr);
+    const yesterdayObj = new Date(todayObj.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = formatDateKey(yesterdayObj);
+
+    const isDataAccumulating = allPerf.slice(1).length < 3;
 
     metricDefinitions.forEach(m => {
-      const pastVals = pastSessions
+      let targetRecord: any = null;
+      let targetPastSessions: any[] = [];
+
+      if (m.type === "load") {
+        // --- 負荷（LOAD）指標: 前日のデータをもとに当日の状態への影響を測る ---
+        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr) || null;
+        if (targetRecord) {
+          const targetIndex = allPerf.findIndex(p => p.id === targetRecord.id);
+          targetPastSessions = allPerf.slice(targetIndex + 1).slice(0, baselineDays);
+        } else {
+          // 前日データがない場合のフォールバック: 最新セッションより過去のものを参照
+          targetPastSessions = allPerf.slice(1).slice(0, baselineDays);
+        }
+      } else {
+        // --- 状態（STATE）指標: 当日のデータ（朝の心拍や体調報告）をもとに測る ---
+        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr) || null;
+        if (targetRecord) {
+          const targetIndex = allPerf.findIndex(p => p.id === targetRecord.id);
+          targetPastSessions = allPerf.slice(targetIndex + 1).slice(0, baselineDays);
+        } else {
+          targetPastSessions = allPerf.slice(1).slice(0, baselineDays);
+        }
+      }
+
+      const pastVals = targetPastSessions
         .map(p => getVal(p, m.key))
         .filter((v): v is number => v !== null && !isNaN(v));
       const stats = calcMeanAndSd(pastVals);
       
-      const latestVal = latestSession ? getVal(latestSession, m.key) : null;
+      const latestVal = targetRecord ? getVal(targetRecord, m.key) : null;
       
       let zScore = 0;
+
       if (stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         zScore = (latestVal - stats.mean) / stats.sd;
       }
@@ -3718,18 +3740,7 @@ export async function getTeamAnalytics(teamId: number) {
     // --- Zスコア個人基準判定の開始 ---
     const baseDateMode = settings.baseDateMode || "rolling";
     const baseFixedDate = settings.baseFixedDate;
-    
-    let pastSessions = [];
-    if (baseDateMode === "fixed" && baseFixedDate) {
-      const fixedTime = new Date(baseFixedDate).getTime();
-      pastSessions = athletePerf.slice(1).filter(p => {
-        const pTime = new Date(p.date).getTime();
-        return pTime >= fixedTime;
-      }).slice(0, baselineDays);
-    } else {
-      pastSessions = athletePerf.slice(1, 1 + baselineDays);
-    }
-    const isDataAccumulating = pastSessions.length < 3;
+    const isDataAccumulating = athletePerf.slice(1).length < 3;
 
     const metricDefinitions = [
       { key: "totalJumps", name: "ジャンプ量", type: "load" as const },
@@ -3752,6 +3763,14 @@ export async function getTeamAnalytics(teamId: number) {
       { key: "highIntensityDistance", name: "高強度走行距離", type: "load" as const },
       { key: "avgHeartRate", name: "平均心拍数", type: "load" as const },
       { key: "physiologicalMarker", name: "生理学マーカー(CK)", type: "load" as const },
+      // SOXAI詳細指標のZスコア計算を追加
+      { key: "soxaiSleepDuration", name: "睡眠時間", type: "state" as const },
+      { key: "soxaiBedTime", name: "全就床時間", type: "state" as const },
+      { key: "soxaiAwakeTime", name: "中途覚醒時間", type: "state" as const },
+      { key: "soxaiRemSleep", name: "レム睡眠時間", type: "state" as const },
+      { key: "soxaiLightSleep", name: "浅い睡眠時間", type: "state" as const },
+      { key: "soxaiDeepSleep", name: "深い睡眠時間", type: "state" as const },
+      { key: "soxaiSleepEfficiency", name: "睡眠効率", type: "state" as const },
     ];
 
     const getVal = (p: any, key: string): number | null => {
@@ -3765,6 +3784,18 @@ export async function getTeamAnalytics(teamId: number) {
           return null;
         }
       }
+      
+      // soxaiData JSONからデータをパース
+      if (key.startsWith("soxai")) {
+        try {
+          const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+          const val = soxai[key];
+          return val !== undefined && val !== null ? Number(val) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
       const val = p[key];
       return val !== undefined && val !== null ? Number(val) : null;
     };
@@ -3772,14 +3803,46 @@ export async function getTeamAnalytics(teamId: number) {
     const baselines: Record<string, { mean: number; sd: number; val: number | null; zScore: number; status: "green" | "yellow" | "red" }> = {};
     const signals: Record<string, "green" | "yellow" | "red"> = {};
 
+    // Determine target dates for this athlete
+    const todayStr = athletePerf.length > 0 ? formatDateKey(new Date(athletePerf[0].date)) : formatDateKey(new Date());
+    const todayObj = new Date(todayStr);
+    const yesterdayObj = new Date(todayObj.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = formatDateKey(yesterdayObj);
+
     metricDefinitions.forEach(m => {
-      const pastVals = pastSessions
+      let targetRecord: any = null;
+      let targetPastSessions: any[] = [];
+
+      if (m.type === "load") {
+        // --- 負荷（LOAD）指標: 前日のデータをもとに当日の状態への影響を測る ---
+        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr) || null;
+        if (targetRecord) {
+          const targetIndex = athletePerf.findIndex(p => p.id === targetRecord.id);
+          targetPastSessions = athletePerf.slice(targetIndex + 1).slice(0, baselineDays);
+        } else {
+          // 前日データがない場合のフォールバック: 最新セッションより過去のものを参照
+          targetPastSessions = athletePerf.slice(1).slice(0, baselineDays);
+        }
+      } else {
+        // --- 状態（STATE）指標: 当日のデータ（朝の心拍や体調報告）をもとに測る ---
+        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr) || null;
+        if (targetRecord) {
+          const targetIndex = athletePerf.findIndex(p => p.id === targetRecord.id);
+          targetPastSessions = athletePerf.slice(targetIndex + 1).slice(0, baselineDays);
+        } else {
+          targetPastSessions = athletePerf.slice(1).slice(0, baselineDays);
+        }
+      }
+
+      const pastVals = targetPastSessions
         .map(p => getVal(p, m.key))
         .filter((v): v is number => v !== null && !isNaN(v));
       const stats = calcMeanAndSd(pastVals);
-      const latestVal = latestPerf ? getVal(latestPerf, m.key) : null;
+      
+      const latestVal = targetRecord ? getVal(targetRecord, m.key) : null;
       
       let zScore = 0;
+
       if (stats.sd > 0 && latestVal !== null && !isNaN(latestVal)) {
         zScore = (latestVal - stats.mean) / stats.sd;
       }

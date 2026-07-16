@@ -2932,7 +2932,7 @@ export default function HomeScreen() {
                         <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
                           <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>選手名</Text>
                         </View>
-                        {["主観", "神経筋", "生理学マーカー", "体組成", "最大"].map((catName) => (
+                        {["主観 (当日)", "神経筋 (前日)", "生理学・客観 (当日)", "体組成", "最大"].map((catName) => (
                           <View key={catName} style={{ width: 100, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
                             <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>{catName}</Text>
                           </View>
