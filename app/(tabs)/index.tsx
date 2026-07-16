@@ -3738,23 +3738,25 @@ export default function HomeScreen() {
                       const isSelected = teamSettings.baselineDays === days;
                       return (
                         <TouchableOpacity
-                          key={days}
-                          onPress={async () => {
-                            try {
-                              const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
-                              await updateSettingsMutation.mutateAsync({
-                                teamId: user?.teamId || 1,
-                                baselineDays: days,
-                                enabledMetrics: enabledArr,
-                                baseDateMode: teamSettings.baseDateMode || "rolling",
-                                baseFixedDate: teamSettings.baseFixedDate || null
-                              });
-                              refetchSettings();
-                              refetchTeam();
-                            } catch (err) {
-                              console.error("Settings update failed", err);
-                            }
-                          }}
+                           key={days}
+                           onPress={async () => {
+                             try {
+                               const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
+                               const alertingArr = teamSettings.alertingMetrics ? (JSON.parse(teamSettings.alertingMetrics) as string[]) : [];
+                               await updateSettingsMutation.mutateAsync({
+                                 teamId: user?.teamId || 1,
+                                 baselineDays: days,
+                                 enabledMetrics: enabledArr,
+                                 alertingMetrics: alertingArr,
+                                 baseDateMode: teamSettings.baseDateMode || "rolling",
+                                 baseFixedDate: teamSettings.baseFixedDate || null
+                               });
+                               refetchSettings();
+                               refetchTeam();
+                             } catch (err) {
+                               console.error("Settings update failed", err);
+                             }
+                           }}
                           style={{
                             flex: 1,
                             paddingVertical: 10,
@@ -3809,6 +3811,7 @@ export default function HomeScreen() {
                     ];
 
                     const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
+                    const alertingArr = teamSettings.alertingMetrics ? (JSON.parse(teamSettings.alertingMetrics) as string[]) : [];
 
                     return (
                       <View style={{ gap: 16 }}>
@@ -3822,39 +3825,11 @@ export default function HomeScreen() {
                                 
                                 {sub.items.map(m => {
                                   const isEnabled = enabledArr.includes(m.key);
+                                  const isAlerting = alertingArr.includes(m.key);
                                   
-                                  // Dummy reliability based on metric key to look authentic
-                                  let reliabilityText = "信頼性 高";
-                                  let reliabilityColor = "#1D4ED8";
-                                  let reliabilityBg = "#DBEAFE";
-                                  
-                                  if (m.key === "hrv") {
-                                    reliabilityText = "信頼性 中";
-                                    reliabilityColor = "#D97706";
-                                    reliabilityBg = "#FEF3C7";
-                                  }
-
                                   return (
-                                    <TouchableOpacity
+                                    <View
                                       key={m.key}
-                                      onPress={async () => {
-                                        try {
-                                          const nextArr = isEnabled
-                                            ? enabledArr.filter(k => k !== m.key)
-                                            : [...enabledArr, m.key];
-                                          await updateSettingsMutation.mutateAsync({
-                                            teamId: user?.teamId || 1,
-                                            baselineDays: teamSettings.baselineDays,
-                                            enabledMetrics: nextArr,
-                                            baseDateMode: teamSettings.baseDateMode || "rolling",
-                                            baseFixedDate: teamSettings.baseFixedDate || null
-                                          });
-                                          refetchSettings();
-                                          refetchTeam();
-                                        } catch (err) {
-                                          console.error("Settings update failed", err);
-                                        }
-                                      }}
                                       style={{
                                         flexDirection: "row",
                                         alignItems: "center",
@@ -3864,23 +3839,108 @@ export default function HomeScreen() {
                                         borderColor: "#F1F5F9"
                                       }}
                                     >
-                                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                        {/* Simple custom Checkbox */}
-                                        <View style={{
-                                          width: 18, height: 18, borderRadius: 4, borderWidth: 2,
-                                          borderColor: isEnabled ? "#2F80ED" : "#CBD5E1",
-                                          backgroundColor: isEnabled ? "#2F80ED" : "transparent",
-                                          alignItems: "center", justifyContent: "center"
-                                        }}>
-                                          {isEnabled && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
-                                        </View>
+                                      <View style={{ flex: 1, marginRight: 8 }}>
                                         <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1E293B" }}>{m.label}</Text>
                                       </View>
                                       
-                                      <View style={{ backgroundColor: reliabilityBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                        <Text style={{ fontSize: 8, fontWeight: "bold", color: reliabilityColor }}>{reliabilityText}</Text>
+                                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                                        {/* 表示トグル */}
+                                        <TouchableOpacity
+                                          onPress={async () => {
+                                            try {
+                                              let nextEnabled = isEnabled
+                                                ? enabledArr.filter(k => k !== m.key)
+                                                : [...enabledArr, m.key];
+                                              
+                                              let nextAlerting = alertingArr;
+                                              if (isEnabled && isAlerting) {
+                                                nextAlerting = alertingArr.filter(k => k !== m.key);
+                                              }
+
+                                              await updateSettingsMutation.mutateAsync({
+                                                teamId: user?.teamId || 1,
+                                                baselineDays: teamSettings.baselineDays,
+                                                enabledMetrics: nextEnabled,
+                                                alertingMetrics: nextAlerting,
+                                                baseDateMode: teamSettings.baseDateMode || "rolling",
+                                                baseFixedDate: teamSettings.baseFixedDate || null
+                                              });
+                                              refetchSettings();
+                                              refetchTeam();
+                                            } catch (err) {
+                                              console.error("Settings update failed", err);
+                                            }
+                                          }}
+                                          style={{
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            gap: 4,
+                                            paddingVertical: 4,
+                                            paddingHorizontal: 6,
+                                            borderRadius: 6,
+                                            backgroundColor: isEnabled ? "#E8F0FE" : "#F1F5F9"
+                                          }}
+                                        >
+                                          <View style={{
+                                            width: 14, height: 14, borderRadius: 3, borderWidth: 1.5,
+                                            borderColor: isEnabled ? "#2F80ED" : "#CBD5E1",
+                                            backgroundColor: isEnabled ? "#2F80ED" : "transparent",
+                                            alignItems: "center", justifyContent: "center"
+                                          }}>
+                                            {isEnabled && <Text style={{ color: "#FFFFFF", fontSize: 8, fontWeight: "bold" }}>✓</Text>}
+                                          </View>
+                                          <Text style={{ fontSize: 10, fontWeight: "bold", color: isEnabled ? "#2F80ED" : "#64748B" }}>表示</Text>
+                                        </TouchableOpacity>
+
+                                        {/* 判定トグル */}
+                                        <TouchableOpacity
+                                          onPress={async () => {
+                                            try {
+                                              let nextAlerting = isAlerting
+                                                ? alertingArr.filter(k => k !== m.key)
+                                                : [...alertingArr, m.key];
+                                              
+                                              let nextEnabled = enabledArr;
+                                              if (!isAlerting && !isEnabled) {
+                                                nextEnabled = [...enabledArr, m.key];
+                                              }
+
+                                              await updateSettingsMutation.mutateAsync({
+                                                teamId: user?.teamId || 1,
+                                                baselineDays: teamSettings.baselineDays,
+                                                enabledMetrics: nextEnabled,
+                                                alertingMetrics: nextAlerting,
+                                                baseDateMode: teamSettings.baseDateMode || "rolling",
+                                                baseFixedDate: teamSettings.baseFixedDate || null
+                                              });
+                                              refetchSettings();
+                                              refetchTeam();
+                                            } catch (err) {
+                                              console.error("Settings update failed", err);
+                                            }
+                                          }}
+                                          style={{
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            gap: 4,
+                                            paddingVertical: 4,
+                                            paddingHorizontal: 6,
+                                            borderRadius: 6,
+                                            backgroundColor: isAlerting ? "#FEE2E2" : "#F1F5F9"
+                                          }}
+                                        >
+                                          <View style={{
+                                            width: 14, height: 14, borderRadius: 3, borderWidth: 1.5,
+                                            borderColor: isAlerting ? "#EF4444" : "#CBD5E1",
+                                            backgroundColor: isAlerting ? "#EF4444" : "transparent",
+                                            alignItems: "center", justifyContent: "center"
+                                          }}>
+                                            {isAlerting && <Text style={{ color: "#FFFFFF", fontSize: 8, fontWeight: "bold" }}>✓</Text>}
+                                          </View>
+                                          <Text style={{ fontSize: 10, fontWeight: "bold", color: isAlerting ? "#EF4444" : "#64748B" }}>判定（重要）</Text>
+                                        </TouchableOpacity>
                                       </View>
-                                    </TouchableOpacity>
+                                    </View>
                                   );
                                 })}
                               </View>
@@ -3901,10 +3961,12 @@ export default function HomeScreen() {
                       onPress={async () => {
                         try {
                           const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
+                          const alertingArr = teamSettings.alertingMetrics ? (JSON.parse(teamSettings.alertingMetrics) as string[]) : [];
                           await updateSettingsMutation.mutateAsync({
                             teamId: user?.teamId || 1,
                             baselineDays: teamSettings.baselineDays,
                             enabledMetrics: enabledArr,
+                            alertingMetrics: alertingArr,
                             baseDateMode: "rolling",
                             baseFixedDate: teamSettings.baseFixedDate || null
                           });
@@ -3929,10 +3991,12 @@ export default function HomeScreen() {
                       onPress={async () => {
                         try {
                           const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
+                          const alertingArr = teamSettings.alertingMetrics ? (JSON.parse(teamSettings.alertingMetrics) as string[]) : [];
                           await updateSettingsMutation.mutateAsync({
                             teamId: user?.teamId || 1,
                             baselineDays: teamSettings.baselineDays,
                             enabledMetrics: enabledArr,
+                            alertingMetrics: alertingArr,
                             baseDateMode: "fixed",
                             baseFixedDate: teamSettings.baseFixedDate || new Date().toLocaleDateString("sv-SE")
                           });
@@ -3964,10 +4028,12 @@ export default function HomeScreen() {
                           const text = (e as any).nativeEvent.text;
                           try {
                             const enabledArr = JSON.parse(teamSettings.enabledMetrics) as string[];
+                            const alertingArr = teamSettings.alertingMetrics ? (JSON.parse(teamSettings.alertingMetrics) as string[]) : [];
                             await updateSettingsMutation.mutateAsync({
                               teamId: user?.teamId || 1,
                               baselineDays: teamSettings.baselineDays,
                               enabledMetrics: enabledArr,
+                              alertingMetrics: alertingArr,
                               baseDateMode: "fixed",
                               baseFixedDate: text || new Date().toLocaleDateString("sv-SE")
                             });

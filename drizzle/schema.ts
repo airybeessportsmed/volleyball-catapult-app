@@ -160,6 +160,7 @@ export const teamSettings = pgTable("teamSettings", {
   teamId: integer("teamId").notNull(),
   baselineDays: integer("baselineDays").default(28).notNull(),
   enabledMetrics: text("enabledMetrics").default("[]").notNull(),
+  alertingMetrics: text("alertingMetrics").default("[]").notNull(),
   baseDateMode: varchar("baseDateMode", { length: 20 }).default("rolling").notNull(),
   baseFixedDate: varchar("baseFixedDate", { length: 20 }),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

@@ -238,6 +238,7 @@ export const appRouter = router({
         teamId: z.number(),
         baselineDays: z.number(),
         enabledMetrics: z.array(z.string()),
+        alertingMetrics: z.array(z.string()),
         baseDateMode: z.string(),
         baseFixedDate: z.string().nullable().optional(),
       }))

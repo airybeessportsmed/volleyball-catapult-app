@@ -178,6 +178,10 @@ let mockPerformanceData: PerfData[] = [];
 let mockTeamSettings: any[] = [];
 
 export async function getTeamSettings(teamId: number): Promise<any> {
+  const defaultAlerting = [
+    "totalJumps", "top5JumpHeight", "totalLoad", "wellnessFatigue", "hrv"
+  ];
+
   const db = await getDb();
   if (!db) {
     let settings = mockTeamSettings.find(s => s.teamId === teamId);
@@ -191,6 +195,7 @@ export async function getTeamSettings(teamId: number): Promise<any> {
           "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
           "wellnessFatigue", "wellnessSoreness", "wellnessStress"
         ]),
+        alertingMetrics: JSON.stringify(defaultAlerting),
         baseDateMode: "rolling",
         baseFixedDate: null,
         updatedAt: new Date()
@@ -202,14 +207,39 @@ export async function getTeamSettings(teamId: number): Promise<any> {
 
   const res = await db.select().from(teamSettings).where(eq(teamSettings.teamId, teamId)).limit(1);
   if (res.length > 0) {
-    const settings = res[0];
+    const settings = res[0] as any;
+    let updated = false;
+    
     try {
       const metrics = JSON.parse(settings.enabledMetrics) as string[];
       if (!metrics.includes("top5JumpHeight")) {
         metrics.push("top5JumpHeight");
         settings.enabledMetrics = JSON.stringify(metrics);
+        updated = true;
       }
     } catch (e) {}
+
+    // alertingMetricsの初期化チェック
+    try {
+      const alerting = settings.alertingMetrics ? JSON.parse(settings.alertingMetrics) as string[] : [];
+      if (!alerting || alerting.length === 0) {
+        settings.alertingMetrics = JSON.stringify(defaultAlerting);
+        updated = true;
+      }
+    } catch (e) {
+      settings.alertingMetrics = JSON.stringify(defaultAlerting);
+      updated = true;
+    }
+
+    if (updated) {
+      await db.update(teamSettings)
+        .set({ 
+          enabledMetrics: settings.enabledMetrics,
+          alertingMetrics: settings.alertingMetrics
+        })
+        .where(eq(teamSettings.id, settings.id));
+    }
+    
     return settings;
   }
 
@@ -221,6 +251,7 @@ export async function getTeamSettings(teamId: number): Promise<any> {
       "accelCount", "maxAcceleration", "sRPE", "rpeValue", "hrv", 
       "wellnessFatigue", "wellnessSoreness", "wellnessStress"
     ]),
+    alertingMetrics: JSON.stringify(defaultAlerting),
     baseDateMode: "rolling",
     baseFixedDate: null
   };
@@ -229,9 +260,10 @@ export async function getTeamSettings(teamId: number): Promise<any> {
   return refetch[0];
 }
 
-export async function updateTeamSettings(teamId: number, settings: { baselineDays: number; enabledMetrics: string[]; baseDateMode: string; baseFixedDate?: string | null }): Promise<any> {
+export async function updateTeamSettings(teamId: number, settings: { baselineDays: number; enabledMetrics: string[]; alertingMetrics: string[]; baseDateMode: string; baseFixedDate?: string | null }): Promise<any> {
   const db = await getDb();
   const enabledStr = JSON.stringify(settings.enabledMetrics);
+  const alertingStr = JSON.stringify(settings.alertingMetrics);
   
   if (!db) {
     let mockS = mockTeamSettings.find(s => s.teamId === teamId);
@@ -241,6 +273,7 @@ export async function updateTeamSettings(teamId: number, settings: { baselineDay
         teamId,
         baselineDays: settings.baselineDays,
         enabledMetrics: enabledStr,
+        alertingMetrics: alertingStr,
         baseDateMode: settings.baseDateMode || "rolling",
         baseFixedDate: settings.baseFixedDate || null,
         updatedAt: new Date()
@@ -249,6 +282,7 @@ export async function updateTeamSettings(teamId: number, settings: { baselineDay
     } else {
       mockS.baselineDays = settings.baselineDays;
       mockS.enabledMetrics = enabledStr;
+      mockS.alertingMetrics = alertingStr;
       mockS.baseDateMode = settings.baseDateMode || "rolling";
       mockS.baseFixedDate = settings.baseFixedDate || null;
       mockS.updatedAt = new Date();
@@ -262,6 +296,7 @@ export async function updateTeamSettings(teamId: number, settings: { baselineDay
       .set({ 
         baselineDays: settings.baselineDays, 
         enabledMetrics: enabledStr, 
+        alertingMetrics: alertingStr,
         baseDateMode: settings.baseDateMode || "rolling",
         baseFixedDate: settings.baseFixedDate || null,
         updatedAt: new Date() 
@@ -272,6 +307,7 @@ export async function updateTeamSettings(teamId: number, settings: { baselineDay
       teamId,
       baselineDays: settings.baselineDays,
       enabledMetrics: enabledStr,
+      alertingMetrics: alertingStr,
       baseDateMode: settings.baseDateMode || "rolling",
       baseFixedDate: settings.baseFixedDate || null
     });
@@ -3145,6 +3181,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     const settings = await getTeamSettings(athleteInfo.teamId);
     const baselineDays = settings.baselineDays;
     const enabledMetrics = JSON.parse(settings.enabledMetrics) as string[];
+    const alertingMetrics = settings.alertingMetrics ? (JSON.parse(settings.alertingMetrics) as string[]) : [];
 
     // 当日を含まない過去のデータを取得
     const baseDateMode = settings.baseDateMode || "rolling";
@@ -3242,10 +3279,10 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       };
     });
 
-    // 総合ステータス（トグルで有効になっている指標のみで判定）
+    // 総合ステータス（重要項目として設定されている指標のみで判定）
     let overallStatus: "green" | "yellow" | "red" = "green";
     const activeSignals = Object.keys(signals)
-      .filter(k => enabledMetrics.includes(k))
+      .filter(k => alertingMetrics.includes(k))
       .map(k => signals[k]);
       
     if (activeSignals.includes("red")) {
@@ -3257,7 +3294,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     // 自動テキスト要約
     const activeZStats: Record<string, any> = {};
     const activeSignalsObj: Record<string, string> = {};
-    enabledMetrics.forEach(k => {
+    alertingMetrics.forEach(k => {
       activeZStats[k] = baselines[k];
       activeSignalsObj[k] = signals[k];
     });
@@ -3411,6 +3448,7 @@ export async function getTeamAnalytics(teamId: number) {
   const settings = await getTeamSettings(teamId);
   const baselineDays = settings.baselineDays;
   const enabledMetrics = JSON.parse(settings.enabledMetrics) as string[];
+  const alertingMetrics = settings.alertingMetrics ? (JSON.parse(settings.alertingMetrics) as string[]) : [];
 
   // 1. Fetch athletes in the team
   let athleteList: any[] = [];
@@ -3587,10 +3625,10 @@ export async function getTeamAnalytics(teamId: number) {
       };
     });
 
-    // 総合ステータス（トグルで有効になっている指標のみで判定）
+    // 総合ステータス（重要項目として設定されている指標のみで判定）
     let overallStatus: "green" | "yellow" | "red" = "green";
     const activeSignals = Object.keys(signals)
-      .filter(k => enabledMetrics.includes(k))
+      .filter(k => alertingMetrics.includes(k))
       .map(k => signals[k]);
       
     if (activeSignals.includes("red")) {
@@ -3601,7 +3639,7 @@ export async function getTeamAnalytics(teamId: number) {
 
     const activeZStats: Record<string, any> = {};
     const activeSignalsObj: Record<string, string> = {};
-    enabledMetrics.forEach(k => {
+    alertingMetrics.forEach(k => {
       activeZStats[k] = baselines[k];
       activeSignalsObj[k] = signals[k];
     });
