@@ -247,6 +247,31 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(latest.jumpZone3Count).toBe(1); // 30-40cm zone (35cm)
     expect(latest.jumpZone4Count).toBe(1); // 40-50cm zone (45cm)
   });
+
+  it("should parse new SOXAI wide format using jersey number headers", async () => {
+    // #1 (Sakura) and #4 (Hinata) are mapped in mock data
+    const csv = `日時,QoLスコア (#1 ユウキ),睡眠スコア (#1 ユウキ),睡眠時HRV_RMSSD_平均 (ms) (#1 ユウキ),睡眠時心拍_平均 (bpm) (#1 ユウキ),体調スコア (#1 ユウキ),歩数 (#1 ユウキ),QoLスコア (#4 バタコ),睡眠スコア (#4 バタコ),睡眠時HRV_RMSSD_平均 (ms) (#4 バタコ)
+2026/06/04,80,90,75.5,55,85,8500,70,88,68.2`;
+
+    const result = await importPerformanceCsv(1, 1, csv, "soxai_new.csv");
+    expect(result.success).toBe(true);
+
+    const recordsSakura = await getPerformanceDataByAthleteId(1);
+    const latestSakura = recordsSakura.find(p => formatDateKey(p.date) === "2026-06-04");
+    expect(latestSakura).toBeDefined();
+    expect(Number(latestSakura!.wellnessSleep)).toBe(90);
+    expect(Number(latestSakura!.hrv)).toBe(75.5);
+    expect(latestSakura!.avgHeartRate).toBe(55);
+    expect(Number(latestSakura!.wellnessFatigue)).toBe(6); // scaled 85/100 * 7 = 5.95 -> 6
+    expect(Number(latestSakura!.wellnessStress)).toBe(6); // scaled 80/100 * 7 = 5.6 -> 6
+    expect(latestSakura!.accelCount).toBe(8500);
+
+    const recordsHinata = await getPerformanceDataByAthleteId(2);
+    const latestHinata = recordsHinata.find(p => formatDateKey(p.date) === "2026-06-04");
+    expect(latestHinata).toBeDefined();
+    expect(Number(latestHinata!.wellnessSleep)).toBe(88);
+    expect(Number(latestHinata!.hrv)).toBe(68.2);
+  });
 });
 
 function formatDateKey(date: Date) {

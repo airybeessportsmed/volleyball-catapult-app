@@ -1902,9 +1902,9 @@ export async function importPerformanceCsv(
     }
 
     let headerLine = lines[0];
-    const isSoxaiType = csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数");
+    const isSoxaiType = (csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数")) || (csvText.includes("QoLスコア") && csvText.includes("睡眠スコア"));
     if (isSoxaiType) {
-      const foundHeader = lines.find(l => l.includes("タイムスタンプ"));
+      const foundHeader = lines.find(l => l.includes("タイムスタンプ") || l.includes("日時"));
       if (foundHeader) headerLine = foundHeader;
     }
 
@@ -1927,7 +1927,7 @@ export async function importPerformanceCsv(
     // Detection flags for 7 user formats
     const isWellnessOnetap = findHeaderIndex(["項目名", "項目"]) !== -1 && findHeaderIndex(["値", "スコア", "回答", "value"]) !== -1 && (findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name"]) !== -1 || findHeaderIndex(["内訳"]) !== -1);
     const isSRPE = findHeaderIndex(["トレーニング実施日"]) !== -1 && findHeaderIndex(["Session RPE"]) !== -1;
-    const isSoxai = csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数");
+    const isSoxai = (csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数")) || (csvText.includes("QoLスコア") && csvText.includes("睡眠スコア"));
     
     // Enhanced IMA Log detection to prevent misclassification as isMenuLoadLog
     const isImaLog = 
@@ -2154,65 +2154,167 @@ export async function importPerformanceCsv(
       }
 
     } else if (isSoxai) {
-      let currentEmail = "";
-      interface SoxaiRecord {
-        email: string;
-        dateObj: Date;
-        sleepScore: number;
-        rhr: number;
-        hrvVal: number;
-      }
-      const soxaiRecords: SoxaiRecord[] = [];
+      const isWideSoxai = headers.some(h => h.includes("(#"));
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        if (line.includes("@") && !line.includes("\t") && !line.includes(",")) {
-          currentEmail = line.replace(/["']/g, "").trim();
-          continue;
+      if (isWideSoxai) {
+        // --- 新形式：全選手横並びのワイドフォーマット ---
+        interface WideSoxaiMapping {
+          colIdx: number;
+          athleteId: number;
+          metricKey: string;
         }
+        const mappings: WideSoxaiMapping[] = [];
 
-        if (line.includes("タイムスタンプ")) continue;
+        headers.forEach((h, colIdx) => {
+          const match = h.match(/#(\d+)/);
+          if (match) {
+            const jerseyNumber = parseInt(match[1], 10);
+            const matchedAthlete = teamAthletes.find(a => a.jerseyNumber === jerseyNumber);
+            if (matchedAthlete) {
+              let metricKey = "";
+              if (h.includes("睡眠スコア")) {
+                metricKey = "wellnessSleep";
+              } else if (h.includes("HRV_RMSSD_平均") || h.includes("睡眠時HRV_RMSSD_平均")) {
+                metricKey = "hrv";
+              } else if (h.includes("心拍_平均") || h.includes("睡眠時心拍_平均")) {
+                metricKey = "avgHeartRate";
+              } else if (h.includes("体調スコア")) {
+                metricKey = "wellnessFatigue";
+              } else if (h.includes("QoLスコア")) {
+                metricKey = "wellnessStress";
+              } else if (h.includes("歩数")) {
+                metricKey = "accelCount";
+              }
 
-        const vals = parseCsvLine(line);
-        if (vals.length < 16 || !currentEmail) continue;
-
-        const dateStr = vals[0];
-        const sleepScore = parseInt(vals[2], 10);
-        const rhr = parseInt(vals[14], 10);
-        const hrvVal = parseFloat(vals[15]);
-
-        if (!dateStr) continue;
-        const dateObj = new Date(dateStr);
-        if (isNaN(dateObj.getTime())) continue;
-
-        soxaiRecords.push({ email: currentEmail, dateObj, sleepScore, rhr, hrvVal });
-      }
-
-      for (const rec of soxaiRecords) {
-        const matchedAthlete = teamAthletes.find(a => 
-          (a.soxaiEmail && a.soxaiEmail.toLowerCase() === rec.email.toLowerCase()) ||
-          (a.user?.email?.toLowerCase() === rec.email.toLowerCase())
-        );
-        if (!matchedAthlete) {
-          unregisteredSet.add(rec.email);
-          continue;
-        }
-
-        const sleepVal = isNaN(rec.sleepScore) ? undefined : Math.round(rec.sleepScore);
-
-        await mergePerformanceData(db, teamId, {
-          athleteId: matchedAthlete.id,
-          teamId,
-          date: rec.dateObj,
-          wellnessSleep: sleepVal,
-          hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
-          avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
-          rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+              if (metricKey) {
+                mappings.push({ colIdx, athleteId: matchedAthlete.id, metricKey });
+              }
+            } else {
+              unregisteredSet.add(`#${jerseyNumber}`);
+            }
+          }
         });
-        importedCount++;
+
+        // 2行目以降のデータ行をループ
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line || line.includes("タイムスタンプ") || line.includes("日時")) continue;
+
+          const vals = parseCsvLine(line);
+          const dateStr = vals[0];
+          if (!dateStr) continue;
+
+          const dateObj = new Date(dateStr);
+          if (isNaN(dateObj.getTime())) continue;
+
+          // 同一選手・同一日付のパラメータを統合してmergeするためのバッファ
+          const athleteBatch: Record<number, any> = {};
+
+          mappings.forEach(m => {
+            const valStr = vals[m.colIdx];
+            if (valStr && valStr.trim() !== "") {
+              const val = parseFloat(valStr);
+              if (!isNaN(val)) {
+                if (!athleteBatch[m.athleteId]) {
+                  athleteBatch[m.athleteId] = {
+                    athleteId: m.athleteId,
+                    teamId,
+                    date: dateObj,
+                    sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+                    rawCsvData: JSON.stringify({ note: "SOXAI wide biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+                  };
+                }
+
+                const rec = athleteBatch[m.athleteId];
+                if (m.metricKey === "wellnessSleep") {
+                  rec.wellnessSleep = Math.round(val);
+                } else if (m.metricKey === "hrv") {
+                  rec.hrv = val.toFixed(2);
+                } else if (m.metricKey === "avgHeartRate") {
+                  rec.avgHeartRate = Math.round(val);
+                } else if (m.metricKey === "wellnessFatigue") {
+                  // SOXAIのスコア（0-100）をアプリの基準（1-7）へ変換（例: スコアが高い＝コンディション良好なので、1-7スケールにマージ。SOXAI体調スコアは100に近いほど良好）
+                  // アプリのwellnessFatigueは「1:最悪 〜 7:良好」
+                  rec.wellnessFatigue = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                } else if (m.metricKey === "wellnessStress") {
+                  // 同様に、QoLスコア（0-100）を「1:最悪 〜 7:良好」へマッピング
+                  rec.wellnessStress = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                } else if (m.metricKey === "accelCount") {
+                  rec.accelCount = Math.round(val);
+                }
+              }
+            }
+          });
+
+          // 選手ごとにマージ処理
+          for (const athId of Object.keys(athleteBatch).map(Number)) {
+            await mergePerformanceData(db, teamId, athleteBatch[athId]);
+            importedCount++;
+          }
+        }
+
+      } else {
+        // --- 従来の形式：選手別セクションの縦フォーマット ---
+        let currentEmail = "";
+        interface SoxaiRecord {
+          email: string;
+          dateObj: Date;
+          sleepScore: number;
+          rhr: number;
+          hrvVal: number;
+        }
+        const soxaiRecords: SoxaiRecord[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          if (line.includes("@") && !line.includes("\t") && !line.includes(",")) {
+            currentEmail = line.replace(/["']/g, "").trim();
+            continue;
+          }
+
+          if (line.includes("タイムスタンプ")) continue;
+
+          const vals = parseCsvLine(line);
+          if (vals.length < 16 || !currentEmail) continue;
+
+          const dateStr = vals[0];
+          const sleepScore = parseInt(vals[2], 10);
+          const rhr = parseInt(vals[14], 10);
+          const hrvVal = parseFloat(vals[15]);
+
+          if (!dateStr) continue;
+          const dateObj = new Date(dateStr);
+          if (isNaN(dateObj.getTime())) continue;
+
+          soxaiRecords.push({ email: currentEmail, dateObj, sleepScore, rhr, hrvVal });
+        }
+
+        for (const rec of soxaiRecords) {
+          const matchedAthlete = teamAthletes.find(a => 
+            (a.soxaiEmail && a.soxaiEmail.toLowerCase() === rec.email.toLowerCase()) ||
+            (a.user?.email?.toLowerCase() === rec.email.toLowerCase())
+          );
+          if (!matchedAthlete) {
+            unregisteredSet.add(rec.email);
+            continue;
+          }
+
+          const sleepVal = isNaN(rec.sleepScore) ? undefined : Math.round(rec.sleepScore);
+
+          await mergePerformanceData(db, teamId, {
+            athleteId: matchedAthlete.id,
+            teamId,
+            date: rec.dateObj,
+            wellnessSleep: sleepVal,
+            hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
+            avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
+            sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+            rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+          });
+          importedCount++;
+        }
       }
 
     } else if (isImaLog) {
