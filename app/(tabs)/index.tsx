@@ -3843,10 +3843,12 @@ export default function HomeScreen() {
                                         <Text style={{ fontSize: 12, fontWeight: "bold", color: "#1E293B" }}>{m.label}</Text>
                                       </View>
                                       
-                                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center", zIndex: 20 }}>
                                         {/* 表示トグル */}
                                         <TouchableOpacity
+                                          activeOpacity={0.6}
                                           onPress={async () => {
+                                            alert("表示トグルがクリックされました: " + m.label);
                                             try {
                                               let nextEnabled = isEnabled
                                                 ? enabledArr.filter(k => k !== m.key)
@@ -3876,10 +3878,11 @@ export default function HomeScreen() {
                                             flexDirection: "row",
                                             alignItems: "center",
                                             gap: 4,
-                                            paddingVertical: 4,
-                                            paddingHorizontal: 6,
+                                            paddingVertical: 8,
+                                            paddingHorizontal: 10,
                                             borderRadius: 6,
-                                            backgroundColor: isEnabled ? "#E8F0FE" : "#F1F5F9"
+                                            backgroundColor: isEnabled ? "#E8F0FE" : "#F1F5F9",
+                                            zIndex: 30
                                           }}
                                         >
                                           <View style={{
@@ -3895,7 +3898,9 @@ export default function HomeScreen() {
 
                                         {/* 判定トグル */}
                                         <TouchableOpacity
+                                          activeOpacity={0.6}
                                           onPress={async () => {
+                                            alert("判定トグルがクリックされました: " + m.label);
                                             try {
                                               let nextAlerting = isAlerting
                                                 ? alertingArr.filter(k => k !== m.key)
@@ -3925,10 +3930,11 @@ export default function HomeScreen() {
                                             flexDirection: "row",
                                             alignItems: "center",
                                             gap: 4,
-                                            paddingVertical: 4,
-                                            paddingHorizontal: 6,
+                                            paddingVertical: 8,
+                                            paddingHorizontal: 10,
                                             borderRadius: 6,
-                                            backgroundColor: isAlerting ? "#FEE2E2" : "#F1F5F9"
+                                            backgroundColor: isAlerting ? "#FEE2E2" : "#F1F5F9",
+                                            zIndex: 30
                                           }}
                                         >
                                           <View style={{
