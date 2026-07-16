@@ -3867,8 +3867,9 @@ export default function HomeScreen() {
                                               });
                                               refetchSettings();
                                               refetchTeam();
-                                            } catch (err) {
+                                            } catch (err: any) {
                                               console.error("Settings update failed", err);
+                                              alert("表示設定の更新に失敗しました: " + (err.message || String(err)));
                                             }
                                           }}
                                           style={{
@@ -3915,8 +3916,9 @@ export default function HomeScreen() {
                                               });
                                               refetchSettings();
                                               refetchTeam();
-                                            } catch (err) {
+                                            } catch (err: any) {
                                               console.error("Settings update failed", err);
+                                              alert("判定設定の更新に失敗しました: " + (err.message || String(err)));
                                             }
                                           }}
                                           style={{
