@@ -237,6 +237,16 @@ export const METRICS_MAP = [
   { key: "sRpeSandC", label: "sRPE (S&C)", desc: "内的負荷: フィジカル・S&Cの sRPE", unit: "AU", polarity: "positive", category: "load_int" },
   { key: "rpeValue", label: "主観強度 (RPE)", desc: "内の負荷: 練習の主観的きつさ(1-10)", unit: "強度", polarity: "positive", category: "load_int" },
   { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
+  { key: "wellnessSleep", label: "睡眠スコア (SOXAI)", desc: "客観状態: SOXAI睡眠総合スコア", unit: "点", polarity: "positive", category: "state_obj" },
+  { key: "soxaiSleepDuration", label: "睡眠時間 (SOXAI)", desc: "客観状態: 実睡眠時間", unit: "分", polarity: "positive", category: "state_obj" },
+  { key: "soxaiBedTime", label: "全就床時間 (SOXAI)", desc: "客観状態: ベッドに入っていた時間", unit: "分", polarity: "positive", category: "state_obj" },
+  { key: "soxaiAwakeTime", label: "中途覚醒時間 (SOXAI)", desc: "客観状態: 睡眠中に目が覚めていた時間", unit: "分", polarity: "negative", category: "state_obj" },
+  { key: "soxaiRemSleep", label: "レム睡眠時間 (SOXAI)", desc: "客観状態: 浅いレム睡眠の時間", unit: "分", polarity: "positive", category: "state_obj" },
+  { key: "soxaiLightSleep", label: "浅い睡眠時間 (SOXAI)", desc: "客観状態: ノンレム浅い睡眠の時間", unit: "分", polarity: "positive", category: "state_obj" },
+  { key: "soxaiDeepSleep", label: "深い睡眠時間 (SOXAI)", desc: "客観状態: ノンレム深い睡眠の時間", unit: "分", polarity: "positive", category: "state_obj" },
+  { key: "soxaiSleepEfficiency", label: "睡眠効率 (SOXAI)", desc: "客観状態: 睡眠効率割合", unit: "%", polarity: "positive", category: "state_obj" },
+  { key: "soxaiBedTimeStr", label: "就床時刻 (SOXAI)", desc: "客観状態: ベッドに入った時刻", unit: "時刻", polarity: "positive", category: "state_obj" },
+  { key: "soxaiWakeTimeStr", label: "起床時刻 (SOXAI)", desc: "客観状態: 目が覚めた時刻", unit: "時刻", polarity: "positive", category: "state_obj" },
   { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度(低スコア推奨)", unit: "点", polarity: "negative", category: "state_subj" },
   { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "点", polarity: "positive", category: "state_subj" },
   { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "点", polarity: "positive", category: "state_subj" },
@@ -2934,13 +2944,30 @@ export default function HomeScreen() {
                         const categories = [
                           { label: "主観", keys: ["wellnessFatigue", "wellnessSoreness", "wellnessStress"], polarity: "negative" as const },
                           { label: "神経筋", keys: ["top5JumpHeight"], polarity: "positive" as const },
-                          { label: "生理学マーカー", keys: ["physiologicalMarker"], polarity: "positive" as const },
+                          { 
+                            label: "生理学・客観", 
+                            keys: [
+                              "physiologicalMarker", 
+                              "hrv", 
+                              "wellnessSleep", 
+                              "soxaiSleepDuration", 
+                              "soxaiBedTime", 
+                              "soxaiAwakeTime", 
+                              "soxaiRemSleep", 
+                              "soxaiLightSleep", 
+                              "soxaiDeepSleep", 
+                              "soxaiSleepEfficiency"
+                            ], 
+                            polarity: "positive" as const 
+                          },
                           { label: "体組成", keys: [], polarity: "positive" as const }
                         ];
 
                         let maxCatZ = 0;
                         let maxCatStatus: "green" | "yellow" | "red" = "green";
                         let anyCatHasValue = false;
+                        
+                        const statusOrder = { green: 0, yellow: 1, red: 2 };
 
                         const catVals = categories.map(cat => {
                           let worstZ = 0;
@@ -2952,15 +2979,15 @@ export default function HomeScreen() {
                             if (base && base.val !== null && base.val !== undefined) {
                               hasValue = true;
                               anyCatHasValue = true;
-                              // If absolute Z is larger, consider it worst deviance
-                              if (Math.abs(base.zScore) > Math.abs(worstZ)) {
+                              // If absolute Z is larger or status is worse, consider it worst deviance
+                              if (statusOrder[base.status] > statusOrder[worstStatus] || (statusOrder[base.status] === statusOrder[worstStatus] && Math.abs(base.zScore) > Math.abs(worstZ))) {
                                 worstZ = base.zScore;
                                 worstStatus = base.status;
                               }
                             }
                           });
 
-                          if (hasValue && Math.abs(worstZ) > Math.abs(maxCatZ)) {
+                          if (hasValue && (statusOrder[worstStatus] > statusOrder[maxCatStatus] || (statusOrder[worstStatus] === statusOrder[maxCatStatus] && Math.abs(worstZ) > Math.abs(maxCatZ)))) {
                             maxCatZ = worstZ;
                             maxCatStatus = worstStatus;
                           }
@@ -2978,7 +3005,12 @@ export default function HomeScreen() {
                             </TouchableOpacity>
 
                             {catVals.map((cv, cIdx) => {
-                              const cellStyle = getCellStyle(cv.z, cv.polarity);
+                              const getStatusStyle = (status: "green" | "yellow" | "red") => {
+                                if (status === "red") return { bg: "#FCE4D6", text: "#C00000" }; // worse2 相当
+                                if (status === "yellow") return { bg: "#FFF2CC", text: "#7F6000" }; // worse1 相当
+                                return { bg: "#FFFFFF", text: "#1E293B" }; // green はシンプルに白
+                              };
+                              const cellStyle = getStatusStyle(cv.status);
                               const displayText = cv.z === 0 ? "0.0" : (cv.z > 0 ? `+${cv.z.toFixed(1)}` : `${cv.z.toFixed(1)}`);
                               const isBodyComposition = cv.label === "体組成";
                               const showHyphen = isBodyComposition || !cv.hasValue;

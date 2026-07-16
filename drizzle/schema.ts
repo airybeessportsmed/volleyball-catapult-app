@@ -127,6 +127,7 @@ export const performanceData = pgTable("performanceData", {
   highIntensityDistance: numeric("highIntensityDistance", { precision: 7, scale: 2 }),
   avgHeartRate: integer("avgHeartRate"),
   physiologicalMarker: numeric("physiologicalMarker", { precision: 7, scale: 2 }),
+  soxaiData: text("soxaiData"),
   
   isAnomaly: boolean("isAnomaly").default(false).notNull(),
   anomalyDetails: text("anomalyDetails"),

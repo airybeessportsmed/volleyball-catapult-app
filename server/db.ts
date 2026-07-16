@@ -497,6 +497,7 @@ const generateDemoPerformanceData = () => {
       wellnessSoreness: null,
       wellnessStress: null,
       rawCsvData: null,
+      soxaiData: null,
       isAnomaly: false,
       anomalyDetails: null,
       isCorrected: false,
@@ -567,6 +568,7 @@ const generateDemoPerformanceData = () => {
       wellnessSoreness: null,
       wellnessStress: null,
       rawCsvData: null,
+      soxaiData: null,
       isAnomaly: false,
       anomalyDetails: null,
       isCorrected: false,
@@ -1733,6 +1735,26 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   }
   const finalRawMenuData = Object.keys(mergedMenuObj).length > 0 ? JSON.stringify(mergedMenuObj) : null;
 
+  // Merge soxaiData JSON structures safely
+  let mergedSoxaiObj: any = {};
+  if (existing && existing.soxaiData) {
+    try {
+      const parsed = JSON.parse(existing.soxaiData);
+      if (parsed && typeof parsed === "object") {
+        mergedSoxaiObj = { ...parsed };
+      }
+    } catch (e) {}
+  }
+  if (data.soxaiData) {
+    try {
+      const parsed = typeof data.soxaiData === "string" ? JSON.parse(data.soxaiData) : data.soxaiData;
+      if (parsed && typeof parsed === "object") {
+        mergedSoxaiObj = { ...mergedSoxaiObj, ...parsed };
+      }
+    } catch (e) {}
+  }
+  const finalSoxaiData = Object.keys(mergedSoxaiObj).length > 0 ? JSON.stringify(mergedSoxaiObj) : null;
+
   const mergedData = {
     ...data,
     sessionType: mergeField(data.sessionType, existing?.sessionType, defaultSessionType),
@@ -1799,6 +1821,7 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     avgHeartRate: mergeField(data.avgHeartRate, existing?.avgHeartRate),
     physiologicalMarker: mergeField(data.physiologicalMarker, existing?.physiologicalMarker),
     coachAdvice: mergeField(data.coachAdvice, existing?.coachAdvice),
+    soxaiData: finalSoxaiData,
     rawCsvData: newRawCsvData,
   };
 
@@ -2184,6 +2207,24 @@ export async function importPerformanceCsv(
                 metricKey = "wellnessStress";
               } else if (h.includes("歩数")) {
                 metricKey = "accelCount";
+              } else if (h.includes("睡眠時間")) {
+                metricKey = "soxaiSleepDuration";
+              } else if (h.includes("全就床時間")) {
+                metricKey = "soxaiBedTime";
+              } else if (h.includes("中途覚醒時間")) {
+                metricKey = "soxaiAwakeTime";
+              } else if (h.includes("レム睡眠時間")) {
+                metricKey = "soxaiRemSleep";
+              } else if (h.includes("浅い睡眠時間")) {
+                metricKey = "soxaiLightSleep";
+              } else if (h.includes("深い睡眠時間")) {
+                metricKey = "soxaiDeepSleep";
+              } else if (h.includes("就床時刻")) {
+                metricKey = "soxaiBedTimeStr";
+              } else if (h.includes("起床時刻")) {
+                metricKey = "soxaiWakeTimeStr";
+              } else if (h.includes("睡眠効率")) {
+                metricKey = "soxaiSleepEfficiency";
               }
 
               if (metricKey) {
@@ -2195,7 +2236,7 @@ export async function importPerformanceCsv(
           }
         });
 
-        // 2行目以降のデータ行をループ
+        // 2行目以降 of データ行をループ
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line || line.includes("タイムスタンプ") || line.includes("日時")) continue;
@@ -2213,34 +2254,39 @@ export async function importPerformanceCsv(
           mappings.forEach(m => {
             const valStr = vals[m.colIdx];
             if (valStr && valStr.trim() !== "") {
-              const val = parseFloat(valStr);
-              if (!isNaN(val)) {
-                if (!athleteBatch[m.athleteId]) {
-                  athleteBatch[m.athleteId] = {
-                    athleteId: m.athleteId,
-                    teamId,
-                    date: dateObj,
-                    sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
-                    rawCsvData: JSON.stringify({ note: "SOXAI wide biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
-                  };
-                }
+              if (!athleteBatch[m.athleteId]) {
+                athleteBatch[m.athleteId] = {
+                  athleteId: m.athleteId,
+                  teamId,
+                  date: dateObj,
+                  sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
+                  rawCsvData: JSON.stringify({ note: "SOXAI wide biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" }),
+                  soxaiData: {}
+                };
+              }
 
-                const rec = athleteBatch[m.athleteId];
-                if (m.metricKey === "wellnessSleep") {
-                  rec.wellnessSleep = Math.round(val);
-                } else if (m.metricKey === "hrv") {
-                  rec.hrv = val.toFixed(2);
-                } else if (m.metricKey === "avgHeartRate") {
-                  rec.avgHeartRate = Math.round(val);
-                } else if (m.metricKey === "wellnessFatigue") {
-                  // SOXAIのスコア（0-100）をアプリの基準（1-7）へ変換（例: スコアが高い＝コンディション良好なので、1-7スケールにマージ。SOXAI体調スコアは100に近いほど良好）
-                  // アプリのwellnessFatigueは「1:最悪 〜 7:良好」
-                  rec.wellnessFatigue = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
-                } else if (m.metricKey === "wellnessStress") {
-                  // 同様に、QoLスコア（0-100）を「1:最悪 〜 7:良好」へマッピング
-                  rec.wellnessStress = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
-                } else if (m.metricKey === "accelCount") {
-                  rec.accelCount = Math.round(val);
+              const rec = athleteBatch[m.athleteId];
+              
+              if (m.metricKey === "soxaiBedTimeStr" || m.metricKey === "soxaiWakeTimeStr") {
+                rec.soxaiData[m.metricKey] = valStr.trim();
+              } else {
+                const val = parseFloat(valStr);
+                if (!isNaN(val)) {
+                  if (m.metricKey === "wellnessSleep") {
+                    rec.wellnessSleep = Math.round(val);
+                  } else if (m.metricKey === "hrv") {
+                    rec.hrv = val.toFixed(2);
+                  } else if (m.metricKey === "avgHeartRate") {
+                    rec.avgHeartRate = Math.round(val);
+                  } else if (m.metricKey === "wellnessFatigue") {
+                    rec.wellnessFatigue = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                  } else if (m.metricKey === "wellnessStress") {
+                    rec.wellnessStress = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                  } else if (m.metricKey === "accelCount") {
+                    rec.accelCount = Math.round(val);
+                  } else {
+                    rec.soxaiData[m.metricKey] = val;
+                  }
                 }
               }
             }
@@ -2248,7 +2294,9 @@ export async function importPerformanceCsv(
 
           // 選手ごとにマージ処理
           for (const athId of Object.keys(athleteBatch).map(Number)) {
-            await mergePerformanceData(db, teamId, athleteBatch[athId]);
+            const rawRec = athleteBatch[athId];
+            rawRec.soxaiData = JSON.stringify(rawRec.soxaiData);
+            await mergePerformanceData(db, teamId, rawRec);
             importedCount++;
           }
         }
@@ -3333,6 +3381,14 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       { key: "highIntensityDistance", name: "高強度走行距離", type: "load" as const },
       { key: "avgHeartRate", name: "平均心拍数", type: "load" as const },
       { key: "physiologicalMarker", name: "生理学マーカー(CK)", type: "load" as const },
+      // SOXAI詳細指標のZスコア計算を追加
+      { key: "soxaiSleepDuration", name: "睡眠時間", type: "state" as const },
+      { key: "soxaiBedTime", name: "全就床時間", type: "state" as const },
+      { key: "soxaiAwakeTime", name: "中途覚醒時間", type: "state" as const },
+      { key: "soxaiRemSleep", name: "レム睡眠時間", type: "state" as const },
+      { key: "soxaiLightSleep", name: "浅い睡眠時間", type: "state" as const },
+      { key: "soxaiDeepSleep", name: "深い睡眠時間", type: "state" as const },
+      { key: "soxaiSleepEfficiency", name: "睡眠効率", type: "state" as const },
     ];
 
     const getVal = (p: any, key: string): number | null => {
@@ -3346,6 +3402,18 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
           return null;
         }
       }
+      
+      // soxaiData JSONからデータをパース
+      if (key.startsWith("soxai")) {
+        try {
+          const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+          const val = soxai[key];
+          return val !== undefined && val !== null ? Number(val) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
       const val = p[key];
       return val !== undefined && val !== null ? Number(val) : null;
     };
