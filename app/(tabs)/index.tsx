@@ -2940,14 +2940,18 @@ export default function HomeScreen() {
 
                         let maxCatZ = 0;
                         let maxCatStatus: "green" | "yellow" | "red" = "green";
+                        let anyCatHasValue = false;
 
                         const catVals = categories.map(cat => {
                           let worstZ = 0;
                           let worstStatus: "green" | "yellow" | "red" = "green";
+                          let hasValue = false;
 
                           cat.keys.forEach(k => {
                             const base = ath.baselines?.[k];
-                            if (base) {
+                            if (base && base.val !== null && base.val !== undefined) {
+                              hasValue = true;
+                              anyCatHasValue = true;
                               // If absolute Z is larger, consider it worst deviance
                               if (Math.abs(base.zScore) > Math.abs(worstZ)) {
                                 worstZ = base.zScore;
@@ -2956,12 +2960,12 @@ export default function HomeScreen() {
                             }
                           });
 
-                          if (Math.abs(worstZ) > Math.abs(maxCatZ)) {
+                          if (hasValue && Math.abs(worstZ) > Math.abs(maxCatZ)) {
                             maxCatZ = worstZ;
                             maxCatStatus = worstStatus;
                           }
 
-                          return { label: cat.label, z: worstZ, status: worstStatus, polarity: cat.polarity };
+                          return { label: cat.label, z: worstZ, status: worstStatus, polarity: cat.polarity, hasValue };
                         });
 
                         return (
@@ -2977,16 +2981,17 @@ export default function HomeScreen() {
                               const cellStyle = getCellStyle(cv.z, cv.polarity);
                               const displayText = cv.z === 0 ? "0.0" : (cv.z > 0 ? `+${cv.z.toFixed(1)}` : `${cv.z.toFixed(1)}`);
                               const isBodyComposition = cv.label === "体組成";
+                              const showHyphen = isBodyComposition || !cv.hasValue;
                               return (
                                 <View key={cIdx} style={{
                                   width: 100, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center",
-                                  backgroundColor: isBodyComposition ? "#FFF" : cellStyle.bg
+                                  backgroundColor: showHyphen ? "#FFF" : cellStyle.bg
                                 }}>
                                   <Text style={{
                                     fontSize: 11, fontWeight: "bold",
-                                    color: isBodyComposition ? "#94A3B8" : cellStyle.text
+                                    color: showHyphen ? "#94A3B8" : cellStyle.text
                                   }}>
-                                    {isBodyComposition ? "-" : displayText}
+                                    {showHyphen ? "-" : displayText}
                                   </Text>
                                 </View>
                               );
@@ -2995,13 +3000,13 @@ export default function HomeScreen() {
                             {/* Max column */}
                             <View style={{
                               width: 100, height: "100%", alignItems: "center", justifyContent: "center",
-                              backgroundColor: (maxCatStatus as string) === "red" ? "#FCE4D6" : (maxCatStatus as string) === "yellow" ? "#FFF2CC" : "#E2F0D9"
+                              backgroundColor: !anyCatHasValue ? "#FFF" : ((maxCatStatus as string) === "red" ? "#FCE4D6" : (maxCatStatus as string) === "yellow" ? "#FFF2CC" : "#E2F0D9")
                             }}>
                               <Text style={{
                                 fontSize: 11, fontWeight: "800",
-                                color: (maxCatStatus as string) === "red" ? "#C00000" : (maxCatStatus as string) === "yellow" ? "#7F6000" : "#385723"
+                                color: !anyCatHasValue ? "#94A3B8" : ((maxCatStatus as string) === "red" ? "#C00000" : (maxCatStatus as string) === "yellow" ? "#7F6000" : "#385723")
                               }}>
-                                {maxCatZ > 0 ? `+${maxCatZ.toFixed(1)}` : maxCatZ.toFixed(1)}
+                                {!anyCatHasValue ? "-" : (maxCatZ > 0 ? `+${maxCatZ.toFixed(1)}` : maxCatZ.toFixed(1))}
                               </Text>
                             </View>
                           </View>
