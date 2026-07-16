@@ -177,6 +177,21 @@ export default function AthleteAnalyticsScreen() {
     }
   );
 
+  // Automatically adjust selected date state to match the returned actual session date.
+  // This ensures if a player has pre-entered today's wellness check but has no catapult load data yet,
+  // we fallback to the latest training day and display that day in the calendar header.
+  React.useEffect(() => {
+    if (analytics?.latestSession?.date) {
+      const actualDate = new Date(analytics.latestSession.date);
+      const actualDateStr = actualDate.toLocaleDateString("sv-SE");
+      if (actualDateStr !== rawDate) {
+        setRawDate(actualDateStr);
+        setCalYear(actualDate.getFullYear());
+        setCalMonth(actualDate.getMonth() + 1);
+      }
+    }
+  }, [analytics?.latestSession?.date, rawDate]);
+
   const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
   const rollbackAnomalyMutation = trpc.performance.rollbackAnomaly.useMutation();
 

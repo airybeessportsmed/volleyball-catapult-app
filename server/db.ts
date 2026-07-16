@@ -2917,6 +2917,17 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
   let latestSession = null;
   if (targetDateStr) {
     latestSession = allPerf.find(p => formatDateKey(new Date(p.date)) === targetDateStr) || null;
+    
+    // If the target session has no Catapult data (totalJumps & totalLoad are null or 0),
+    // fallback to the most recent session that actually contains training/Catapult data.
+    if (latestSession && 
+        (latestSession.totalJumps === null || Number(latestSession.totalJumps) === 0) && 
+        (latestSession.totalLoad === null || Number(latestSession.totalLoad) === 0)) {
+      const realSession = allPerf.find(p => p.totalJumps !== null && Number(p.totalJumps) > 0);
+      if (realSession) {
+        latestSession = realSession;
+      }
+    }
   }
   if (!latestSession && allPerf.length > 0) {
     latestSession = allPerf[0];
