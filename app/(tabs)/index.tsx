@@ -2213,9 +2213,9 @@ export default function HomeScreen() {
                 <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 12 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                     <View>
-                      <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>生データ直接入力・編集 (直近1週間)</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>登録データ・コンディション履歴 (直近1週間)</Text>
                       <Text style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>
-                        選択日（{rawDate}）から遡る過去7日間のデータを直接入力して一括保存できます。
+                        選択日（{rawDate}）から遡る過去7日間のデータの詳細とコンディションのZスコア判定を確認できます。
                       </Text>
                     </View>
                     <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
@@ -2293,37 +2293,25 @@ export default function HomeScreen() {
                                   }
 
                                   const base = analytics?.signalLight?.baselines?.[m.key];
-                                  const liveVal = pendingUpdates[pendingKey] !== undefined ? pendingUpdates[pendingKey] : dbVal;
-
                                   let liveZ = 0;
-                                  if (liveVal !== null && base && base.sd > 0) {
-                                    liveZ = (liveVal - base.mean) / base.sd;
+                                  if (dbVal !== null && base && base.sd > 0) {
+                                    liveZ = (dbVal - base.mean) / base.sd;
                                   }
 
-                                  const cellStyle = liveVal === null ? { bg: "#FFFFFF", text: "#1E293B" } : getCellStyle(liveZ, m.polarity);
+                                  const cellStyle = dbVal === null ? { bg: "#FFFFFF", text: "#1E293B" } : getCellStyle(liveZ, m.polarity);
 
                                   return (
-                                    <View key={m.key} style={{ width: 90, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", padding: 4, backgroundColor: cellStyle.bg, justifyContent: "center" }}>
-                                      <TextInput
-                                        defaultValue={dbVal !== null ? String(dbVal) : ""}
-                                        value={liveVal !== null ? String(liveVal) : ""}
-                                        onChangeText={(text) => {
-                                          const parsed = text === "" ? null : Number(text);
-                                          setPendingUpdates(prev => ({
-                                            ...prev,
-                                            [pendingKey]: isNaN(parsed as any) ? null : parsed
-                                          }));
-                                        }}
-                                        keyboardType="numeric"
+                                    <View key={m.key} style={{ width: 90, height: "100%", borderRightWidth: 1, borderColor: "#E2E8F0", padding: 4, backgroundColor: cellStyle.bg, justifyContent: "center", alignItems: "center" }}>
+                                      <Text
                                         style={{
                                           fontSize: 12,
                                           fontWeight: "bold",
                                           color: cellStyle.text,
-                                          textAlign: "center",
-                                          width: "100%",
-                                          height: "100%"
+                                          textAlign: "center"
                                         }}
-                                      />
+                                      >
+                                        {dbVal !== null ? String(dbVal) : ""}
+                                      </Text>
                                     </View>
                                   );
                                 })}
@@ -2333,59 +2321,6 @@ export default function HomeScreen() {
                       })()}
                     </View>
                   </ScrollView>
-                </View>
-
-                {/* 3. 保存 ＆ 破棄アクションボタン */}
-                <View style={{ flexDirection: "row", justifyContent: "flex-start", gap: 12, marginTop: 4 }}>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      const updatesByDate: Record<string, { athleteId: number; metricKey: string; value: number | null }[]> = {};
-
-                      Object.entries(pendingUpdates).forEach(([key, val]) => {
-                        const [dateStr, metricKey] = key.split("_");
-                        if (!updatesByDate[dateStr]) {
-                          updatesByDate[dateStr] = [];
-                        }
-                        updatesByDate[dateStr].push({
-                          athleteId: athlete?.id || 0,
-                          metricKey,
-                          value: val
-                        });
-                      });
-
-                      const datesToSave = Object.keys(updatesByDate);
-                      if (datesToSave.length === 0) return;
-
-                      try {
-                        await Promise.all(
-                          datesToSave.map(dStr =>
-                            updateMetricsBatchMutation.mutateAsync({
-                              teamId: user?.teamId || 1,
-                              dateStr: dStr,
-                              updates: updatesByDate[dStr]
-                            })
-                          )
-                        );
-                        setPendingUpdates({});
-                        refetchLatest();
-                        refetchAnalytics();
-                        alert("変更を保存しました。");
-                      } catch (err) {
-                        console.error("Batch save failed for athlete across dates", err);
-                        alert("保存に失敗しました。");
-                      }
-                    }}
-                    style={{ backgroundColor: "#2F80ED", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
-                  >
-                    <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "bold" }}>変更を保存</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setPendingUpdates({})}
-                    style={{ backgroundColor: "#FFFFFF", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0" }}
-                  >
-                    <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "bold" }}>キャンセル</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             )}
