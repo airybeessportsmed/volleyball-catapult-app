@@ -1999,17 +1999,22 @@ export default function HomeScreen() {
                     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                     .slice(-7);
 
+                  const getSafeNum = (val: any): number => {
+                    const num = Number(val);
+                    return isNaN(num) || !isFinite(num) ? 0 : num;
+                  };
+
                   const getVal = (p: any, key: string): number => {
                     if (!p) return 0;
                     if (key.startsWith("soxai")) {
                       try {
                         const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
-                        return soxai[key] !== undefined && soxai[key] !== null ? Number(soxai[key]) : 0;
+                        return soxai[key] !== undefined && soxai[key] !== null ? getSafeNum(soxai[key]) : 0;
                       } catch (e) {
                         return 0;
                       }
                     }
-                    return p[key] !== undefined && p[key] !== null ? Number(p[key]) : 0;
+                    return p[key] !== undefined && p[key] !== null ? getSafeNum(p[key]) : 0;
                   };
 
                   const leftLabel = METRICS_MAP.find(m => m.key === dashboardChartLeftMetric)?.label || dashboardChartLeftMetric;
@@ -2032,7 +2037,13 @@ export default function HomeScreen() {
                     const x = paddingLeft + (index * (sortedPast.length > 1 ? graphWidth / (sortedPast.length - 1) : graphWidth));
                     const valDiff = maxLoad;
                     const rawVal = getVal(t, dashboardChartLeftMetric);
-                    const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+                    let y = paddingTop + graphHeight;
+                    if (valDiff > 0 && !isNaN(valDiff) && isFinite(valDiff)) {
+                      y -= (rawVal / valDiff) * graphHeight;
+                    }
+                    if (isNaN(y) || !isFinite(y)) {
+                      y = paddingTop + graphHeight;
+                    }
                     const dObj = new Date(t.date);
                     const dateStr = `${dObj.getMonth() + 1}/${dObj.getDate()}`;
                     return { x, y, value: rawVal, dateStr };
@@ -2042,7 +2053,13 @@ export default function HomeScreen() {
                     const x = paddingLeft + (index * (sortedPast.length > 1 ? graphWidth / (sortedPast.length - 1) : graphWidth));
                     const valDiff = maxSRPE;
                     const rawVal = getVal(t, dashboardChartRightMetric);
-                    const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+                    let y = paddingTop + graphHeight;
+                    if (valDiff > 0 && !isNaN(valDiff) && isFinite(valDiff)) {
+                      y -= (rawVal / valDiff) * graphHeight;
+                    }
+                    if (isNaN(y) || !isFinite(y)) {
+                      y = paddingTop + graphHeight;
+                    }
                     return { x, y, value: rawVal };
                   });
 

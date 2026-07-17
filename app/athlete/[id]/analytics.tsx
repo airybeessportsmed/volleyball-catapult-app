@@ -1268,9 +1268,14 @@ export default function AthleteAnalyticsScreen() {
     const leftLabel = leftMetrics.find(m => m.key === chartLeftMetric)?.label || chartLeftMetric;
     const rightLabel = rightMetrics.find(m => m.key === chartRightMetric)?.label || chartRightMetric;
 
+    const getSafeNum = (val: any): number => {
+      const num = Number(val);
+      return isNaN(num) || !isFinite(num) ? 0 : num;
+    };
+
     // 動的に選択されたキーに基づいて最大値を取得
-    const maxLoad = Math.max(...trend.map(t => ((t as any)[chartLeftMetric] !== undefined ? Number((t as any)[chartLeftMetric]) : 0)), 1) * 1.1;
-    const maxSRPE = chartRightMetric === "none" ? 1 : Math.max(...trend.map(t => ((t as any)[chartRightMetric] !== undefined ? Number((t as any)[chartRightMetric]) : 0)), 1) * 1.1;
+    const maxLoad = Math.max(...trend.map(t => getSafeNum((t as any)[chartLeftMetric])), 1) * 1.1;
+    const maxSRPE = chartRightMetric === "none" ? 1 : Math.max(...trend.map(t => getSafeNum((t as any)[chartRightMetric])), 1) * 1.1;
 
     const chartWidth = windowWidth - 40; // Full width minus container padding
     const chartHeight = 180;
@@ -1285,16 +1290,28 @@ export default function AthleteAnalyticsScreen() {
     const loadPoints = trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxLoad;
-      const rawVal = (t as any)[chartLeftMetric] !== undefined ? Number((t as any)[chartLeftMetric]) : 0;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      const rawVal = getSafeNum((t as any)[chartLeftMetric]);
+      let y = paddingTop + graphHeight;
+      if (valDiff > 0 && !isNaN(valDiff) && isFinite(valDiff)) {
+        y -= (rawVal / valDiff) * graphHeight;
+      }
+      if (isNaN(y) || !isFinite(y)) {
+        y = paddingTop + graphHeight;
+      }
       return { x, y, value: rawVal, dateStr: t.dateStr };
     });
 
     const srpePoints = chartRightMetric === "none" ? [] : trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxSRPE;
-      const rawVal = (t as any)[chartRightMetric] !== undefined ? Number((t as any)[chartRightMetric]) : 0;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      const rawVal = getSafeNum((t as any)[chartRightMetric]);
+      let y = paddingTop + graphHeight;
+      if (valDiff > 0 && !isNaN(valDiff) && isFinite(valDiff)) {
+        y -= (rawVal / valDiff) * graphHeight;
+      }
+      if (isNaN(y) || !isFinite(y)) {
+        y = paddingTop + graphHeight;
+      }
       return { x, y, value: rawVal };
     });
 
