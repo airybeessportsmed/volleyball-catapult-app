@@ -572,8 +572,10 @@ export default function HomeScreen() {
   const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings">("summary");
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
   const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
-  const [dashboardChartMetric, setDashboardChartMetric] = useState<string>("totalLoad");
+  const [dashboardChartLeftMetric, setDashboardChartLeftMetric] = useState<string>("totalLoad");
+  const [dashboardChartRightMetric, setDashboardChartRightMetric] = useState<string>("sRPE");
   const [dashboardMetricModalOpen, setDashboardMetricModalOpen] = useState(false);
+  const [dashboardSelectorTargetAxis, setDashboardSelectorTargetAxis] = useState<"left" | "right">("left");
 
   // Fetch athlete info
   // Fetch performance data for selected date
@@ -915,53 +917,10 @@ export default function HomeScreen() {
     }
   }, [latestPerformance]);
 
-  // Generate mini SVG path for trend chart
-  const miniChartPath = useMemo(() => {
-    if (!pastPerformance || pastPerformance.length < 2) return null;
-    
-    // Sort chronological
-    const sorted = [...pastPerformance].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    const getVal = (p: any, key: string): number => {
-      if (!p) return 0;
-      if (key.startsWith("soxai")) {
-        try {
-          const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
-          return soxai[key] !== undefined && soxai[key] !== null ? Number(soxai[key]) : 0;
-        } catch (e) {
-          return 0;
-        }
-      }
-      return p[key] !== undefined && p[key] !== null ? Number(p[key]) : 0;
-    };
-
-    const loads = sorted.map(p => getVal(p, dashboardChartMetric));
-    
-    const maxVal = Math.max(...loads, 1);
-    const minVal = Math.min(...loads);
-    const valDiff = maxVal - minVal;
-    
-    const chartWidth = windowWidth - 80; // Container width minus padding
-    const stepX = chartWidth / (sorted.length - 1);
-    
-    const points = sorted.map((p, idx) => {
-      const x = idx * stepX;
-      const load = getVal(p, dashboardChartMetric);
-      // Invert Y for SVG coordinates
-      const y = MINI_CHART_HEIGHT - 10 - (valDiff > 0 ? ((load - minVal) / valDiff) * (MINI_CHART_HEIGHT - 20) : (MINI_CHART_HEIGHT - 20) / 2);
-      return { x, y };
-    });
-    
-    let path = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 1; i < points.length; i++) {
-      path += ` L ${points[i].x} ${points[i].y}`;
-    }
-    
-    return { path, points };
-  }, [pastPerformance, dashboardChartMetric]);
+  // miniChartPath removed (calculations inline in JSX rendering block below)
   
   const renderDashboardMetricSelectorModal = () => {
-    const list = [
+    const leftMetrics = [
       { key: "totalLoad", label: "Player Load" },
       { key: "totalJumps", label: "総ジャンプ数" },
       { key: "maxJumpHeight", label: "最高ジャンプ高" },
@@ -971,12 +930,20 @@ export default function HomeScreen() {
       { key: "highIntensityDistance", label: "高速走行距離" },
       { key: "accelCount", label: "加速回数" },
       { key: "maxAcceleration", label: "最高加速度" },
+    ];
+
+    const rightMetrics = [
       { key: "sRPE", label: "sRPE" },
       { key: "rpeValue", label: "主観強度 (RPE)" },
       { key: "avgHeartRate", label: "平均心拍数" },
       { key: "hrv", label: "HRV (心拍変動)" },
       { key: "wellnessSleep", label: "睡眠スコア" },
+      { key: "none", label: "（非表示）" },
     ];
+
+    const list = dashboardSelectorTargetAxis === "left" ? leftMetrics : rightMetrics;
+    const currentVal = dashboardSelectorTargetAxis === "left" ? dashboardChartLeftMetric : dashboardChartRightMetric;
+    const setVal = dashboardSelectorTargetAxis === "left" ? setDashboardChartLeftMetric : setDashboardChartRightMetric;
 
     return (
       <Modal
@@ -995,18 +962,18 @@ export default function HomeScreen() {
             style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 340, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}
           >
             <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", textAlign: "center" }}>
-              運動量グラフの指標選択
+              {dashboardSelectorTargetAxis === "left" ? "左軸の指標選択" : "右軸の指標選択"}
             </Text>
             
             <ScrollView style={{ maxHeight: 300 }}>
               <View style={{ gap: 8 }}>
                 {list.map((item) => {
-                  const isSelected = dashboardChartMetric === item.key;
+                  const isSelected = currentVal === item.key;
                   return (
                     <TouchableOpacity
                       key={item.key}
                       onPress={() => {
-                        setDashboardChartMetric(item.key);
+                        setVal(item.key);
                         setDashboardMetricModalOpen(false);
                       }}
                       style={{
@@ -2027,53 +1994,215 @@ export default function HomeScreen() {
                 )}
 
                 {/* トレンドグラフ */}
-                {pastPerformance && pastPerformance.length > 0 && (
-                  <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-3">
-                    <View className="flex-row justify-between items-center pb-2 border-b border-border/30">
-                      <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
-                      <TouchableOpacity
-                        onPress={() => setDashboardMetricModalOpen(true)}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          backgroundColor: "#F8FAFC",
-                          borderWidth: 1,
-                          borderColor: "#E2E8F0",
-                          paddingVertical: 4,
-                          paddingHorizontal: 8,
-                          borderRadius: 8,
-                          gap: 4
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>
-                          {METRICS_MAP.find(m => m.key === dashboardChartMetric)?.label || dashboardChartMetric} ▾
-                        </Text>
-                      </TouchableOpacity>
+                {pastPerformance && pastPerformance.length > 0 && (() => {
+                  const sortedPast = [...pastPerformance]
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .slice(-7);
+
+                  const getVal = (p: any, key: string): number => {
+                    if (!p) return 0;
+                    if (key.startsWith("soxai")) {
+                      try {
+                        const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+                        return soxai[key] !== undefined && soxai[key] !== null ? Number(soxai[key]) : 0;
+                      } catch (e) {
+                        return 0;
+                      }
+                    }
+                    return p[key] !== undefined && p[key] !== null ? Number(p[key]) : 0;
+                  };
+
+                  const leftLabel = METRICS_MAP.find(m => m.key === dashboardChartLeftMetric)?.label || dashboardChartLeftMetric;
+                  const rightLabel = METRICS_MAP.find(m => m.key === dashboardChartRightMetric)?.label || dashboardChartRightMetric;
+
+                  const maxLoad = Math.max(...sortedPast.map(t => getVal(t, dashboardChartLeftMetric)), 1) * 1.1;
+                  const maxSRPE = dashboardChartRightMetric === "none" ? 1 : Math.max(...sortedPast.map(t => getVal(t, dashboardChartRightMetric)), 1) * 1.1;
+
+                  const chartWidth = windowWidth - 40;
+                  const chartHeight = 180;
+                  const paddingLeft = 35;
+                  const paddingRight = 35;
+                  const paddingTop = 25;
+                  const paddingBottom = 25;
+
+                  const graphWidth = chartWidth - paddingLeft - paddingRight;
+                  const graphHeight = chartHeight - paddingTop - paddingBottom;
+
+                  const loadPoints = sortedPast.map((t, index) => {
+                    const x = paddingLeft + (index * (sortedPast.length > 1 ? graphWidth / (sortedPast.length - 1) : graphWidth));
+                    const valDiff = maxLoad;
+                    const rawVal = getVal(t, dashboardChartLeftMetric);
+                    const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+                    const dObj = new Date(t.date);
+                    const dateStr = `${dObj.getMonth() + 1}/${dObj.getDate()}`;
+                    return { x, y, value: rawVal, dateStr };
+                  });
+
+                  const srpePoints = dashboardChartRightMetric === "none" ? [] : sortedPast.map((t, index) => {
+                    const x = paddingLeft + (index * (sortedPast.length > 1 ? graphWidth / (sortedPast.length - 1) : graphWidth));
+                    const valDiff = maxSRPE;
+                    const rawVal = getVal(t, dashboardChartRightMetric);
+                    const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+                    return { x, y, value: rawVal };
+                  });
+
+                  let loadLinePath = "";
+                  if (loadPoints.length > 0) {
+                    loadLinePath = `M ${loadPoints[0].x} ${loadPoints[0].y}`;
+                    for (let i = 1; i < loadPoints.length; i++) {
+                      loadLinePath += ` L ${loadPoints[i].x} ${loadPoints[i].y}`;
+                    }
+                  }
+
+                  let srpeLinePath = "";
+                  if (srpePoints.length > 0) {
+                    srpeLinePath = `M ${srpePoints[0].x} ${srpePoints[0].y}`;
+                    for (let i = 1; i < srpePoints.length; i++) {
+                      srpeLinePath += ` L ${srpePoints[i].x} ${srpePoints[i].y}`;
+                    }
+                  }
+
+                  return (
+                    <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-4">
+                      <View className="flex-row justify-between items-center pb-2 border-b border-border/30">
+                        <View>
+                          <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
+                          <Text className="text-[10px] text-muted font-medium">タップして各軸の指標を切り替えられます</Text>
+                        </View>
+                      </View>
+
+                      {/* Legend & Metric Selector Buttons */}
+                      <View className="flex-row justify-between items-center gap-3 bg-[#F8FAFC] p-2.5 rounded-2xl border border-slate-100">
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setDashboardSelectorTargetAxis("left");
+                            setDashboardMetricModalOpen(true);
+                          }}
+                          className="flex-1 flex-row items-center justify-center gap-1.5 bg-white border border-slate-200/80 py-2 px-3 rounded-xl shadow-xs"
+                        >
+                          <View className="w-2 h-2 rounded-full bg-[#FF6B35]" />
+                          <Text className="text-[10px] text-slate-700 font-bold">左軸: {leftLabel} ▾</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setDashboardSelectorTargetAxis("right");
+                            setDashboardMetricModalOpen(true);
+                          }}
+                          className="flex-1 flex-row items-center justify-center gap-1.5 bg-white border border-slate-200/80 py-2 px-3 rounded-xl shadow-xs"
+                        >
+                          <View className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+                          <Text className="text-[10px] text-slate-700 font-bold">右軸: {rightLabel} ▾</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View className="my-1 items-center">
+                        <Svg width={chartWidth} height={chartHeight}>
+                          {/* 選択した右軸指標の ±1.0SD のグレー帯バンド描画 */}
+                          {(() => {
+                            if (dashboardChartRightMetric === "none") return null;
+                            const rightBaseline = analytics?.signalLight?.baselines?.[dashboardChartRightMetric];
+                            if (!rightBaseline) return null;
+                            const yMin = Math.max(0, rightBaseline.mean - rightBaseline.sd);
+                            const yMax = rightBaseline.mean + rightBaseline.sd;
+                            const valDiff = maxSRPE;
+                            if (valDiff <= 0) return null;
+                            const bandYStart = paddingTop + graphHeight - (yMax / valDiff) * graphHeight;
+                            const bandYEnd = paddingTop + graphHeight - (yMin / valDiff) * graphHeight;
+                            const bandHeight = bandYEnd - bandYStart;
+                            if (isNaN(bandHeight) || bandHeight <= 0) return null;
+                            return (
+                              <Rect
+                                x={paddingLeft}
+                                y={Math.max(paddingTop, bandYStart)}
+                                width={graphWidth}
+                                height={Math.min(graphHeight, bandHeight)}
+                                fill="#C4B5FD"
+                                opacity="0.2"
+                              />
+                            );
+                          })()}
+
+                          {/* Y axis lines */}
+                          <Line x1={paddingLeft} y1={paddingTop} x2={chartWidth - paddingRight} y2={paddingTop} stroke="#F3F4F6" />
+                          <Line x1={paddingLeft} y1={paddingTop + graphHeight / 2} x2={chartWidth - paddingRight} y2={paddingTop + graphHeight / 2} stroke="#F3F4F6" />
+                          <Line x1={paddingLeft} y1={chartHeight - paddingBottom} x2={chartWidth - paddingRight} y2={chartHeight - paddingBottom} stroke="#E5E7EB" strokeWidth="1.5" />
+
+                          {/* Left Y axis labels */}
+                          <SvgText x={paddingLeft - 6} y={paddingTop + 3} fontSize="8" fill="#FF6B35" fontWeight="bold" textAnchor="end">{Math.round(maxLoad)}</SvgText>
+                          <SvgText x={paddingLeft - 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#FF6B35" textAnchor="end">{Math.round(maxLoad / 2)}</SvgText>
+                          <SvgText x={paddingLeft - 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#FF6B35" textAnchor="end">0</SvgText>
+
+                          {/* Right Y axis labels */}
+                          {dashboardChartRightMetric !== "none" && (
+                            <>
+                              <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + 3} fontSize="8" fill="#8B5CF6" fontWeight="bold" textAnchor="start">{Math.round(maxSRPE)}</SvgText>
+                              <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">{Math.round(maxSRPE / 2)}</SvgText>
+                              <SvgText x={chartWidth - paddingRight + 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">0</SvgText>
+                            </>
+                          )}
+
+                          {/* Paths */}
+                          {loadLinePath ? (
+                            <Path 
+                              d={loadLinePath} 
+                              fill="none" 
+                              stroke="#FF6B35" 
+                              strokeWidth="2.5" 
+                              strokeLinecap="round" 
+                            />
+                          ) : null}
+
+                          {srpeLinePath ? (
+                            <Path 
+                              d={srpeLinePath} 
+                              fill="none" 
+                              stroke="#8B5CF6" 
+                              strokeWidth="2" 
+                              strokeDasharray="3 3"
+                              strokeLinecap="round" 
+                            />
+                          ) : null}
+
+                          {/* Points (Left Axis) */}
+                          {loadPoints.map((p, idx) => (
+                            <Circle
+                              key={`load-${idx}`}
+                              cx={p.x}
+                              cy={p.y}
+                              r="3"
+                              fill="#FFFFFF"
+                              stroke="#FF6B35"
+                              strokeWidth="1.5"
+                            />
+                          ))}
+
+                          {/* Points (Right Axis) */}
+                          {srpePoints.map((p, idx) => (
+                            <Circle
+                              key={`srpe-${idx}`}
+                              cx={p.x}
+                              cy={p.y}
+                              r="2"
+                              fill="#8B5CF6"
+                            />
+                          ))}
+
+                          {/* X axis labels */}
+                          {loadPoints.length > 0 && (
+                            <SvgText x={loadPoints[0].x} y={chartHeight - 6} fontSize="8" fill="#6B7280" textAnchor="middle">{loadPoints[0].dateStr}</SvgText>
+                          )}
+                          {loadPoints.length > 2 && (
+                            <SvgText x={loadPoints[Math.floor(loadPoints.length / 2)].x} y={chartHeight - 6} fontSize="8" fill="#6B7280" textAnchor="middle">{loadPoints[Math.floor(loadPoints.length / 2)].dateStr}</SvgText>
+                          )}
+                          {loadPoints.length > 1 && (
+                            <SvgText x={loadPoints[loadPoints.length - 1].x} y={chartHeight - 6} fontSize="8" fill="#6B7280" textAnchor="middle">{loadPoints[loadPoints.length - 1].dateStr}</SvgText>
+                          )}
+                        </Svg>
+                      </View>
                     </View>
-                    <View className="py-2 items-center">
-                      <Svg width={windowWidth - 72} height={MINI_CHART_HEIGHT}>
-                        <Path 
-                          d={miniChartPath ? miniChartPath.path : ""} 
-                          fill="none" 
-                          stroke="#FF6B35" 
-                          strokeWidth="3" 
-                          strokeLinecap="round"
-                        />
-                        {miniChartPath && miniChartPath.points.map((p, idx) => (
-                          <Circle 
-                            key={idx} 
-                            cx={p.x} 
-                            cy={p.y} 
-                            r="3.5" 
-                            fill="#FFFFFF" 
-                            stroke="#FF6B35" 
-                            strokeWidth="2" 
-                          />
-                        ))}
-                      </Svg>
-                    </View>
-                  </View>
-                )}
+                  );
+                })()}
               </View>
             )}
 
