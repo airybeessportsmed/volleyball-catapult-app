@@ -185,6 +185,10 @@ export default function AthleteAnalyticsScreen() {
   const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
   const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
+  const [chartLeftMetric, setChartLeftMetric] = useState<string>("totalLoad");
+  const [chartRightMetric, setChartRightMetric] = useState<string>("sRPE");
+  const [metricSelectorModalOpen, setMetricSelectorModalOpen] = useState(false);
+  const [selectorTargetAxis, setSelectorTargetAxis] = useState<"left" | "right">("left");
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
@@ -1236,11 +1240,37 @@ export default function AthleteAnalyticsScreen() {
   // Trend line chart rendering helpers (uses react-native-svg)
   // ----------------------------------------------------
   const renderTrendChart = () => {
-    const trend = analytics.trend;
+    // 直近最大7測定分に絞る
+    const trend = analytics.trend.slice(-7);
     if (trend.length === 0) return null;
 
-    const maxLoad = Math.max(...trend.map(t => t.totalLoad), 1) * 1.1;
-    const maxSRPE = Math.max(...trend.map(t => t.sRPE), 1) * 1.1;
+    const leftMetrics = [
+      { key: "totalLoad", label: "Player Load" },
+      { key: "totalJumps", label: "総ジャンプ数" },
+      { key: "maxJumpHeight", label: "最高ジャンプ高" },
+      { key: "avgJumpHeight", label: "平均ジャンプ高" },
+      { key: "top5JumpHeight", label: "ジャンプ高 (Top5平均)" },
+      { key: "totalDistance", label: "総走行距離" },
+      { key: "highIntensityDistance", label: "高速走行距離" },
+      { key: "accelCount", label: "加速回数" },
+      { key: "maxAcceleration", label: "最高加速度" },
+    ];
+
+    const rightMetrics = [
+      { key: "sRPE", label: "sRPE" },
+      { key: "rpeValue", label: "主観強度 (RPE)" },
+      { key: "avgHeartRate", label: "平均心拍数" },
+      { key: "hrv", label: "HRV (心拍変動)" },
+      { key: "wellnessSleep", label: "睡眠スコア" },
+      { key: "none", label: "（非表示）" },
+    ];
+
+    const leftLabel = leftMetrics.find(m => m.key === chartLeftMetric)?.label || chartLeftMetric;
+    const rightLabel = rightMetrics.find(m => m.key === chartRightMetric)?.label || chartRightMetric;
+
+    // 動的に選択されたキーに基づいて最大値を取得
+    const maxLoad = Math.max(...trend.map(t => ((t as any)[chartLeftMetric] !== undefined ? Number((t as any)[chartLeftMetric]) : 0)), 1) * 1.1;
+    const maxSRPE = chartRightMetric === "none" ? 1 : Math.max(...trend.map(t => ((t as any)[chartRightMetric] !== undefined ? Number((t as any)[chartRightMetric]) : 0)), 1) * 1.1;
 
     const chartWidth = windowWidth - 40; // Full width minus container padding
     const chartHeight = 180;
@@ -1255,15 +1285,17 @@ export default function AthleteAnalyticsScreen() {
     const loadPoints = trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxLoad;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (t.totalLoad / valDiff) * graphHeight : 0);
-      return { x, y, value: t.totalLoad, dateStr: t.dateStr };
+      const rawVal = (t as any)[chartLeftMetric] !== undefined ? Number((t as any)[chartLeftMetric]) : 0;
+      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      return { x, y, value: rawVal, dateStr: t.dateStr };
     });
 
-    const srpePoints = trend.map((t, index) => {
+    const srpePoints = chartRightMetric === "none" ? [] : trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxSRPE;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (t.sRPE / valDiff) * graphHeight : 0);
-      return { x, y, value: t.sRPE };
+      const rawVal = (t as any)[chartRightMetric] !== undefined ? Number((t as any)[chartRightMetric]) : 0;
+      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      return { x, y, value: rawVal };
     });
 
     let loadLinePath = "";
@@ -1284,33 +1316,47 @@ export default function AthleteAnalyticsScreen() {
 
     return (
       <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-4">
-        <View className="flex-row justify-between items-center">
+        <View className="flex-row justify-between items-center pb-2 border-b border-border/30">
           <View>
-            <Text className="text-sm font-bold text-foreground">負荷バランス推移</Text>
-            <Text className="text-[10px] text-muted font-medium">客観負荷 (Player Load) と主観負荷 (sRPE) の比較</Text>
+            <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
+            <Text className="text-[10px] text-muted font-medium">タップして各軸の可視化指標を切り替えられます</Text>
           </View>
         </View>
 
-        {/* Legend */}
-        <View className="flex-row justify-center gap-6 mt-1">
-          <View className="flex-row items-center gap-1.5">
-            <View className="w-2.5 h-2.5 rounded-full bg-[#FF6B35]" />
-            <Text className="text-[10px] text-muted font-bold">Player Load (左軸)</Text>
-          </View>
-          <View className="flex-row items-center gap-1.5">
-            <View className="w-2.5 h-2.5 rounded-full bg-[#8B5CF6]" />
-            <Text className="text-[10px] text-muted font-bold">sRPE (右軸)</Text>
-          </View>
+        {/* Legend & Metric Selector Buttons */}
+        <View className="flex-row justify-between items-center gap-3 bg-[#F8FAFC] p-2.5 rounded-2xl border border-slate-100">
+          <TouchableOpacity 
+            onPress={() => {
+              setSelectorTargetAxis("left");
+              setMetricSelectorModalOpen(true);
+            }}
+            className="flex-1 flex-row items-center justify-center gap-1.5 bg-white border border-slate-200/80 py-2 px-3 rounded-xl shadow-xs"
+          >
+            <View className="w-2 h-2 rounded-full bg-[#FF6B35]" />
+            <Text className="text-[10px] text-slate-700 font-bold">左軸: {leftLabel} ▾</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => {
+              setSelectorTargetAxis("right");
+              setMetricSelectorModalOpen(true);
+            }}
+            className="flex-1 flex-row items-center justify-center gap-1.5 bg-white border border-slate-200/80 py-2 px-3 rounded-xl shadow-xs"
+          >
+            <View className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+            <Text className="text-[10px] text-slate-700 font-bold">右軸: {rightLabel} ▾</Text>
+          </TouchableOpacity>
         </View>
 
         <View className="my-1">
           <Svg width={chartWidth} height={chartHeight}>
-            {/* sRPE ±1.0SD のグレー帯バンド描画 */}
+            {/* 選択した右軸指標の ±1.0SD のグレー帯バンド描画 */}
             {(() => {
-              const sRpeBaseline = analytics.signalLight?.baselines?.sRPE;
-              if (!sRpeBaseline) return null;
-              const yMin = Math.max(0, sRpeBaseline.mean - sRpeBaseline.sd);
-              const yMax = sRpeBaseline.mean + sRpeBaseline.sd;
+              if (chartRightMetric === "none") return null;
+              const rightBaseline = analytics.signalLight?.baselines?.[chartRightMetric];
+              if (!rightBaseline) return null;
+              const yMin = Math.max(0, rightBaseline.mean - rightBaseline.sd);
+              const yMax = rightBaseline.mean + rightBaseline.sd;
               const valDiff = maxSRPE;
               if (valDiff <= 0) return null;
               const bandYStart = paddingTop + graphHeight - (yMax / valDiff) * graphHeight;
@@ -1329,12 +1375,12 @@ export default function AthleteAnalyticsScreen() {
               );
             })()}
 
-            {/* Y axis labels */}
+            {/* Y axis lines */}
             <Line x1={paddingLeft} y1={paddingTop} x2={chartWidth - paddingRight} y2={paddingTop} stroke="#F3F4F6" />
             <Line x1={paddingLeft} y1={paddingTop + graphHeight / 2} x2={chartWidth - paddingRight} y2={paddingTop + graphHeight / 2} stroke="#F3F4F6" />
             <Line x1={paddingLeft} y1={chartHeight - paddingBottom} x2={chartWidth - paddingRight} y2={chartHeight - paddingBottom} stroke="#E5E7EB" strokeWidth="1.5" />
 
-            {/* Left Y axis labels (Player Load) */}
+            {/* Left Y axis labels */}
             <SvgText x={paddingLeft - 6} y={paddingTop + 3} fontSize="8" fill="#FF6B35" fontWeight="bold" textAnchor="end">{Math.round(maxLoad)}</SvgText>
             <SvgText x={paddingLeft - 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#FF6B35" textAnchor="end">{Math.round(maxLoad / 2)}</SvgText>
             <SvgText x={paddingLeft - 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#FF6B35" textAnchor="end">0</SvgText>
@@ -1430,6 +1476,97 @@ export default function AthleteAnalyticsScreen() {
           </View>
         </View>
       </View>
+    );
+  };
+
+  const renderMetricSelectorModal = () => {
+    const leftMetrics = [
+      { key: "totalLoad", label: "Player Load" },
+      { key: "totalJumps", label: "総ジャンプ数" },
+      { key: "maxJumpHeight", label: "最高ジャンプ高" },
+      { key: "avgJumpHeight", label: "平均ジャンプ高" },
+      { key: "top5JumpHeight", label: "ジャンプ高 (Top5平均)" },
+      { key: "totalDistance", label: "総走行距離" },
+      { key: "highIntensityDistance", label: "高速走行距離" },
+      { key: "accelCount", label: "加速回数" },
+      { key: "maxAcceleration", label: "最高加速度" },
+    ];
+
+    const rightMetrics = [
+      { key: "sRPE", label: "sRPE" },
+      { key: "rpeValue", label: "主観強度 (RPE)" },
+      { key: "avgHeartRate", label: "平均心拍数" },
+      { key: "hrv", label: "HRV (心拍変動)" },
+      { key: "wellnessSleep", label: "睡眠スコア" },
+      { key: "none", label: "（非表示）" },
+    ];
+
+    const list = selectorTargetAxis === "left" ? leftMetrics : rightMetrics;
+    const currentVal = selectorTargetAxis === "left" ? chartLeftMetric : chartRightMetric;
+    const setVal = selectorTargetAxis === "left" ? setChartLeftMetric : setChartRightMetric;
+
+    return (
+      <Modal
+        visible={metricSelectorModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMetricSelectorModalOpen(false)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          onPress={() => setMetricSelectorModalOpen(false)}
+          style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", padding: 20 }}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 340, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", textAlign: "center" }}>
+              {selectorTargetAxis === "left" ? "左軸の指標選択" : "右軸の指標選択"}
+            </Text>
+            
+            <ScrollView style={{ maxHeight: 300 }}>
+              <View style={{ gap: 8 }}>
+                {list.map((item) => {
+                  const isSelected = currentVal === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      onPress={() => {
+                        setVal(item.key);
+                        setMetricSelectorModalOpen(false);
+                      }}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? "#F3F4F6" : "transparent",
+                        borderWidth: 1,
+                        borderColor: isSelected ? "#E5E7EB" : "transparent",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: isSelected ? "bold" : "normal", color: isSelected ? "#FF6B35" : "#374151" }}>
+                        {item.label}
+                      </Text>
+                      {isSelected && <Text style={{ color: "#FF6B35", fontWeight: "bold" }}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            
+            <TouchableOpacity
+              onPress={() => setMetricSelectorModalOpen(false)}
+              style={{ backgroundColor: "#F1F5F9", paddingVertical: 12, borderRadius: 12, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569" }}>キャンセル</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     );
   };
 
@@ -1676,6 +1813,7 @@ export default function AthleteAnalyticsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      {renderMetricSelectorModal()}
     </ScreenContainer>
   );
 }

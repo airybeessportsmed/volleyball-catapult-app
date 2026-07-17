@@ -2260,20 +2260,7 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* アンケート入力への誘導リンク */}
-            {(athleteActiveTab === "summary" || athleteActiveTab === "dashboard") && (
-              <View className="bg-primary/5 border border-primary/10 rounded-3xl p-5 items-center gap-3">
-                <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center">
-                  <IconSymbol size={18} name="pencil.and.outline" color="#FF6B35" />
-                </View>
-                <View className="gap-1 items-center">
-                  <Text className="text-sm font-bold text-foreground text-center">Wellnessアンケートを回答する</Text>
-                  <Text className="text-[10px] text-muted text-center leading-relaxed">
-                    毎朝のWellness項目と練習後のsRPEを登録して、コンディション精度を高めましょう。
-                  </Text>
-                </View>
-              </View>
-            )}
+
           </View>
         </ScrollView>
 
