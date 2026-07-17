@@ -572,6 +572,8 @@ export default function HomeScreen() {
   const [athleteActiveTab, setAthleteActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings">("summary");
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
   const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
+  const [dashboardChartMetric, setDashboardChartMetric] = useState<string>("totalLoad");
+  const [dashboardMetricModalOpen, setDashboardMetricModalOpen] = useState(false);
 
   // Fetch athlete info
   // Fetch performance data for selected date
@@ -919,7 +921,21 @@ export default function HomeScreen() {
     
     // Sort chronological
     const sorted = [...pastPerformance].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const loads = sorted.map(p => p.totalLoad ? Number(p.totalLoad) : 0);
+    
+    const getVal = (p: any, key: string): number => {
+      if (!p) return 0;
+      if (key.startsWith("soxai")) {
+        try {
+          const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+          return soxai[key] !== undefined && soxai[key] !== null ? Number(soxai[key]) : 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+      return p[key] !== undefined && p[key] !== null ? Number(p[key]) : 0;
+    };
+
+    const loads = sorted.map(p => getVal(p, dashboardChartMetric));
     
     const maxVal = Math.max(...loads, 1);
     const minVal = Math.min(...loads);
@@ -930,7 +946,7 @@ export default function HomeScreen() {
     
     const points = sorted.map((p, idx) => {
       const x = idx * stepX;
-      const load = p.totalLoad ? Number(p.totalLoad) : 0;
+      const load = getVal(p, dashboardChartMetric);
       // Invert Y for SVG coordinates
       const y = MINI_CHART_HEIGHT - 10 - (valDiff > 0 ? ((load - minVal) / valDiff) * (MINI_CHART_HEIGHT - 20) : (MINI_CHART_HEIGHT - 20) / 2);
       return { x, y };
@@ -942,7 +958,90 @@ export default function HomeScreen() {
     }
     
     return { path, points };
-  }, [pastPerformance]);
+  }, [pastPerformance, dashboardChartMetric]);
+  
+  const renderDashboardMetricSelectorModal = () => {
+    const list = [
+      { key: "totalLoad", label: "Player Load" },
+      { key: "totalJumps", label: "総ジャンプ数" },
+      { key: "maxJumpHeight", label: "最高ジャンプ高" },
+      { key: "avgJumpHeight", label: "平均ジャンプ高" },
+      { key: "top5JumpHeight", label: "ジャンプ高 (Top5平均)" },
+      { key: "totalDistance", label: "総走行距離" },
+      { key: "highIntensityDistance", label: "高速走行距離" },
+      { key: "accelCount", label: "加速回数" },
+      { key: "maxAcceleration", label: "最高加速度" },
+      { key: "sRPE", label: "sRPE" },
+      { key: "rpeValue", label: "主観強度 (RPE)" },
+      { key: "avgHeartRate", label: "平均心拍数" },
+      { key: "hrv", label: "HRV (心拍変動)" },
+      { key: "wellnessSleep", label: "睡眠スコア" },
+    ];
+
+    return (
+      <Modal
+        visible={dashboardMetricModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDashboardMetricModalOpen(false)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          onPress={() => setDashboardMetricModalOpen(false)}
+          style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.4)", justifyContent: "center", alignItems: "center", padding: 20 }}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, width: "100%", maxWidth: 340, gap: 16, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", textAlign: "center" }}>
+              運動量グラフの指標選択
+            </Text>
+            
+            <ScrollView style={{ maxHeight: 300 }}>
+              <View style={{ gap: 8 }}>
+                {list.map((item) => {
+                  const isSelected = dashboardChartMetric === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      onPress={() => {
+                        setDashboardChartMetric(item.key);
+                        setDashboardMetricModalOpen(false);
+                      }}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? "#F3F4F6" : "transparent",
+                        borderWidth: 1,
+                        borderColor: isSelected ? "#E5E7EB" : "transparent",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: isSelected ? "bold" : "normal", color: isSelected ? "#FF6B35" : "#374151" }}>
+                        {item.label}
+                      </Text>
+                      {isSelected && <Text style={{ color: "#FF6B35", fontWeight: "bold" }}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            
+            <TouchableOpacity
+              onPress={() => setDashboardMetricModalOpen(false)}
+              style={{ backgroundColor: "#F1F5F9", paddingVertical: 12, borderRadius: 12, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "bold", color: "#475569" }}>キャンセル</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
 
   if (loading || isLoggingIn) {
     return (
@@ -1930,7 +2029,27 @@ export default function HomeScreen() {
                 {/* トレンドグラフ */}
                 {pastPerformance && pastPerformance.length > 0 && (
                   <View className="bg-surface rounded-3xl p-5 border border-border shadow-sm gap-3">
-                    <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
+                    <View className="flex-row justify-between items-center pb-2 border-b border-border/30">
+                      <Text className="text-sm font-bold text-foreground">直近の運動量の推移 (最大7測定分)</Text>
+                      <TouchableOpacity
+                        onPress={() => setDashboardMetricModalOpen(true)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F8FAFC",
+                          borderWidth: 1,
+                          borderColor: "#E2E8F0",
+                          paddingVertical: 4,
+                          paddingHorizontal: 8,
+                          borderRadius: 8,
+                          gap: 4
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569" }}>
+                          {METRICS_MAP.find(m => m.key === dashboardChartMetric)?.label || dashboardChartMetric} ▾
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                     <View className="py-2 items-center">
                       <Svg width={windowWidth - 72} height={MINI_CHART_HEIGHT}>
                         <Path 
@@ -2405,6 +2524,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
+        {renderDashboardMetricSelectorModal()}
       </ScreenContainer>
     );
   }
