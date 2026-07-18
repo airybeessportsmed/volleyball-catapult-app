@@ -3472,12 +3472,16 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
         }
       }
       
+      const safeMean = isNaN(stats.mean) || !isFinite(stats.mean) ? 0 : stats.mean;
+      const safeSd = isNaN(stats.sd) || !isFinite(stats.sd) ? 0 : stats.sd;
+      const safeZ = isNaN(zScore) || !isFinite(zScore) ? 0 : zScore;
+
       signals[m.key] = status;
       baselines[m.key] = {
-        mean: Number(stats.mean.toFixed(2)),
-        sd: Number(stats.sd.toFixed(2)),
+        mean: Number(safeMean.toFixed(2)),
+        sd: Number(safeSd.toFixed(2)),
         val: latestVal,
-        zScore: Number(zScore.toFixed(2)),
+        zScore: Number(safeZ.toFixed(2)),
         status
       };
     });
@@ -3859,12 +3863,16 @@ export async function getTeamAnalytics(teamId: number) {
         }
       }
       
+      const safeMean = isNaN(stats.mean) || !isFinite(stats.mean) ? 0 : stats.mean;
+      const safeSd = isNaN(stats.sd) || !isFinite(stats.sd) ? 0 : stats.sd;
+      const safeZ = isNaN(zScore) || !isFinite(zScore) ? 0 : zScore;
+
       signals[m.key] = status;
       baselines[m.key] = {
-        mean: Number(stats.mean.toFixed(2)),
-        sd: Number(stats.sd.toFixed(2)),
+        mean: Number(safeMean.toFixed(2)),
+        sd: Number(safeSd.toFixed(2)),
         val: latestVal,
-        zScore: Number(zScore.toFixed(2)),
+        zScore: Number(safeZ.toFixed(2)),
         status
       };
     });

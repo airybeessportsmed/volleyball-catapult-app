@@ -30,12 +30,12 @@ export const METRICS_MAP = [
   { key: "physiologicalMarker", label: "生理学マーカー(CK)", desc: "客観状態: 血液生化学(筋肉損傷)", unit: "U/L", polarity: "positive", category: "state_obj" },
 ] as const;
 
-function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", history = [], polarity = "positive" }: {
+function ZScoreBar({ label, zScore = 0, status = "green", val = 0, baselineMean = 0, unit = "", history = [], polarity = "positive" }: {
   label: string;
-  zScore: number;
-  status: "green" | "yellow" | "red";
-  val: number;
-  baselineMean: number;
+  zScore?: number;
+  status?: "green" | "yellow" | "red";
+  val?: number;
+  baselineMean?: number;
   unit?: string;
   history?: number[];
   polarity?: "positive" | "negative";
@@ -44,13 +44,18 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
   const sparklineHeight = 22;
   let sparklinePoints = "";
   
-  if (history.length > 1) {
-    const minVal = Math.min(...history);
-    const maxVal = Math.max(...history);
+  const safeZScore = isNaN(zScore) || !isFinite(zScore) ? 0 : zScore;
+  const safeBaselineMean = isNaN(baselineMean) || !isFinite(baselineMean) ? 0 : baselineMean;
+  const safeVal = isNaN(val) || !isFinite(val) ? 0 : val;
+  const safeHistory = Array.isArray(history) ? history.filter(v => v !== null && !isNaN(v) && isFinite(v)) : [];
+
+  if (safeHistory.length > 1) {
+    const minVal = Math.min(...safeHistory);
+    const maxVal = Math.max(...safeHistory);
     const valDiff = maxVal - minVal;
-    const stepX = sparklineWidth / (history.length - 1);
+    const stepX = sparklineWidth / (safeHistory.length - 1);
     
-    const pts = history.map((v, idx) => {
+    const pts = safeHistory.map((v, idx) => {
       const x = idx * stepX;
       const y = sparklineHeight - 3 - (valDiff > 0 ? ((v - minVal) / valDiff) * (sparklineHeight - 6) : (sparklineHeight - 6) / 2);
       return `${x},${y}`;
@@ -58,21 +63,21 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
     sparklinePoints = pts.join(" ");
   }
 
-  const pinPercent = Math.min(100, Math.max(0, ((zScore + 3) / 6) * 100));
+  const pinPercent = Math.min(100, Math.max(0, ((safeZScore + 3) / 6) * 100));
   
   let reliabilityText = "データ不足";
   let reliabilityBg = "#E2E8F0";
   let reliabilityColor = "#64748B";
   
-  if (history.length >= 14) {
+  if (safeHistory.length >= 14) {
     reliabilityText = "信頼性 高";
     reliabilityBg = "#DBEAFE";
     reliabilityColor = "#1D4ED8";
-  } else if (history.length >= 7) {
+  } else if (safeHistory.length >= 7) {
     reliabilityText = "信頼性 中";
     reliabilityBg = "#FEF3C7";
     reliabilityColor = "#D97706";
-  } else if (history.length >= 3) {
+  } else if (safeHistory.length >= 3) {
     reliabilityText = "信頼性 低";
     reliabilityBg = "#FEE2E2";
     reliabilityColor = "#DC2626";
@@ -88,11 +93,15 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
     return "#385723";
   };
 
+  const diffMaxMin = safeHistory.length > 0 ? Math.max(...safeHistory) - Math.min(...safeHistory) : 0;
+  const lastHistoryVal = safeHistory.length > 0 ? safeHistory[safeHistory.length - 1] : 0;
+  const minHistoryVal = safeHistory.length > 0 ? Math.min(...safeHistory) : 0;
+
   return (
     <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 6, paddingVertical: 4, borderBottomWidth: 1, borderColor: "#F1F5F9" }}>
       <View style={{ width: 105, gap: 2 }}>
         <Text style={{ fontSize: 12, color: "#1E293B", fontWeight: "bold" }}>{label}</Text>
-        {history.length > 1 ? (
+        {safeHistory.length > 1 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <Svg width={sparklineWidth} height={sparklineHeight}>
               <Polyline
@@ -103,7 +112,7 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
               />
               <Circle
                 cx={sparklineWidth}
-                cy={sparklineHeight - 3 - (Math.max(...history) - Math.min(...history) > 0 ? ((history[history.length - 1] - Math.min(...history)) / (Math.max(...history) - Math.min(...history))) * (sparklineHeight - 6) : (sparklineHeight - 6) / 2)}
+                cy={sparklineHeight - 3 - (diffMaxMin > 0 ? ((lastHistoryVal - minHistoryVal) / diffMaxMin) * (sparklineHeight - 6) : (sparklineHeight - 6) / 2)}
                 r="2.5"
                 fill="#FF6B35"
               />
@@ -116,10 +125,10 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
 
       <View style={{ width: 85, gap: 1 }}>
         <Text style={{ fontSize: 11, fontWeight: "bold", color: "#1E293B" }}>
-          {val % 1 === 0 ? val : val.toFixed(1)} <Text style={{ fontSize: 8, fontWeight: "normal", color: "#64748B" }}>{unit}</Text>
+          {safeVal % 1 === 0 ? safeVal : safeVal.toFixed(1)} <Text style={{ fontSize: 8, fontWeight: "normal", color: "#64748B" }}>{unit}</Text>
         </Text>
         <Text style={{ fontSize: 8, color: "#94A3B8" }}>
-          基準: {baselineMean.toFixed(1)}
+          基準: {safeBaselineMean.toFixed(1)}
         </Text>
       </View>
 
@@ -140,7 +149,7 @@ function ZScoreBar({ label, zScore, status, val, baselineMean, unit = "", histor
         </View>
         
         <Text style={{ position: "absolute", left: `${Math.min(80, Math.max(0, pinPercent - 15))}%`, bottom: -6, fontSize: 8, fontWeight: "bold", color: getPinColor(status) }}>
-          {zScore > 0 ? `+${zScore.toFixed(1)}` : zScore.toFixed(1)} SD
+          {safeZScore > 0 ? `+${safeZScore.toFixed(1)}` : safeZScore.toFixed(1)} SD
         </Text>
       </View>
 
@@ -290,7 +299,11 @@ export default function AthleteAnalyticsScreen() {
     const chronic = analytics.acwr.chronic;
     const status = analytics.acwr.status;
 
-    const clampedVal = Math.max(0.0, Math.min(2.0, acwrVal));
+    const safeAcwrVal = isNaN(acwrVal) || !isFinite(acwrVal) ? 1.0 : acwrVal;
+    const safeAcute = isNaN(acute) || !isFinite(acute) ? 0.0 : acute;
+    const safeChronic = isNaN(chronic) || !isFinite(chronic) ? 0.0 : chronic;
+
+    const clampedVal = Math.max(0.0, Math.min(2.0, safeAcwrVal));
     const percent = (clampedVal / 2.0) * 100;
 
     let statusText = "適正負荷";
@@ -384,17 +397,17 @@ export default function AthleteAnalyticsScreen() {
         <View className="flex-row justify-between items-center bg-muted/10 p-3 rounded-2xl border border-border/40">
           <View className="items-center flex-1">
             <Text className="text-[9px] text-muted font-bold mb-0.5">ACWRスコア</Text>
-            <Text className="text-xl font-extrabold text-foreground font-mono">{acwrVal.toFixed(2)}</Text>
+            <Text className="text-xl font-extrabold text-foreground font-mono">{safeAcwrVal.toFixed(2)}</Text>
           </View>
           <View className="w-[1px] h-8 bg-border" />
           <View className="items-center flex-1">
             <Text className="text-[9px] text-muted font-bold mb-0.5">急性的負荷 (7日間平均)</Text>
-            <Text className="text-base font-extrabold text-foreground font-mono">{acute}</Text>
+            <Text className="text-base font-extrabold text-foreground font-mono">{safeAcute}</Text>
           </View>
           <View className="w-[1px] h-8 bg-border" />
           <View className="items-center flex-1">
             <Text className="text-[9px] text-muted font-bold mb-0.5">慢性的負荷 (28日間平均)</Text>
-            <Text className="text-base font-extrabold text-foreground font-mono">{chronic}</Text>
+            <Text className="text-base font-extrabold text-foreground font-mono">{safeChronic}</Text>
           </View>
         </View>
 
@@ -506,14 +519,19 @@ export default function AthleteAnalyticsScreen() {
           </View>
         </View>
 
-        {latest.duration && (
+        {!!latest.duration && (
           <View className="bg-muted/10 p-4 rounded-2xl border border-border/40 flex-row justify-between items-center">
             <View className="gap-0.5">
               <Text className="text-xs font-bold text-foreground">ジャンプ頻度</Text>
               <Text className="text-[10px] text-muted font-normal">練習時間1分間あたりのジャンプ数</Text>
             </View>
             <Text className="text-base font-extrabold text-foreground font-mono">
-              {(totalJumps / (latest.duration / 60)).toFixed(2)} 回/分
+              {(() => {
+                const durMin = Number(latest.duration) / 60;
+                if (durMin <= 0 || isNaN(durMin) || !isFinite(durMin)) return "--";
+                const freq = totalJumps / durMin;
+                return isNaN(freq) || !isFinite(freq) ? "--" : freq.toFixed(2);
+              })()} 回/分
             </Text>
           </View>
         )}
@@ -538,9 +556,12 @@ export default function AthleteAnalyticsScreen() {
           menuLoads = parsed || {};
           // ima は load の比率から適当に分配
           const totalIma = latest.accelCount || 0;
-          const totalLoad = latest.totalLoad ? Number(latest.totalLoad) : 1;
+          const rawTotalLoad = latest.totalLoad ? Number(latest.totalLoad) : 0;
+          const totalLoad = isNaN(rawTotalLoad) || !isFinite(rawTotalLoad) || rawTotalLoad <= 0 ? 1 : rawTotalLoad;
           Object.entries(menuLoads).forEach(([name, val]) => {
-            menuIma[name] = Math.round((Number(val) / totalLoad) * totalIma);
+            const rawVal = Number(val);
+            const safeRawVal = isNaN(rawVal) || !isFinite(rawVal) ? 0 : rawVal;
+            menuIma[name] = Math.round((safeRawVal / totalLoad) * totalIma);
           });
         }
       }
@@ -551,10 +572,13 @@ export default function AthleteAnalyticsScreen() {
     const isLoad = menuMetric === "load";
     const targetData = isLoad ? menuLoads : menuIma;
 
-    const menuItems = Object.entries(targetData).map(([name, val]) => ({
-      name,
-      value: Number(val)
-    })).sort((a, b) => b.value - a.value);
+    const menuItems = Object.entries(targetData).map(([name, val]) => {
+      const num = Number(val);
+      return {
+        name,
+        value: isNaN(num) || !isFinite(num) || num < 0 ? 0 : num
+      };
+    }).sort((a, b) => b.value - a.value);
 
     const totalSum = menuItems.reduce((a, b) => a + b.value, 0) || 1;
 
@@ -688,9 +712,13 @@ export default function AthleteAnalyticsScreen() {
 
         <View className="gap-5">
           {metrics.map((m, idx) => {
-            const ownVal = (own as any)[m.key];
-            const teamVal = (team as any)[m.key];
-            const posVal = (pos as any)[m.key];
+            const rawOwnVal = own ? (own as any)[m.key] : 0;
+            const rawTeamVal = team ? (team as any)[m.key] : 0;
+            const rawPosVal = pos ? (pos as any)[m.key] : 0;
+
+            const ownVal = isNaN(rawOwnVal) || rawOwnVal === null || rawOwnVal === undefined ? 0 : Number(rawOwnVal);
+            const teamVal = isNaN(rawTeamVal) || rawTeamVal === null || rawTeamVal === undefined ? 0 : Number(rawTeamVal);
+            const posVal = isNaN(rawPosVal) || rawPosVal === null || rawPosVal === undefined ? 0 : Number(rawPosVal);
             
             const maxVal = Math.max(ownVal, teamVal, posVal, 1);
             
@@ -1402,10 +1430,14 @@ export default function AthleteAnalyticsScreen() {
             <SvgText x={paddingLeft - 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#FF6B35" textAnchor="end">{Math.round(maxLoad / 2)}</SvgText>
             <SvgText x={paddingLeft - 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#FF6B35" textAnchor="end">0</SvgText>
 
-            {/* Right Y axis labels (sRPE) */}
-            <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + 3} fontSize="8" fill="#8B5CF6" fontWeight="bold" textAnchor="start">{Math.round(maxSRPE)}</SvgText>
-            <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">{Math.round(maxSRPE / 2)}</SvgText>
-            <SvgText x={chartWidth - paddingRight + 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">0</SvgText>
+            {/* Right Y axis labels */}
+            {chartRightMetric !== "none" && (
+              <>
+                <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + 3} fontSize="8" fill="#8B5CF6" fontWeight="bold" textAnchor="start">{Math.round(maxSRPE)}</SvgText>
+                <SvgText x={chartWidth - paddingRight + 6} y={paddingTop + graphHeight / 2 + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">{Math.round(maxSRPE / 2)}</SvgText>
+                <SvgText x={chartWidth - paddingRight + 6} y={chartHeight - paddingBottom + 3} fontSize="8" fill="#8B5CF6" textAnchor="start">0</SvgText>
+              </>
+            )}
 
             {/* Paths */}
             {loadLinePath ? (
