@@ -3425,13 +3425,16 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       let targetPastSessions: any[] = [];
 
       if (m.type === "load") {
-        // --- 負荷（LOAD）指標: 前日のデータをもとに当日の状態への影響を測る ---
-        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr) || null;
+        // --- 負荷（LOAD）指標: 直近の練習セッションデータをもとに評価する ---
+        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
+                    || allPerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr)
+                    || allPerf[0]
+                    || null;
         if (targetRecord) {
           const targetIndex = allPerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = allPerf.slice(targetIndex + 1).slice(0, baselineDays);
         } else {
-          // 前日データがない場合のフォールバック: 最新セッションより過去のものを参照
+          // データがない場合のフォールバック: 最新セッションより過去のものを参照
           targetPastSessions = allPerf.slice(1).slice(0, baselineDays);
         }
       } else {
@@ -3864,13 +3867,16 @@ export async function getTeamAnalytics(teamId: number) {
       let targetPastSessions: any[] = [];
 
       if (m.type === "load") {
-        // --- 負荷（LOAD）指標: 前日のデータをもとに当日の状態への影響を測る ---
-        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr) || null;
+        // --- 負荷（LOAD）指標: 直近の練習セッションデータをもとに評価する ---
+        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
+                    || athletePerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr)
+                    || athletePerf[0]
+                    || null;
         if (targetRecord) {
           const targetIndex = athletePerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = athletePerf.slice(targetIndex + 1).slice(0, baselineDays);
         } else {
-          // 前日データがない場合のフォールバック: 最新セッションより過去のものを参照
+          // データがない場合のフォールバック: 最新セッションより過去のものを参照
           targetPastSessions = athletePerf.slice(1).slice(0, baselineDays);
         }
       } else {
