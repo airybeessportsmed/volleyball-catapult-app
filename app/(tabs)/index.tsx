@@ -2624,6 +2624,7 @@ export default function HomeScreen() {
     const redAthletes = allAthletes.filter(a => a.overallStatus === "red");
     const yellowAthletes = allAthletes.filter(a => a.overallStatus === "yellow");
     const greenAthletes = allAthletes.filter(a => a.overallStatus === "green");
+    const pendingAthletes = allAthletes.filter(a => a.overallStatus === "pending");
 
     const trendData = teamAnalytics?.trend || [];
     const posComparison = teamAnalytics?.positionComparison || [];
@@ -2990,6 +2991,15 @@ export default function HomeScreen() {
                     <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
                   )}
                 </View>
+
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#64748B", marginBottom: 10 }}>{t("⚪ 未入力 / データ不足 (", "⚪ Unreported / Insufficient (")}{pendingAthletes.length}{t("名)", " athletes)")}</Text>
+                  {pendingAthletes.length > 0 ? (
+                    pendingAthletes.map(ath => renderSummaryAthleteCard(ath))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
+                  )}
+                </View>
               </View>
             )}
 
@@ -3009,16 +3019,19 @@ export default function HomeScreen() {
                           const rCount = redAthletes.length;
                           const yCount = yellowAthletes.length;
                           const gCount = greenAthletes.length;
+                          const pCount = pendingAthletes.length;
                           
                           const rPerc = rCount / total;
                           const yPerc = yCount / total;
                           const gPerc = gCount / total;
+                          const pPerc = pCount / total;
 
                           // Circumference = 2 * PI * r = 2 * PI * 35 = 219.9
                           const c = 219.9;
                           const redStroke = rPerc * c;
                           const yellowStroke = yPerc * c;
                           const greenStroke = gPerc * c;
+                          const pendingStroke = pPerc * c;
                           
                           let offset = 0;
                           const paths = [];
@@ -3033,6 +3046,10 @@ export default function HomeScreen() {
                           }
                           if (gCount > 0) {
                             paths.push(<Circle key="green" cx="50" cy="50" r="35" fill="transparent" stroke="#10B981" strokeWidth="10" strokeDasharray={`${greenStroke} ${c}`} strokeDashoffset={offset} transform="rotate(-90 50 50)" />);
+                            offset -= greenStroke;
+                          }
+                          if (pCount > 0) {
+                            paths.push(<Circle key="pending" cx="50" cy="50" r="35" fill="transparent" stroke="#94A3B8" strokeWidth="10" strokeDasharray={`${pendingStroke} ${c}`} strokeDashoffset={offset} transform="rotate(-90 50 50)" />);
                           }
                           return paths;
                         })()}
@@ -3042,10 +3059,11 @@ export default function HomeScreen() {
                         <Text style={{ fontSize: 10, color: "#64748B" }}>名</Text>
                       </View>
                     </View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%", borderTopWidth: 1, borderColor: "#F1F5F9", paddingTop: 10 }}>
-                      <View style={{ alignItems: "center" }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#EF4444" }}>🔴 要確認</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{redAthletes.length}名</Text></View>
-                      <View style={{ alignItems: "center" }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#F59E0B" }}>🟡 注意</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{yellowAthletes.length}名</Text></View>
-                      <View style={{ alignItems: "center" }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#10B981" }}>🟢 良好</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{greenAthletes.length}名</Text></View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%", borderTopWidth: 1, borderColor: "#F1F5F9", paddingTop: 10, flexWrap: "wrap", gap: 8 }}>
+                      <View style={{ alignItems: "center", minWidth: 60 }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#EF4444" }}>🔴 要確認</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{redAthletes.length}名</Text></View>
+                      <View style={{ alignItems: "center", minWidth: 60 }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#F59E0B" }}>🟡 注意</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{yellowAthletes.length}名</Text></View>
+                      <View style={{ alignItems: "center", minWidth: 60 }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#10B981" }}>🟢 良好</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{greenAthletes.length}名</Text></View>
+                      <View style={{ alignItems: "center", minWidth: 60 }}><Text style={{ fontSize: 11, fontWeight: "bold", color: "#64748B" }}>⚪ 未入力</Text><Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>{pendingAthletes.length}名</Text></View>
                     </View>
                   </View>
 

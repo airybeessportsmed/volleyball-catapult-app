@@ -3500,13 +3500,20 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     // 総合ステータス（重要項目として設定されている指標のみで判定）
     let overallStatus: "green" | "yellow" | "red" | "pending" = "green";
     
+    const activeSignals = Object.keys(signals)
+      .filter(k => alertingMetrics.includes(k))
+      .map(k => signals[k]);
+
     if (!hasWellnessData) {
-      overallStatus = "pending";
+      // Wellnessが未入力でも、運動量やその他のデータでアラート（赤・黄）があればステータスを引き上げる
+      if (activeSignals.includes("red")) {
+        overallStatus = "red";
+      } else if (activeSignals.includes("yellow")) {
+        overallStatus = "yellow";
+      } else {
+        overallStatus = "pending";
+      }
     } else {
-      const activeSignals = Object.keys(signals)
-        .filter(k => alertingMetrics.includes(k))
-        .map(k => signals[k]);
-        
       if (activeSignals.includes("red")) {
         overallStatus = "red";
       } else if (activeSignals.includes("yellow")) {
@@ -3532,10 +3539,31 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       metricHistory[m.key] = vals;
     });
 
+    const translateKey = (k: string) => {
+      if (k === "totalJumps") return "ジャンプ量";
+      if (k === "sRPE") return "sRPE";
+      if (k === "hrv") return "HRV";
+      if (k === "wellnessSoreness") return "筋肉痛(DOMS)";
+      if (k === "wellnessSleep") return "睡眠";
+      if (k === "wellnessFatigue") return "疲労感";
+      if (k === "totalDistance") return "走行距離";
+      if (k === "highIntensityDistance") return "高強度走行距離";
+      if (k === "avgHeartRate") return "心拍数";
+      if (k === "physiologicalMarker") return "CK値";
+      return k;
+    };
+
     const autoSummary = isDataAccumulating 
       ? "データ蓄積中（正常🟢）です。過去3日分のデータが集まると自動判定が始まります。"
       : !hasWellnessData
-      ? "本日の朝のコンディション報告（Wellnessアンケートなど）がまだ入力されていません。"
+      ? (overallStatus === "red" || overallStatus === "yellow"
+        ? (() => {
+            const reds = Object.keys(signals).filter(k => alertingMetrics.includes(k) && signals[k] === "red").map(translateKey);
+            const yellows = Object.keys(signals).filter(k => alertingMetrics.includes(k) && signals[k] === "yellow").map(translateKey);
+            const alertNames = [...reds, ...yellows].join("、");
+            return `【朝の報告未入力】ですが、前日の運動量等（${alertNames}）で個人基準値からの逸脱（アラート）を検出しています。確認してください。`;
+          })()
+        : "本日の朝のコンディション報告（Wellnessアンケートなど）がまだ入力されていません。")
       : generateAutoSummary(activeSignalsObj, activeZStats);
 
     return {
@@ -3909,13 +3937,19 @@ export async function getTeamAnalytics(teamId: number) {
     // 総合ステータス（重要項目として設定されている指標のみで判定）
     let overallStatus: "green" | "yellow" | "red" | "pending" = "green";
     
+    const activeSignals = Object.keys(signals)
+      .filter(k => alertingMetrics.includes(k))
+      .map(k => signals[k]);
+
     if (!hasWellnessData) {
-      overallStatus = "pending";
+      if (activeSignals.includes("red")) {
+        overallStatus = "red";
+      } else if (activeSignals.includes("yellow")) {
+        overallStatus = "yellow";
+      } else {
+        overallStatus = "pending";
+      }
     } else {
-      const activeSignals = Object.keys(signals)
-        .filter(k => alertingMetrics.includes(k))
-        .map(k => signals[k]);
-        
       if (activeSignals.includes("red")) {
         overallStatus = "red";
       } else if (activeSignals.includes("yellow")) {
@@ -3930,10 +3964,31 @@ export async function getTeamAnalytics(teamId: number) {
       activeSignalsObj[k] = signals[k];
     });
 
+    const translateKey = (k: string) => {
+      if (k === "totalJumps") return "ジャンプ量";
+      if (k === "sRPE") return "sRPE";
+      if (k === "hrv") return "HRV";
+      if (k === "wellnessSoreness") return "筋肉痛(DOMS)";
+      if (k === "wellnessSleep") return "睡眠";
+      if (k === "wellnessFatigue") return "疲労感";
+      if (k === "totalDistance") return "走行距離";
+      if (k === "highIntensityDistance") return "高強度走行距離";
+      if (k === "avgHeartRate") return "心拍数";
+      if (k === "physiologicalMarker") return "CK値";
+      return k;
+    };
+
     const autoSummary = isDataAccumulating 
       ? "データ蓄積中（正常🟢）です。"
       : !hasWellnessData
-      ? "本日のコンディション報告がまだ入力されていません。"
+      ? (overallStatus === "red" || overallStatus === "yellow"
+        ? (() => {
+            const reds = Object.keys(signals).filter(k => alertingMetrics.includes(k) && signals[k] === "red").map(translateKey);
+            const yellows = Object.keys(signals).filter(k => alertingMetrics.includes(k) && signals[k] === "yellow").map(translateKey);
+            const alertNames = [...reds, ...yellows].join("、");
+            return `【朝の報告未入力】ですが、前日の運動量等（${alertNames}）で個人基準値からの逸脱（アラート）を検出しています。`;
+          })()
+        : "本日のコンディション報告がまだ入力されていません。")
       : generateAutoSummaryForTeam(activeSignalsObj, activeZStats);
 
     const metricHistory: Record<string, number[]> = {};
