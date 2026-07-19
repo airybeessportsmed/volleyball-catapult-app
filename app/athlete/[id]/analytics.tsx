@@ -1017,21 +1017,21 @@ export default function AthleteAnalyticsScreen() {
       <View style={{ gap: 16 }}>
         {/* 1. コンディション自動要約バナー (画像のような薄赤バナー) */}
         <View style={{
-          backgroundColor: signal.status === "red" ? "#FDF2F2" : signal.status === "yellow" ? "#FFFDF5" : "#F4FBF7",
-          borderColor: signal.status === "red" ? "#F8D7DA" : signal.status === "yellow" ? "#FFF3CD" : "#D1E7DD",
+          backgroundColor: signal.status === "red" ? "#FDF2F2" : signal.status === "yellow" ? "#FFFDF5" : signal.status === "pending" ? "#F1F5F9" : "#F4FBF7",
+          borderColor: signal.status === "red" ? "#F8D7DA" : signal.status === "yellow" ? "#FFF3CD" : signal.status === "pending" ? "#CBD5E1" : "#D1E7DD",
           borderWidth: 1, borderRadius: 16, padding: 16
         }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <Text style={{ fontSize: 18 }}>
-              {signal.status === "red" ? "🔴" : signal.status === "yellow" ? "🟡" : "🟢"}
+              {signal.status === "red" ? "🔴" : signal.status === "yellow" ? "🟡" : signal.status === "pending" ? "⚪" : "🟢"}
             </Text>
-            <Text style={{ fontSize: 14, fontWeight: "bold", color: signal.status === "red" ? "#842029" : signal.status === "yellow" ? "#664D03" : "#0F5132" }}>
-              本日のコンディション判定: {signal.status === "red" ? "要確認" : signal.status === "yellow" ? "注意" : "良好"}
+            <Text style={{ fontSize: 14, fontWeight: "bold", color: signal.status === "red" ? "#842029" : signal.status === "yellow" ? "#664D03" : signal.status === "pending" ? "#475569" : "#0F5132" }}>
+              本日のコンディション判定: {signal.status === "red" ? "要確認" : signal.status === "yellow" ? "注意" : signal.status === "pending" ? "未入力" : "良好"}
             </Text>
           </View>
           <Text style={{
             fontSize: 12, fontWeight: "semibold",
-            color: signal.status === "red" ? "#842029" : signal.status === "yellow" ? "#664D03" : "#0F5132",
+            color: signal.status === "red" ? "#842029" : signal.status === "yellow" ? "#664D03" : signal.status === "pending" ? "#475569" : "#0F5132",
             lineHeight: 18
           }}>
             {signal.statusText}

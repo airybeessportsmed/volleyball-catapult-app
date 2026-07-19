@@ -3411,7 +3411,7 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
     const signals: Record<string, "green" | "yellow" | "red"> = {};
     
     // Determine the base "today" date string for state metrics
-    const todayStr = targetDateStr || (allPerf.length > 0 ? formatDateKey(new Date(allPerf[0].date)) : formatDateKey(new Date()));
+    const todayStr = targetDateStr || formatDateKey(new Date());
     
     // Determine the "yesterday" date string for load metrics
     const todayObj = new Date(todayStr);
@@ -3486,16 +3486,32 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       };
     });
 
+    // 状態系（Wellness等）の当日データが登録されているか判定
+    let hasWellnessData = false;
+    const todayStateRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr);
+    if (todayStateRecord) {
+      const checkKeys = ["wellnessFatigue", "wellnessSoreness", "wellnessStress", "wellnessSleep", "hrv", "soxaiSleepDuration"];
+      hasWellnessData = checkKeys.some(k => {
+        const val = getVal(todayStateRecord, k);
+        return val !== null && !isNaN(val);
+      });
+    }
+
     // 総合ステータス（重要項目として設定されている指標のみで判定）
-    let overallStatus: "green" | "yellow" | "red" = "green";
-    const activeSignals = Object.keys(signals)
-      .filter(k => alertingMetrics.includes(k))
-      .map(k => signals[k]);
-      
-    if (activeSignals.includes("red")) {
-      overallStatus = "red";
-    } else if (activeSignals.includes("yellow")) {
-      overallStatus = "yellow";
+    let overallStatus: "green" | "yellow" | "red" | "pending" = "green";
+    
+    if (!hasWellnessData) {
+      overallStatus = "pending";
+    } else {
+      const activeSignals = Object.keys(signals)
+        .filter(k => alertingMetrics.includes(k))
+        .map(k => signals[k]);
+        
+      if (activeSignals.includes("red")) {
+        overallStatus = "red";
+      } else if (activeSignals.includes("yellow")) {
+        overallStatus = "yellow";
+      }
     }
 
     // 自動テキスト要約
@@ -3518,6 +3534,8 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
 
     const autoSummary = isDataAccumulating 
       ? "データ蓄積中（正常🟢）です。過去3日分のデータが集まると自動判定が始まります。"
+      : !hasWellnessData
+      ? "本日の朝のコンディション報告（Wellnessアンケートなど）がまだ入力されていません。"
       : generateAutoSummary(activeSignalsObj, activeZStats);
 
     return {
@@ -3808,7 +3826,7 @@ export async function getTeamAnalytics(teamId: number) {
     const signals: Record<string, "green" | "yellow" | "red"> = {};
 
     // Determine target dates for this athlete
-    const todayStr = athletePerf.length > 0 ? formatDateKey(new Date(athletePerf[0].date)) : formatDateKey(new Date());
+    const todayStr = formatDateKey(new Date());
     const todayObj = new Date(todayStr);
     const yesterdayObj = new Date(todayObj.getTime() - 24 * 60 * 60 * 1000);
     const yesterdayStr = formatDateKey(yesterdayObj);
@@ -3877,16 +3895,32 @@ export async function getTeamAnalytics(teamId: number) {
       };
     });
 
+    // 状態系（Wellness等）の当日データが登録されているか判定
+    let hasWellnessData = false;
+    const todayStateRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr);
+    if (todayStateRecord) {
+      const checkKeys = ["wellnessFatigue", "wellnessSoreness", "wellnessStress", "wellnessSleep", "hrv", "soxaiSleepDuration"];
+      hasWellnessData = checkKeys.some(k => {
+        const val = getVal(todayStateRecord, k);
+        return val !== null && !isNaN(val);
+      });
+    }
+
     // 総合ステータス（重要項目として設定されている指標のみで判定）
-    let overallStatus: "green" | "yellow" | "red" = "green";
-    const activeSignals = Object.keys(signals)
-      .filter(k => alertingMetrics.includes(k))
-      .map(k => signals[k]);
-      
-    if (activeSignals.includes("red")) {
-      overallStatus = "red";
-    } else if (activeSignals.includes("yellow")) {
-      overallStatus = "yellow";
+    let overallStatus: "green" | "yellow" | "red" | "pending" = "green";
+    
+    if (!hasWellnessData) {
+      overallStatus = "pending";
+    } else {
+      const activeSignals = Object.keys(signals)
+        .filter(k => alertingMetrics.includes(k))
+        .map(k => signals[k]);
+        
+      if (activeSignals.includes("red")) {
+        overallStatus = "red";
+      } else if (activeSignals.includes("yellow")) {
+        overallStatus = "yellow";
+      }
     }
 
     const activeZStats: Record<string, any> = {};
@@ -3898,6 +3932,8 @@ export async function getTeamAnalytics(teamId: number) {
 
     const autoSummary = isDataAccumulating 
       ? "データ蓄積中（正常🟢）です。"
+      : !hasWellnessData
+      ? "本日のコンディション報告がまだ入力されていません。"
       : generateAutoSummaryForTeam(activeSignalsObj, activeZStats);
 
     const metricHistory: Record<string, number[]> = {};

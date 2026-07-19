@@ -1883,21 +1883,21 @@ export default function HomeScreen() {
                   <View style={{ gap: 16 }}>
                     {/* コンディション自動要約バナー */}
                     <View style={{
-                      backgroundColor: analytics.signalLight.status === "red" ? "#FDF2F2" : analytics.signalLight.status === "yellow" ? "#FFFDF5" : "#F4FBF7",
-                      borderColor: analytics.signalLight.status === "red" ? "#F8D7DA" : analytics.signalLight.status === "yellow" ? "#FFF3CD" : "#D1E7DD",
+                      backgroundColor: analytics.signalLight.status === "red" ? "#FDF2F2" : analytics.signalLight.status === "yellow" ? "#FFFDF5" : analytics.signalLight.status === "pending" ? "#F1F5F9" : "#F4FBF7",
+                      borderColor: analytics.signalLight.status === "red" ? "#F8D7DA" : analytics.signalLight.status === "yellow" ? "#FFF3CD" : analytics.signalLight.status === "pending" ? "#CBD5E1" : "#D1E7DD",
                       borderWidth: 1, borderRadius: 16, padding: 16
                     }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <Text style={{ fontSize: 18 }}>
-                          {analytics.signalLight.status === "red" ? "🔴" : analytics.signalLight.status === "yellow" ? "🟡" : "🟢"}
+                          {analytics.signalLight.status === "red" ? "🔴" : analytics.signalLight.status === "yellow" ? "🟡" : analytics.signalLight.status === "pending" ? "⚪" : "🟢"}
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: "bold", color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : "#0F5132" }}>
-                          本日のコンディション判定: {analytics.signalLight.status === "red" ? "要確認" : analytics.signalLight.status === "yellow" ? "注意" : "良好"}
+                        <Text style={{ fontSize: 14, fontWeight: "bold", color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : analytics.signalLight.status === "pending" ? "#475569" : "#0F5132" }}>
+                          本日のコンディション判定: {analytics.signalLight.status === "red" ? "要確認" : analytics.signalLight.status === "yellow" ? "注意" : analytics.signalLight.status === "pending" ? "未入力" : "良好"}
                         </Text>
                       </View>
                       <Text style={{
                         fontSize: 12, fontWeight: "semibold",
-                        color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : "#0F5132",
+                        color: analytics.signalLight.status === "red" ? "#842029" : analytics.signalLight.status === "yellow" ? "#664D03" : analytics.signalLight.status === "pending" ? "#475569" : "#0F5132",
                         lineHeight: 18
                       }}>
                         {analytics.signalLight.statusText}
@@ -2730,14 +2730,14 @@ export default function HomeScreen() {
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={{
-                backgroundColor: ath.overallStatus === "red" ? "#FCE4D6" : ath.overallStatus === "yellow" ? "#FFF2CC" : "#E2F0D9",
+                backgroundColor: ath.overallStatus === "red" ? "#FCE4D6" : ath.overallStatus === "yellow" ? "#FFF2CC" : ath.overallStatus === "pending" ? "#E2E8F0" : "#E2F0D9",
                 paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99
               }}>
                 <Text style={{
                   fontSize: 11, fontWeight: "bold",
-                  color: ath.overallStatus === "red" ? "#C00000" : ath.overallStatus === "yellow" ? "#7F6000" : "#385723"
+                  color: ath.overallStatus === "red" ? "#C00000" : ath.overallStatus === "yellow" ? "#7F6000" : ath.overallStatus === "pending" ? "#475569" : "#385723"
                 }}>
-                  {ath.overallStatus === "red" ? "要確認" : ath.overallStatus === "yellow" ? "注意" : "良好"}
+                  {ath.overallStatus === "red" ? "要確認" : ath.overallStatus === "yellow" ? "注意" : ath.overallStatus === "pending" ? "未入力" : "良好"}
                 </Text>
               </View>
               <IconSymbol size={16} name={isExpanded ? "chevron.up" : "chevron.down"} color="#64748B" />
@@ -2748,13 +2748,13 @@ export default function HomeScreen() {
             <View style={{ padding: 16, backgroundColor: "#F8FAFC", gap: 16 }}>
               {/* 1. コンディション自動要約バナー (画像のような薄赤バナー) */}
               <View style={{
-                backgroundColor: ath.overallStatus === "red" ? "#FDF2F2" : ath.overallStatus === "yellow" ? "#FFFDF5" : "#F4FBF7",
-                borderColor: ath.overallStatus === "red" ? "#F8D7DA" : ath.overallStatus === "yellow" ? "#FFF3CD" : "#D1E7DD",
+                backgroundColor: ath.overallStatus === "red" ? "#FDF2F2" : ath.overallStatus === "yellow" ? "#FFFDF5" : ath.overallStatus === "pending" ? "#F1F5F9" : "#F4FBF7",
+                borderColor: ath.overallStatus === "red" ? "#F8D7DA" : ath.overallStatus === "yellow" ? "#FFF3CD" : ath.overallStatus === "pending" ? "#CBD5E1" : "#D1E7DD",
                 borderWidth: 1, borderRadius: 12, padding: 14
               }}>
                 <Text style={{
                   fontSize: 12, fontWeight: "bold",
-                  color: ath.overallStatus === "red" ? "#842029" : ath.overallStatus === "yellow" ? "#664D03" : "#0F5132",
+                  color: ath.overallStatus === "red" ? "#842029" : ath.overallStatus === "yellow" ? "#664D03" : ath.overallStatus === "pending" ? "#475569" : "#0F5132",
                   lineHeight: 18
                 }}>
                   📢 {ath.statusText}
