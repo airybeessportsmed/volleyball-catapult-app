@@ -3425,11 +3425,12 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
       let targetPastSessions: any[] = [];
 
       if (m.type === "load") {
-        // --- 負荷（LOAD）指標: 直近の練習セッションデータをもとに評価する ---
-        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
-                    || allPerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr)
-                    || allPerf[0]
-                    || null;
+        // --- 負荷（LOAD）指標: 該当指標に数値が入っている最新の練習セッションレコードを取得 ---
+        targetRecord = allPerf.find(p => {
+          const val = getVal(p, m.key);
+          return val !== null && !isNaN(val);
+        }) || null;
+
         if (targetRecord) {
           const targetIndex = allPerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = allPerf.slice(targetIndex + 1).slice(0, baselineDays);
@@ -3867,11 +3868,12 @@ export async function getTeamAnalytics(teamId: number) {
       let targetPastSessions: any[] = [];
 
       if (m.type === "load") {
-        // --- 負荷（LOAD）指標: 直近の練習セッションデータをもとに評価する ---
-        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
-                    || athletePerf.find(p => formatDateKey(new Date(p.date)) === yesterdayStr)
-                    || athletePerf[0]
-                    || null;
+        // --- 負荷（LOAD）指標: 該当指標に数値が入っている最新の練習セッションレコードを取得 ---
+        targetRecord = athletePerf.find(p => {
+          const val = getVal(p, m.key);
+          return val !== null && !isNaN(val);
+        }) || null;
+
         if (targetRecord) {
           const targetIndex = athletePerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = athletePerf.slice(targetIndex + 1).slice(0, baselineDays);
