@@ -2453,7 +2453,7 @@ export default function HomeScreen() {
                       </View>
                     </View>
 
-                    {/* 直近7日間の日別自主練 2軸統合グラフ (縦長200px: 左軸PL 橙棒, 右軸ジャンプ回数 青折れ線) */}
+                    {/* 直近7日間の日別自主練 2軸統合グラフ (縦長220px: 左軸PL 橙棒, 右軸ジャンプ回数 青折れ線) */}
                     <View style={{ gap: 8 }}>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                         <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
@@ -2471,27 +2471,32 @@ export default function HomeScreen() {
                         </View>
                       </View>
 
-                      {/* 2軸SVGグラフ領域 (200px 縦長) */}
-                      <View style={{ height: 200, width: "100%", backgroundColor: "#FAFAFA", borderRadius: 16, padding: 8, borderWidth: 1, borderColor: "#F1F5F9" }}>
-                        <Svg width="100%" height={184}>
-                          {(() => {
-                            const svgH = 184;
-                            const pTop = 25;
-                            const pBottom = 25;
-                            const pLeft = 32;
-                            const pRight = 32;
-                            const gH = svgH - pTop - pBottom;
-                            
-                            const maxL = Math.max(...last7Days.map(d => d.load), 10) * 1.2;
-                            const maxJ = Math.max(...last7Days.map(d => d.jumps), 10) * 1.2;
+                      {/* 2軸SVGグラフ領域 (220px 縦長・100%幅フルレスポンシブ) */}
+                      <View 
+                        style={{ height: 220, width: "100%", backgroundColor: "#FAFAFA", borderRadius: 16, padding: 8, borderWidth: 1, borderColor: "#F1F5F9" }}
+                      >
+                        {(() => {
+                          const svgH = 204;
+                          const pTop = 30;
+                          const pBottom = 28;
+                          const pLeft = 40;
+                          const pRight = 45;
+                          const gH = svgH - pTop - pBottom;
+                          
+                          // コンテナの実効横幅をレスポンシブ計算
+                          const containerW = Math.max(340, (windowWidth > 900 ? 800 : windowWidth) - 100);
+                          const graphW = containerW - pLeft - pRight;
 
-                            const numDays = last7Days.length;
-                            const graphW = 320; // ベース幅基準
+                          const maxL = Math.max(...last7Days.map(d => d.load), 10) * 1.25;
+                          const maxJ = Math.max(...last7Days.map(d => d.jumps), 10) * 1.25;
 
-                            // 各日のX位置とY位置の計算
-                            const linePoints: { x: number; y: number; jumps: number; hasData: boolean }[] = [];
+                          const numDays = last7Days.length;
 
-                            return (
+                          // 各日のX位置とY位置の計算
+                          const linePoints: { x: number; y: number; jumps: number; hasData: boolean }[] = [];
+
+                          return (
+                            <Svg width="100%" height={svgH} viewBox={`0 0 ${containerW} ${svgH}`}>
                               <G>
                                 {/* 背景グリッド線 */}
                                 <Line x1={pLeft} y1={pTop} x2={pLeft + graphW} y2={pTop} stroke="#E2E8F0" strokeDasharray="3 3" />
@@ -2499,20 +2504,20 @@ export default function HomeScreen() {
                                 <Line x1={pLeft} y1={pTop + gH} x2={pLeft + graphW} y2={pTop + gH} stroke="#CBD5E1" strokeWidth="1.5" />
 
                                 {/* 左軸目盛り (PL: 橙色) */}
-                                <SvgText x={pLeft - 4} y={pTop + 3} fontSize="8" fill="#D97706" fontWeight="bold" textAnchor="end">{Math.round(maxL)}</SvgText>
-                                <SvgText x={pLeft - 4} y={pTop + gH / 2 + 3} fontSize="8" fill="#D97706" textAnchor="end">{Math.round(maxL / 2)}</SvgText>
-                                <SvgText x={pLeft - 4} y={pTop + gH + 3} fontSize="8" fill="#D97706" textAnchor="end">0</SvgText>
+                                <SvgText x={pLeft - 6} y={pTop + 4} fontSize="9" fill="#D97706" fontWeight="bold" textAnchor="end">{Math.round(maxL)}</SvgText>
+                                <SvgText x={pLeft - 6} y={pTop + gH / 2 + 3} fontSize="9" fill="#D97706" textAnchor="end">{Math.round(maxL / 2)}</SvgText>
+                                <SvgText x={pLeft - 6} y={pTop + gH + 3} fontSize="9" fill="#D97706" textAnchor="end">0</SvgText>
 
                                 {/* 右軸目盛り (ジャンプ数: 青色) */}
-                                <SvgText x={pLeft + graphW + 4} y={pTop + 3} fontSize="8" fill="#2563EB" fontWeight="bold" textAnchor="start">{Math.round(maxJ)}</SvgText>
-                                <SvgText x={pLeft + graphW + 4} y={pTop + gH / 2 + 3} fontSize="8" fill="#2563EB" textAnchor="start">{Math.round(maxJ / 2)}</SvgText>
-                                <SvgText x={pLeft + graphW + 4} y={pTop + gH + 3} fontSize="8" fill="#2563EB" textAnchor="start">0</SvgText>
+                                <SvgText x={pLeft + graphW + 6} y={pTop + 4} fontSize="9" fill="#2563EB" fontWeight="bold" textAnchor="start">{Math.round(maxJ)}</SvgText>
+                                <SvgText x={pLeft + graphW + 6} y={pTop + gH / 2 + 3} fontSize="9" fill="#2563EB" textAnchor="start">{Math.round(maxJ / 2)}</SvgText>
+                                <SvgText x={pLeft + graphW + 6} y={pTop + gH + 3} fontSize="9" fill="#2563EB" textAnchor="start">0</SvgText>
 
                                 {/* 棒グラフ (Player Load) 描画 */}
                                 {last7Days.map((d, i) => {
                                   const step = graphW / (numDays - 1 || 1);
                                   const x = pLeft + i * step;
-                                  const barW = 22;
+                                  const barW = Math.min(36, Math.max(18, graphW / 14));
                                   const barH = d.hasData ? Math.max(4, (d.load / maxL) * gH) : 3;
                                   const barY = pTop + gH - barH;
 
@@ -2603,9 +2608,9 @@ export default function HomeScreen() {
                                   );
                                 })()}
                               </G>
-                            );
-                          })()}
-                        </Svg>
+                            </Svg>
+                          );
+                        })()}
                       </View>
                     </View>
                   </View>
