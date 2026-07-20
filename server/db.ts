@@ -1730,15 +1730,24 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
     if (newMenuObj[key]) {
       mergedMenuObj[key] = mergedMenuObj[key] || {};
       for (const mName of Object.keys(newMenuObj[key])) {
+        if (mName === "全体" || mName === "Total" || mName === "ALL" || mName === "total") {
+          continue;
+        }
         const val = parseFloat(newMenuObj[key][mName]);
         if (!isNaN(val)) {
           mergedMenuObj[key][mName] = val;
         }
       }
     }
+    if (mergedMenuObj[key]) {
+      delete mergedMenuObj[key]["全体"];
+      delete mergedMenuObj[key]["Total"];
+      delete mergedMenuObj[key]["ALL"];
+      delete mergedMenuObj[key]["total"];
+    }
   }
   for (const key of Object.keys(newMenuObj)) {
-    if (!keysToMerge.includes(key)) {
+    if (!keysToMerge.includes(key) && key !== "全体" && key !== "Total" && key !== "ALL") {
       mergedMenuObj[key] = newMenuObj[key];
     }
   }
@@ -2874,7 +2883,9 @@ export async function importPerformanceCsv(
         }
         const group = loadAggregations.get(groupKey)!;
         group.loads.push(loadVal);
-        group.menuLoads[menuName] = (group.menuLoads[menuName] || 0) + loadVal;
+        if (menuName !== "全体" && menuName !== "Total" && menuName !== "ALL") {
+          group.menuLoads[menuName] = (group.menuLoads[menuName] || 0) + loadVal;
+        }
       }
 
       const menuList = Array.from(loadAggregations.values());

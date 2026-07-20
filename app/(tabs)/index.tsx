@@ -669,7 +669,11 @@ export default function HomeScreen() {
     "sessionType",
     "sRPE",
     "note",
-    "fileName"
+    "fileName",
+    "全体",
+    "Total",
+    "ALL",
+    "total"
   ]), []);
 
   const catapultData = useMemo(() => {
