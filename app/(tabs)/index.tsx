@@ -12,10 +12,10 @@ const MINI_CHART_HEIGHT = 80;
 export const ATHLETE_METRICS_MAP = [
   { key: "totalJumps", label: "ジャンプ量", desc: "外的負荷: ジャンプ回数", unit: "回", polarity: "positive", category: "load_ext" },
   { key: "sRPE", label: "sRPE(全体)", desc: "内の負荷: 練習強度×時間", unit: "AU", polarity: "positive", category: "load_int" },
-  { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "negative", category: "state_obj" },
-  { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: 全身疲労", unit: "1-7", polarity: "negative", category: "state_subj" },
-  { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "1-7", polarity: "negative", category: "state_subj" },
-  { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "1-7", polarity: "negative", category: "state_subj" },
+  { key: "hrv", label: "HRV (心拍変動)", desc: "客観状態: 自律神経回復指標", unit: "ms", polarity: "positive", category: "state_obj" },
+  { key: "wellnessFatigue", label: "主観的疲労感", desc: "主観状態: コンディション・元気度", unit: "1-7", polarity: "positive", category: "state_subj" },
+  { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "1-7", polarity: "positive", category: "state_subj" },
+  { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "1-7", polarity: "positive", category: "state_subj" },
   { key: "totalDistance", label: "総走行距離", desc: "外的負荷: 移動距離", unit: "m", polarity: "positive", category: "load_ext" },
   { key: "highIntensityDistance", label: "高速走行距離", desc: "外的負荷: 高速移動距離", unit: "m", polarity: "positive", category: "load_ext" },
   { key: "avgHeartRate", label: "平均心拍数", desc: "客観負荷: 循環器系負荷", unit: "bpm", polarity: "positive", category: "load_int" },
@@ -247,7 +247,7 @@ export const METRICS_MAP = [
   { key: "soxaiSleepEfficiency", label: "睡眠効率 (SOXAI)", desc: "客観状態: 睡眠効率割合", unit: "%", polarity: "positive", category: "state_obj" },
   { key: "soxaiBedTimeStr", label: "就床時刻 (SOXAI)", desc: "客観状態: ベッドに入った時刻", unit: "時刻", polarity: "positive", category: "state_obj" },
   { key: "soxaiWakeTimeStr", label: "起床時刻 (SOXAI)", desc: "客観状態: 目が覚めた時刻", unit: "時刻", polarity: "positive", category: "state_obj" },
-  { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: 全身の疲労度(低スコア推奨)", unit: "点", polarity: "negative", category: "state_subj" },
+  { key: "wellnessFatigue", label: "疲労感", desc: "主観状態: コンディション・元気度", unit: "点", polarity: "positive", category: "state_subj" },
   { key: "wellnessStress", label: "気分・モチベーション", desc: "主観状態: 精神的コンディション", unit: "点", polarity: "positive", category: "state_subj" },
   { key: "wellnessSoreness", label: "食欲", desc: "主観状態: 内臓疲労・食欲", unit: "点", polarity: "positive", category: "state_subj" },
 ] as const;
