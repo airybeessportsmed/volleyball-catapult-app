@@ -1970,7 +1970,13 @@ export async function importPerformanceCsv(
     const tagIdx = findHeaderIndex(["tag", "タグ"]);
     const intensityIdx = findHeaderIndex(["intensity", "強度"]);
     const dfEventIdx = findHeaderIndex(["df event", "dfevent", "イベント"]);
-    const loadIdx = findHeaderIndex(["total player load", "player load", "load", "運動量", "value"]);
+    
+    // Total Player Load (J列) を最優先で取得。1D Fwd などの誤検出を防止
+    let loadIdx = findHeaderIndex(["total player load", "total_player_load", "totalplayerload"]);
+    if (loadIdx === -1) {
+      loadIdx = findHeaderIndex(["player load", "load", "運動量", "value"]);
+    }
+    
     const dateIdx = findHeaderIndex(["date", "日付"]);
     const jerseyIdx = findHeaderIndex(["jersey", "no", "背番号"]);
     const rpeIdx = findHeaderIndex(["rpe", "自覚的運動強度", "主観"]);
