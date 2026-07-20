@@ -3475,8 +3475,14 @@ export async function getAthleteAnalytics(athleteId: number, targetDateStr?: str
           targetPastSessions = allPerf.slice(1).slice(0, baselineDays);
         }
       } else {
-        // --- 状態（STATE）指標: 当日のデータ（朝の心拍や体調報告）をもとに測る ---
-        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr) || null;
+        // --- 状態（STATE）指標: 当日のデータをもとに測る（無ければ最新のSOXAI/STATEデータレコードを参照） ---
+        targetRecord = allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr && getVal(p, m.key) !== null)
+                    || allPerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
+                    || allPerf.find(p => {
+                        const val = getVal(p, m.key);
+                        return val !== null && !isNaN(val);
+                       })
+                    || null;
         if (targetRecord) {
           const targetIndex = allPerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = allPerf.slice(targetIndex + 1).slice(0, baselineDays);
@@ -3918,8 +3924,13 @@ export async function getTeamAnalytics(teamId: number) {
           targetPastSessions = athletePerf.slice(1).slice(0, baselineDays);
         }
       } else {
-        // --- 状態（STATE）指標: 当日のデータ（朝の心拍や体調報告）をもとに測る ---
-        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr) || null;
+        // --- 状態（STATE）指標: 当日のデータをもとに測る（無ければ最新のSOXAI/STATEデータレコードを参照） ---
+        targetRecord = athletePerf.find(p => formatDateKey(new Date(p.date)) === todayStr)
+                    || athletePerf.find(p => {
+                        const val = getVal(p, m.key);
+                        return val !== null && !isNaN(val);
+                       })
+                    || null;
         if (targetRecord) {
           const targetIndex = athletePerf.findIndex(p => p.id === targetRecord.id);
           targetPastSessions = athletePerf.slice(targetIndex + 1).slice(0, baselineDays);
