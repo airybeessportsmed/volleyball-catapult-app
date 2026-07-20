@@ -2453,33 +2453,159 @@ export default function HomeScreen() {
                       </View>
                     </View>
 
-                    {/* 直近7日間の日別自主練 棒グラフ */}
+                    {/* 直近7日間の日別自主練 2軸統合グラフ (縦長200px: 左軸PL 橙棒, 右軸ジャンプ回数 青折れ線) */}
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>📊 直近1週間の日別 自主練運動量 (Player Load)</Text>
-                      <View style={{ flexDirection: "row", height: 110, alignItems: "flex-end", gap: 8, paddingHorizontal: 4, paddingTop: 10 }}>
-                        {last7Days.map((d, idx) => {
-                          const heightPercent = d.hasData ? Math.min(100, Math.max(15, (d.load / maxGraphLoad) * 100)) : 0;
-                          return (
-                            <View key={idx} style={{ flex: 1, alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-                              {d.hasData && (
-                                <Text style={{ fontSize: 8, fontWeight: "bold", color: "#D97706", marginBottom: 2 }}>
-                                  {d.load.toFixed(0)}
-                                </Text>
-                              )}
-                              <View style={{
-                                width: "80%",
-                                height: d.hasData ? `${heightPercent}%` : 4,
-                                backgroundColor: d.hasData ? "#F59E0B" : "#F1F5F9",
-                                borderRadius: 6,
-                                borderWidth: d.hasData ? 0 : 1,
-                                borderColor: "#E2E8F0"
-                              }} />
-                              <Text style={{ fontSize: 9, fontWeight: d.hasData ? "bold" : "normal", color: d.hasData ? "#D97706" : "#94A3B8", marginTop: 4 }}>
-                                {d.label}
-                              </Text>
-                            </View>
-                          );
-                        })}
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>
+                          📊 直近1週間の日別 自主練運動量 (PL) & ジャンプ回数
+                        </Text>
+                        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <View style={{ width: 10, height: 10, backgroundColor: "#F59E0B", borderRadius: 2 }} />
+                            <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "bold" }}>Player Load (左軸)</Text>
+                          </View>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <View style={{ width: 10, height: 2, backgroundColor: "#2563EB" }} />
+                            <Text style={{ fontSize: 10, color: "#2563EB", fontWeight: "bold" }}>ジャンプ回数 (右軸)</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* 2軸SVGグラフ領域 (200px 縦長) */}
+                      <View style={{ height: 200, width: "100%", backgroundColor: "#FAFAFA", borderRadius: 16, padding: 8, borderWidth: 1, borderColor: "#F1F5F9" }}>
+                        <Svg width="100%" height={184}>
+                          {(() => {
+                            const svgH = 184;
+                            const pTop = 25;
+                            const pBottom = 25;
+                            const pLeft = 32;
+                            const pRight = 32;
+                            const gH = svgH - pTop - pBottom;
+                            
+                            const maxL = Math.max(...last7Days.map(d => d.load), 10) * 1.2;
+                            const maxJ = Math.max(...last7Days.map(d => d.jumps), 10) * 1.2;
+
+                            const numDays = last7Days.length;
+                            const graphW = 320; // ベース幅基準
+
+                            // 各日のX位置とY位置の計算
+                            const linePoints: { x: number; y: number; jumps: number; hasData: boolean }[] = [];
+
+                            return (
+                              <G>
+                                {/* 背景グリッド線 */}
+                                <Line x1={pLeft} y1={pTop} x2={pLeft + graphW} y2={pTop} stroke="#E2E8F0" strokeDasharray="3 3" />
+                                <Line x1={pLeft} y1={pTop + gH / 2} x2={pLeft + graphW} y2={pTop + gH / 2} stroke="#E2E8F0" strokeDasharray="3 3" />
+                                <Line x1={pLeft} y1={pTop + gH} x2={pLeft + graphW} y2={pTop + gH} stroke="#CBD5E1" strokeWidth="1.5" />
+
+                                {/* 左軸目盛り (PL: 橙色) */}
+                                <SvgText x={pLeft - 4} y={pTop + 3} fontSize="8" fill="#D97706" fontWeight="bold" textAnchor="end">{Math.round(maxL)}</SvgText>
+                                <SvgText x={pLeft - 4} y={pTop + gH / 2 + 3} fontSize="8" fill="#D97706" textAnchor="end">{Math.round(maxL / 2)}</SvgText>
+                                <SvgText x={pLeft - 4} y={pTop + gH + 3} fontSize="8" fill="#D97706" textAnchor="end">0</SvgText>
+
+                                {/* 右軸目盛り (ジャンプ数: 青色) */}
+                                <SvgText x={pLeft + graphW + 4} y={pTop + 3} fontSize="8" fill="#2563EB" fontWeight="bold" textAnchor="start">{Math.round(maxJ)}</SvgText>
+                                <SvgText x={pLeft + graphW + 4} y={pTop + gH / 2 + 3} fontSize="8" fill="#2563EB" textAnchor="start">{Math.round(maxJ / 2)}</SvgText>
+                                <SvgText x={pLeft + graphW + 4} y={pTop + gH + 3} fontSize="8" fill="#2563EB" textAnchor="start">0</SvgText>
+
+                                {/* 棒グラフ (Player Load) 描画 */}
+                                {last7Days.map((d, i) => {
+                                  const step = graphW / (numDays - 1 || 1);
+                                  const x = pLeft + i * step;
+                                  const barW = 22;
+                                  const barH = d.hasData ? Math.max(4, (d.load / maxL) * gH) : 3;
+                                  const barY = pTop + gH - barH;
+
+                                  const jumpY = pTop + gH - (d.jumps / maxJ) * gH;
+                                  linePoints.push({ x, y: jumpY, jumps: d.jumps, hasData: d.hasData });
+
+                                  return (
+                                    <G key={`bar_${i}`}>
+                                      {/* 棒グラフ (PL) */}
+                                      <Rect
+                                        x={x - barW / 2}
+                                        y={barY}
+                                        width={barW}
+                                        height={barH}
+                                        rx={4}
+                                        fill={d.hasData ? "#F59E0B" : "#E2E8F0"}
+                                      />
+                                      {/* PL数値ラベル (棒の上) */}
+                                      {d.hasData && (
+                                        <SvgText
+                                          x={x}
+                                          y={barY - 4}
+                                          fontSize="8"
+                                          fill="#D97706"
+                                          fontWeight="bold"
+                                          textAnchor="middle"
+                                        >
+                                          {d.load.toFixed(0)}
+                                        </SvgText>
+                                      )}
+                                      {/* X軸日付ラベル */}
+                                      <SvgText
+                                        x={x}
+                                        y={pTop + gH + 14}
+                                        fontSize="9"
+                                        fill={d.hasData ? "#D97706" : "#94A3B8"}
+                                        fontWeight={d.hasData ? "bold" : "normal"}
+                                        textAnchor="middle"
+                                      >
+                                        {d.label}
+                                      </SvgText>
+                                    </G>
+                                  );
+                                })}
+
+                                {/* 折れ線グラフ (ジャンプ数: 青色) 描画 */}
+                                {(() => {
+                                  const pathD = linePoints.reduce((acc, p, idx) => {
+                                    return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+                                  }, "");
+
+                                  return (
+                                    <G key="line_group">
+                                      <Path
+                                        d={pathD}
+                                        fill="none"
+                                        stroke="#2563EB"
+                                        strokeWidth="2.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                      {linePoints.map((p, idx) => {
+                                        if (!p.hasData && p.jumps === 0) return null;
+                                        return (
+                                          <G key={`pt_${idx}`}>
+                                            <Circle
+                                              cx={p.x}
+                                              cy={p.y}
+                                              r={4}
+                                              fill="#FFFFFF"
+                                              stroke="#2563EB"
+                                              strokeWidth="2"
+                                            />
+                                            <SvgText
+                                              x={p.x}
+                                              y={p.y - 7}
+                                              fontSize="8"
+                                              fill="#1D4ED8"
+                                              fontWeight="bold"
+                                              textAnchor="middle"
+                                            >
+                                              {p.jumps}回
+                                            </SvgText>
+                                          </G>
+                                        );
+                                      })}
+                                    </G>
+                                  );
+                                })()}
+                              </G>
+                            );
+                          })()}
+                        </Svg>
                       </View>
                     </View>
                   </View>
