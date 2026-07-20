@@ -1524,6 +1524,15 @@ function findAthleteByCsvName(teamAthletes: any[], name: string, platform?: "one
     cleaned = cleaned.replace(/^(Individual\s*-\s*|W-up\s*-\s*|individual\s*-\s*|w-up\s*-\s*)/i, "");
     // Remove jersey number prefix (e.g. "15 Yanagi" -> "Yanagi")
     cleaned = cleaned.replace(/^[\d\s#]+/, "");
+    // Normalize kanji variants (﨑->崎, 髙->高, etc.)
+    cleaned = cleaned
+      .replace(/﨑/g, "崎")
+      .replace(/髙/g, "高")
+      .replace(/𠮷/g, "吉")
+      .replace(/齋/g, "斎")
+      .replace(/邉|邊/g, "辺")
+      .replace(/澤/g, "沢")
+      .replace(/廣/g, "広");
     // Remove all spaces and lowercase
     return cleaned.replace(/\s+/g, "").toLowerCase();
   };
