@@ -1640,15 +1640,25 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   const calculatedSums: any = {};
   if (Object.keys(fileDataMap).length > 0) {
     for (const field of additiveFields) {
-      let sum = 0;
+      // セッション種別 (practice / individual) ごとに重複加算を排除して代表値を取得
+      const sessionValues: Record<string, number> = {};
       let hasValue = false;
+
       for (const fName of Object.keys(fileDataMap)) {
-        if (fileDataMap[fName][field] !== undefined && fileDataMap[fName][field] !== null) {
-          sum += fileDataMap[fName][field];
+        const item = fileDataMap[fName];
+        if (item && item[field] !== undefined && item[field] !== null && !isNaN(item[field])) {
+          const sType = fName.split("_").pop() || "practice";
+          const val = Number(item[field]);
+
+          // 同一セッション種別（practice内での全体データとメニュー別データの重複）は大きな値/代表値を採用
+          sessionValues[sType] = Math.max(sessionValues[sType] || 0, val);
           hasValue = true;
         }
       }
+
       if (hasValue) {
+        // チーム練習 (practice) ＋ 自主練習 (individual) の合算のみを正しく加算
+        const sum = Object.values(sessionValues).reduce((a, b) => a + b, 0);
         if (field === "totalLoad" || field === "jumpVolume") {
           calculatedSums[field] = sum.toFixed(2);
         } else {

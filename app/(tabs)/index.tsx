@@ -3428,19 +3428,21 @@ export default function HomeScreen() {
                                   try {
                                     const csvObj = rawRecord.rawCsvData ? JSON.parse(rawRecord.rawCsvData) : {};
                                     const fileData = csvObj.fileData || {};
-                                    let modeSum = 0;
                                     let hasModeValue = false;
+                                    const sessionMap: Record<string, number> = {};
                                     
                                     for (const key of Object.keys(fileData)) {
-                                      const keyType = key.split("_").pop() || "auto";
-                                      if (keyType === displayMode) {
+                                      const keyType = key.split("_").pop() || "practice";
+                                      if ((displayMode as string) === "all" || keyType === displayMode) {
                                         const val = fileData[key][m.key];
-                                        if (val !== undefined && val !== null) {
-                                          modeSum += val;
+                                        if (val !== undefined && val !== null && !isNaN(val)) {
+                                          const sType = keyType === "individual" ? "individual" : "practice";
+                                          sessionMap[sType] = Math.max(sessionMap[sType] || 0, val);
                                           hasModeValue = true;
                                         }
                                       }
                                     }
+                                    const modeSum = Object.values(sessionMap).reduce((a, b) => a + b, 0);
                                     dbVal = hasModeValue ? modeSum : null;
                                   } catch (e) {
                                     dbVal = null;
