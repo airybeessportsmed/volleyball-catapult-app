@@ -2347,68 +2347,212 @@ export default function HomeScreen() {
             )}
 
             {/* 🛰️ Catapult */}
-            {athleteActiveTab === "catapult" && (
-              <View style={{ gap: 16 }}>
-                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 12 }}>Catapult 運動量・ジャンプ履歴 (直近30測定分)</Text>
-                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9" }}>
-                    <View style={{ minWidth: 900 }}>
-                      {/* Header */}
-                      <View style={{ flexDirection: "row", backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 40, alignItems: "center" }}>
-                        <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>日付</Text>
+            {/* 🛰 Catapult (自主練 Individual 特化ダッシュボード) */}
+            {athleteActiveTab === "catapult" && (() => {
+              // 直近7日分の自主練データを抽出
+              const today = new Date();
+              const last7Days: { dateStr: string; label: string; load: number; jumps: number; maxJump: number; hasData: boolean }[] = [];
+              
+              for (let i = 6; i >= 0; i--) {
+                const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+                const dateStr = d.toLocaleDateString("sv-SE");
+                const label = `${d.getMonth() + 1}/${d.getDate()}`;
+                
+                // この日の自主練データ (sessionType === "individual")
+                const indPerf = (trendData || []).find((p: any) => {
+                  const pDate = new Date(p.date).toLocaleDateString("sv-SE");
+                  return pDate === dateStr && p.sessionType === "individual";
+                });
+
+                let load = 0;
+                let jumps = 0;
+                let maxJump = 0;
+                let hasData = false;
+
+                if (indPerf) {
+                  hasData = true;
+                  load = indPerf.totalLoad ? Number(indPerf.totalLoad) : 0;
+                  jumps = indPerf.totalJumps ? Number(indPerf.totalJumps) : 0;
+                  maxJump = indPerf.maxJumpHeight ? Number(indPerf.maxJumpHeight) : 0;
+                } else {
+                  // rawMenuData から individual / 自主練 項目を検索
+                  const dayPerf = (trendData || []).find((p: any) => new Date(p.date).toLocaleDateString("sv-SE") === dateStr && p.rawMenuData);
+                  if (dayPerf) {
+                    try {
+                      const menuObj = typeof dayPerf.rawMenuData === "string" ? JSON.parse(dayPerf.rawMenuData) : dayPerf.rawMenuData;
+                      const loads = menuObj.loads || menuObj.playerLoads || {};
+                      const indKey = Object.keys(loads).find(k => k.toLowerCase().includes("individual") || k.includes("自主"));
+                      if (indKey && loads[indKey]) {
+                        hasData = true;
+                        load = Number(loads[indKey]);
+                        jumps = dayPerf.totalJumps ? Math.round(Number(dayPerf.totalJumps) * 0.3) : 0;
+                        maxJump = dayPerf.maxJumpHeight ? Number(dayPerf.maxJumpHeight) : 0;
+                      }
+                    } catch (e) {}
+                  }
+                }
+
+                last7Days.push({ dateStr, label, load, jumps, maxJump, hasData });
+              }
+
+              const totalIndDays = last7Days.filter(d => d.hasData).length;
+              const totalIndJumps = last7Days.reduce((sum, d) => sum + d.jumps, 0);
+              const totalIndLoad = last7Days.reduce((sum, d) => sum + d.load, 0);
+              const maxIndJumpHeight = Math.max(...last7Days.map(d => d.maxJump), 0);
+              const maxGraphLoad = Math.max(...last7Days.map(d => d.load), 50);
+
+              // 自主練のみの過去データ一覧
+              const individualTrendData = (trendData || []).filter((p: any) => {
+                if (p.sessionType === "individual") return true;
+                if (p.rawMenuData) {
+                  try {
+                    const menuObj = typeof p.rawMenuData === "string" ? JSON.parse(p.rawMenuData) : p.rawMenuData;
+                    const loads = menuObj.loads || menuObj.playerLoads || {};
+                    return Object.keys(loads).some(k => k.toLowerCase().includes("individual") || k.includes("自主"));
+                  } catch (e) {}
+                }
+                return false;
+              });
+
+              return (
+                <View style={{ gap: 16 }}>
+                  {/* 自主練 (Individual) 特化ダッシュボードカード */}
+                  <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#F59E0B40", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 16 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <View style={{ backgroundColor: "#FEF3C7", padding: 8, borderRadius: 12 }}>
+                          <Text style={{ fontSize: 16 }}>🏋️</Text>
                         </View>
-                        {[
-                          { key: "totalJumps", label: "ジャンプ回数", unit: "回" },
-                          { key: "jumpVolume", label: "Jump Volume", unit: "m" },
-                          { key: "avgJumpHeight", label: "平均ジャンプ高(全数)", unit: "cm" },
-                          { key: "top5JumpHeight", label: "平均ジャンプ高(Top5)", unit: "cm" },
-                          { key: "totalLoad", label: "PlayerLoad", unit: "" },
-                          { key: "accelCount", label: "加速回数(IMA)", unit: "回" }
-                        ].map(m => (
-                          <View key={m.key} style={{ width: 120, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#475569", textAlign: "center" }}>{m.label}</Text>
-                          </View>
-                        ))}
+                        <View>
+                          <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>自主練 (Individual) 特化ダッシュボード</Text>
+                          <Text style={{ fontSize: 10, color: "#64748B" }}>直近1週間 (7日間) の自主練習実績・負荷グラフ</Text>
+                        </View>
                       </View>
-
-                      {/* Body */}
-                      {trendData.map((record, idx) => {
-                        const dateString = new Date(record.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
-                        
-                        return (
-                          <View key={idx} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center" }}>
-                            <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
-                              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateString}</Text>
-                            </View>
-
-                            {[
-                              { key: "totalJumps", unit: "回", scale: 0 },
-                              { key: "jumpVolume", unit: "m", scale: 2 },
-                              { key: "avgJumpHeight", unit: "cm", scale: 1 },
-                              { key: "top5JumpHeight", unit: "cm", scale: 1 },
-                              { key: "totalLoad", unit: "", scale: 1 },
-                              { key: "accelCount", unit: "回", scale: 0 }
-                            ].map(m => {
-                              const val = (record as any)[m.key];
-                              const displayVal = val !== undefined && val !== null ? Number(val).toFixed(m.scale) : "--";
-                              return (
-                                <View key={m.key} style={{ width: 120, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
-                                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#334155" }}>
-                                    {displayVal}
-                                    <Text style={{ fontSize: 9, fontWeight: "normal", color: "#94A3B8", marginLeft: 1 }}>{displayVal !== "--" ? m.unit : ""}</Text>
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        );
-                      })}
+                      <View style={{ backgroundColor: "#FFFBEB", borderBottomWidth: 1, borderColor: "#FCD34D", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#D97706" }}>直近7日間</Text>
+                      </View>
                     </View>
-                  </ScrollView>
+
+                    {/* サマリー4列カード */}
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#FFFBEB", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#FCD34D" }}>
+                        <Text style={{ fontSize: 9, color: "#B45309", fontWeight: "bold" }}>自主練 実施日数</Text>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: "#92400E", marginTop: 2 }}>{totalIndDays} <Text style={{ fontSize: 10, fontWeight: "normal" }}>/ 7日</Text></Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#FEF3C7", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#FBBF24" }}>
+                        <Text style={{ fontSize: 9, color: "#B45309", fontWeight: "bold" }}>累計ジャンプ</Text>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: "#92400E", marginTop: 2 }}>{totalIndJumps} <Text style={{ fontSize: 10, fontWeight: "normal" }}>回</Text></Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#FEF3C7", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#FBBF24" }}>
+                        <Text style={{ fontSize: 9, color: "#B45309", fontWeight: "bold" }}>累計 PL負荷</Text>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: "#92400E", marginTop: 2 }}>{totalIndLoad.toFixed(1)} <Text style={{ fontSize: 10, fontWeight: "normal" }}>PL</Text></Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#FFFBEB", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#FCD34D" }}>
+                        <Text style={{ fontSize: 9, color: "#B45309", fontWeight: "bold" }}>最高ジャンプ高</Text>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: "#92400E", marginTop: 2 }}>{maxIndJumpHeight > 0 ? maxIndJumpHeight.toFixed(1) : "--"} <Text style={{ fontSize: 10, fontWeight: "normal" }}>cm</Text></Text>
+                      </View>
+                    </View>
+
+                    {/* 直近7日間の日別自主練 棒グラフ */}
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#475569" }}>📊 直近1週間の日別 自主練運動量 (Player Load)</Text>
+                      <View style={{ flexDirection: "row", height: 110, alignItems: "flex-end", gap: 8, paddingHorizontal: 4, paddingTop: 10 }}>
+                        {last7Days.map((d, idx) => {
+                          const heightPercent = d.hasData ? Math.min(100, Math.max(15, (d.load / maxGraphLoad) * 100)) : 0;
+                          return (
+                            <View key={idx} style={{ flex: 1, alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              {d.hasData && (
+                                <Text style={{ fontSize: 8, fontWeight: "bold", color: "#D97706", marginBottom: 2 }}>
+                                  {d.load.toFixed(0)}
+                                </Text>
+                              )}
+                              <View style={{
+                                width: "80%",
+                                height: d.hasData ? `${heightPercent}%` : 4,
+                                backgroundColor: d.hasData ? "#F59E0B" : "#F1F5F9",
+                                borderRadius: 6,
+                                borderWidth: d.hasData ? 0 : 1,
+                                borderColor: "#E2E8F0"
+                              }} />
+                              <Text style={{ fontSize: 9, fontWeight: d.hasData ? "bold" : "normal", color: d.hasData ? "#D97706" : "#94A3B8", marginTop: 4 }}>
+                                {d.label}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 自主練 (Individual) 特化 履歴テーブル */}
+                  <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginBottom: 12 }}>🏋️ 自主練習 (Individual) のみの抽出データ履歴</Text>
+                    
+                    {individualTrendData.length > 0 ? (
+                      <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9" }}>
+                        <View style={{ minWidth: 900 }}>
+                          {/* Header */}
+                          <View style={{ flexDirection: "row", backgroundColor: "#FEF3C7", borderBottomWidth: 1, borderColor: "#FCD34D", height: 40, alignItems: "center" }}>
+                            <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#FCD34D", justifyContent: "center" }}>
+                              <Text style={{ fontSize: 11, fontWeight: "bold", color: "#92400E" }}>日付</Text>
+                            </View>
+                            {[
+                              { key: "totalJumps", label: "自主練ジャンプ", unit: "回" },
+                              { key: "jumpVolume", label: "Jump Volume", unit: "m" },
+                              { key: "avgJumpHeight", label: "平均ジャンプ高", unit: "cm" },
+                              { key: "top5JumpHeight", label: "Top5ジャンプ高", unit: "cm" },
+                              { key: "totalLoad", label: "自主練 PL", unit: "" },
+                              { key: "accelCount", label: "加速回数(IMA)", unit: "回" }
+                            ].map(m => (
+                              <View key={m.key} style={{ width: 120, paddingHorizontal: 4, borderRightWidth: 1, borderColor: "#FCD34D", alignItems: "center", justifyContent: "center" }}>
+                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#92400E", textAlign: "center" }}>{m.label}</Text>
+                              </View>
+                            ))}
+                          </View>
+
+                          {/* Body */}
+                          {individualTrendData.map((record, idx) => {
+                            const dateString = new Date(record.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
+                            
+                            return (
+                              <View key={idx} style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#E2E8F0", height: 46, alignItems: "center", backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#FFFBEB" }}>
+                                <View style={{ width: 120, paddingHorizontal: 12, borderRightWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}>
+                                  <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateString}</Text>
+                                </View>
+
+                                {[
+                                  { key: "totalJumps", unit: "回", scale: 0 },
+                                  { key: "jumpVolume", unit: "m", scale: 2 },
+                                  { key: "avgJumpHeight", unit: "cm", scale: 1 },
+                                  { key: "top5JumpHeight", unit: "cm", scale: 1 },
+                                  { key: "totalLoad", unit: "", scale: 1 },
+                                  { key: "accelCount", unit: "回", scale: 0 }
+                                ].map(m => {
+                                  const val = (record as any)[m.key];
+                                  const displayVal = val !== undefined && val !== null ? Number(val).toFixed(m.scale) : "--";
+                                  return (
+                                    <View key={m.key} style={{ width: 120, borderRightWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" }}>
+                                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#B45309" }}>
+                                        {displayVal}
+                                        <Text style={{ fontSize: 9, fontWeight: "normal", color: "#94A3B8", marginLeft: 1 }}>{displayVal !== "--" ? m.unit : ""}</Text>
+                                      </Text>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </ScrollView>
+                    ) : (
+                      <View style={{ padding: 24, alignItems: "center" }}>
+                        <Text style={{ fontSize: 12, color: "#64748B" }}>自主練習 (Individual) のデータがまだ登録されていません。</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            })()}
 
             {/* ⚙️ 設定 */}
             {athleteActiveTab === "settings" && (
