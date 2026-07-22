@@ -2212,29 +2212,29 @@ export async function importPerformanceCsv(
         const num = parseInt(clean, 10);
         if (!isNaN(num)) return num;
 
-        if (clean.includes("全く影響なし") || clean.includes("影響はなかった") || clean.includes("変更なし") || clean.includes("影響なし") || clean.includes("症状なし") || clean.includes("痛みはない")) {
-          return 0;
-        }
-
         if (questionType === "q1") {
-          if (clean.includes("参加に影響したが") || clean.includes("制限はなかった")) return 8;
-          if (clean.includes("制限した")) return 17;
-          if (clean.includes("参加できなかった")) return 25;
+          if (clean.includes("全く影響なし") || clean.includes("問題はなかった") || clean.includes("影響なし") || clean.includes("0")) return 0;
+          if (clean.includes("問題はあったが") || clean.includes("影響はなかった") || clean.includes("制限はなかった") || clean.includes("8")) return 8;
+          if (clean.includes("制限した") || clean.includes("17")) return 17;
+          if (clean.includes("参加できなかった") || clean.includes("25")) return 25;
         }
         if (questionType === "q2") {
-          if (clean.includes("量を減らした")) return 8;
-          if (clean.includes("内容を変更した")) return 13;
-          if (clean.includes("全く参加できなかった")) return 25;
+          if (clean.includes("変更なし") || clean.includes("0")) return 0;
+          if (clean.includes("量を減らした") || clean.includes("8")) return 8;
+          if (clean.includes("内容を変更した") || clean.includes("13")) return 13;
+          if (clean.includes("全く参加できなかった") || clean.includes("25")) return 25;
         }
         if (questionType === "q3") {
-          if (clean.includes("少し低下した")) return 8;
-          if (clean.includes("かなり低下した")) return 13;
-          if (clean.includes("全く参加できなかった")) return 25;
+          if (clean.includes("影響なし") || clean.includes("0")) return 0;
+          if (clean.includes("少し低下した") || clean.includes("少し") || clean.includes("8")) return 8;
+          if (clean.includes("かなり低下した") || clean.includes("かなり") || clean.includes("13")) return 13;
+          if (clean.includes("全く参加できなかった") || clean.includes("25")) return 25;
         }
         if (questionType === "q4") {
-          if (clean.includes("軽度の痛み") || clean.includes("少し")) return 8;
-          if (clean.includes("中等度の痛み") || clean.includes("かなり")) return 13;
-          if (clean.includes("重度の痛み") || clean.includes("激しい")) return 25;
+          if (clean.includes("症状なし") || clean.includes("痛みはない") || clean.includes("0")) return 0;
+          if (clean.includes("軽度の痛み") || clean.includes("少し") || clean.includes("8")) return 8;
+          if (clean.includes("中等度の痛み") || clean.includes("かなり") || clean.includes("13")) return 13;
+          if (clean.includes("重度の痛み") || clean.includes("激しい") || clean.includes("25")) return 25;
         }
         return 0;
       };
@@ -5561,7 +5561,9 @@ export async function getOstrcByAthlete(athleteId: number, date?: string | null)
   const db = await getDb();
   if (!db) {
     if (date) {
-      return mockOstrcResponses.find(o => o.athleteId === athleteId && o.date === date) || null;
+      const filtered = mockOstrcResponses.filter(o => o.athleteId === athleteId && o.date <= date);
+      if (filtered.length === 0) return null;
+      return filtered.sort((a, b) => b.date.localeCompare(a.date))[0] || null;
     } else {
       const filtered = mockOstrcResponses.filter(o => o.athleteId === athleteId);
       if (filtered.length === 0) return null;
@@ -5573,7 +5575,8 @@ export async function getOstrcByAthlete(athleteId: number, date?: string | null)
     const results = await db
       .select()
       .from(ostrcResponses)
-      .where(and(eq(ostrcResponses.athleteId, athleteId), eq(ostrcResponses.date, date)))
+      .where(and(eq(ostrcResponses.athleteId, athleteId), lte(ostrcResponses.date, date)))
+      .orderBy(desc(ostrcResponses.date))
       .limit(1);
     return results[0] || null;
   } else {
