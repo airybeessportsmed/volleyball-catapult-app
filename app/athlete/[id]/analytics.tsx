@@ -190,7 +190,7 @@ export default function AthleteAnalyticsScreen() {
   const athleteId = Number(id);
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<"summary" | "jumps" | "menu" | "comparison">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "jumps" | "menu" | "comparison" | "sleep">("summary");
   const [rawDate, setRawDate] = useState(new Date().toLocaleDateString("sv-SE"));
   const [acwrMetric, setAcwrMetric] = useState<"totalLoad" | "jumpVolume" | "accelVolume">("totalLoad");
   const [menuMetric, setMenuMetric] = useState<"load" | "ima">("load");
@@ -815,6 +815,211 @@ export default function AthleteAnalyticsScreen() {
             })}
           </View>
         </View>
+      </View>
+    );
+  };
+
+  // ----------------------------------------------------
+  // 💤 SOXAI 睡眠ステージ分析 (タイムライン & 内訳)
+  // ----------------------------------------------------
+  const renderSleepStageAnalytics = () => {
+    const trend = (analytics as any)?.trend || (analytics as any)?.history || [];
+    
+    // SOXAIデータが含まれるレコードを日付降順で抽出
+    const sleepRecords = trend
+      .filter((p: any) => {
+        const hasScore = p.wellnessSleep !== undefined && p.wellnessSleep !== null;
+        const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+        const hasBedTime = soxai.soxaiBedTimeStr !== undefined || soxai.soxaiSleepDuration !== undefined;
+        return hasScore || hasBedTime;
+      })
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const parseTimeToMinutes = (timeStr: string | null | undefined): number | null => {
+      if (!timeStr) return null;
+      const parts = timeStr.trim().split(":");
+      if (parts.length < 2) return null;
+      let hrs = parseInt(parts[0], 10);
+      const mins = parseInt(parts[1], 10);
+      if (isNaN(hrs) || isNaN(mins)) return null;
+      if (hrs < 12) hrs += 24; // 00:00〜11:59は翌日扱い
+      return hrs * 60 + mins;
+    };
+
+    const formatMinutesToTime = (totalMins: number): string => {
+      let hrs = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      if (hrs >= 24) hrs -= 24;
+      return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+    };
+
+    // タイムラインの基準時間 (前日21:00〜当日11:00の14時間 = 840分)
+    const timelineStart = 21 * 60; // 1260分
+    const timelineEnd = 35 * 60; // 2100分 (翌日11:00)
+    const totalTimelineMins = timelineEnd - timelineStart;
+
+    return (
+      <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 16 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ backgroundColor: "#EEF2FF", padding: 8, borderRadius: 12 }}>
+              <Text style={{ fontSize: 16 }}>💤</Text>
+            </View>
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A" }}>SOXAI 睡眠ステージ履歴</Text>
+              <Text style={{ fontSize: 10, color: "#64748B" }}>日々の睡眠効率、ステージ割合および自律神経(HRV)回復推移</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 凡例 */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 10, height: 10, backgroundColor: "#4338CA", borderRadius: 2 }} />
+            <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>深い睡眠</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 10, height: 10, backgroundColor: "#818CF8", borderRadius: 2 }} />
+            <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>浅い睡眠</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 10, height: 10, backgroundColor: "#C7D2FE", borderRadius: 2 }} />
+            <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>レム睡眠</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 10, height: 10, backgroundColor: "#FBBF24", borderRadius: 2 }} />
+            <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>覚醒</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 10, height: 10, backgroundColor: "#94A3B8", borderRadius: 2 }} />
+            <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>仮眠</Text>
+          </View>
+        </View>
+
+        {/* リスト表示 */}
+        <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={true}>
+          <View style={{ gap: 12 }}>
+            {sleepRecords.length > 0 ? (
+              sleepRecords.map((p: any, idx: number) => {
+                const dateLabel = new Date(p.date).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", weekday: "short" });
+                const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
+                
+                const bedTimeStr = soxai.soxaiBedTimeStr || "--:--";
+                const wakeTimeStr = soxai.soxaiWakeTimeStr || "--:--";
+                const sleepScore = p.wellnessSleep || "--";
+                const hrvVal = p.hrv ? `${Math.round(Number(p.hrv))}ms` : "--";
+
+                const bedMin = parseTimeToMinutes(soxai.soxaiBedTimeStr);
+                const wakeMin = parseTimeToMinutes(soxai.soxaiWakeTimeStr);
+
+                const deep = Number(soxai.soxaiDeepSleep) || 0;
+                const light = Number(soxai.soxaiLightSleep) || 0;
+                const rem = Number(soxai.soxaiRemSleep) || 0;
+                const awake = Number(soxai.soxaiAwakeTime) || 0;
+                const totalSleepTime = deep + light + rem;
+
+                // タイムライン描画計算
+                let showTimelineBar = false;
+                let leftMarginPercent = 0;
+                let barWidthPercent = 0;
+                let deepPercent = 0;
+                let lightPercent = 0;
+                let remPercent = 0;
+                let awakePercent = 0;
+
+                if (bedMin !== null && wakeMin !== null && wakeMin > bedMin) {
+                  showTimelineBar = true;
+                  const totalBedMins = wakeMin - bedMin;
+                  leftMarginPercent = Math.max(0, Math.min(100, ((bedMin - timelineStart) / totalTimelineMins) * 100));
+                  barWidthPercent = Math.max(10, Math.min(100 - leftMarginPercent, (totalBedMins / totalTimelineMins) * 100));
+
+                  const totalMeasured = deep + light + rem + awake;
+                  if (totalMeasured > 0) {
+                    deepPercent = (deep / totalMeasured) * 100;
+                    lightPercent = (light / totalMeasured) * 100;
+                    remPercent = (rem / totalMeasured) * 100;
+                    awakePercent = (awake / totalMeasured) * 100;
+                  } else {
+                    lightPercent = 100; // データがない場合はデフォルト浅い睡眠100%
+                  }
+                }
+
+                // 就寝・起床時間はないが、睡眠時間はある場合は「仮眠」扱い
+                const isNapOnly = !showTimelineBar && (Number(soxai.soxaiSleepDuration) > 0);
+
+                return (
+                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderColor: "#F1F5F9", paddingVertical: 10, gap: 10 }}>
+                    {/* 日付・基本情報 */}
+                    <View style={{ width: 80 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{dateLabel}</Text>
+                      <View style={{ flexDirection: "row", gap: 4, marginTop: 2 }}>
+                        <Text style={{ fontSize: 9, color: "#64748B" }}>就床: {bedTimeStr}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 4 }}>
+                        <Text style={{ fontSize: 9, color: "#64748B" }}>起床: {wakeTimeStr}</Text>
+                      </View>
+                    </View>
+
+                    {/* スコア・HRV */}
+                    <View style={{ width: 65, gap: 2, alignItems: "center" }}>
+                      <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: "#DCFCE7" }}>
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#166534" }}>{sleepScore}点</Text>
+                      </View>
+                      <View style={{ backgroundColor: "#EFF6FF", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: "#DBEAFE" }}>
+                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#1D4ED8" }}>{hrvVal}</Text>
+                      </View>
+                    </View>
+
+                    {/* 積み上げグラフ (タイムライン風) */}
+                    <View style={{ flex: 1, height: 26, backgroundColor: "#F8FAFC", borderRadius: 8, overflow: "hidden", position: "relative", justifyContent: "center" }}>
+                      {/* 時間軸の背景目盛り (24:00, 3:00, 6:00 のガイドライン) */}
+                      <View style={{ position: "absolute", left: `${((24 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+                      <View style={{ position: "absolute", left: `${((27 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+                      <View style={{ position: "absolute", left: `${((30 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+
+                      {showTimelineBar ? (
+                        <View style={{
+                          position: "absolute",
+                          left: `${leftMarginPercent}%`,
+                          width: `${barWidthPercent}%`,
+                          height: 16,
+                          borderRadius: 4,
+                          overflow: "hidden",
+                          flexDirection: "row"
+                        }}>
+                          {deepPercent > 0 && <View style={{ width: `${deepPercent}%`, height: "100%", backgroundColor: "#4338CA" }} />}
+                          {lightPercent > 0 && <View style={{ width: `${lightPercent}%`, height: "100%", backgroundColor: "#818CF8" }} />}
+                          {remPercent > 0 && <View style={{ width: `${remPercent}%`, height: "100%", backgroundColor: "#C7D2FE" }} />}
+                          {awakePercent > 0 && <View style={{ width: `${awakePercent}%`, height: "100%", backgroundColor: "#FBBF24" }} />}
+                        </View>
+                      ) : isNapOnly ? (
+                        /* 仮眠のみ */
+                        <View style={{
+                          position: "absolute",
+                          left: "40%",
+                          width: "20%",
+                          height: 12,
+                          backgroundColor: "#94A3B8",
+                          borderRadius: 4,
+                          justifyContent: "center",
+                          alignItems: "center"
+                        }}>
+                          <Text style={{ fontSize: 7, color: "#FFFFFF", fontWeight: "bold" }}>仮眠 {(Number(soxai.soxaiSleepDuration)).toFixed(0)}分</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 8, color: "#94A3B8", textAlign: "center", fontStyle: "italic" }}>睡眠データ未登録</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic" }}>SOXAI睡眠データが登録されていません。</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       </View>
     );
   };
@@ -1830,6 +2035,7 @@ export default function AthleteAnalyticsScreen() {
           { id: "summary", name: "総合サマリー", icon: "doc.text.fill" },
           { id: "jumps", name: "ジャンプ詳細", icon: "arrow.up.fill" },
           { id: "menu", name: "メニュー別", icon: "chart.pie.fill" },
+          { id: "sleep", name: "睡眠ステージ", icon: "bed.double.fill" },
           { id: "comparison", name: "グループ比較", icon: "person.2.fill" }
         ].map(t => {
           const isActive = activeTab === t.id;
@@ -1837,12 +2043,12 @@ export default function AthleteAnalyticsScreen() {
             <TouchableOpacity
               key={t.id}
               onPress={() => setActiveTab(t.id as any)}
-              className={`flex-1 flex-row justify-center items-center gap-1.5 py-3.5 border-b-2 ${
+              className={`flex-1 flex-row justify-center items-center gap-1 py-3 border-b-2 ${
                 isActive ? "border-primary" : "border-transparent"
               }`}
             >
-              <IconSymbol size={12} name={t.icon as any} color={isActive ? "#FF6B35" : "#9CA3AF"} />
-              <Text className={`text-[11px] font-bold ${isActive ? "text-primary" : "text-muted"}`}>
+              <IconSymbol size={11} name={t.icon as any} color={isActive ? "#FF6B35" : "#9CA3AF"} />
+              <Text className={`text-[10px] font-bold ${isActive ? "text-primary" : "text-muted"}`} numberOfLines={1}>
                 {t.name}
               </Text>
             </TouchableOpacity>
@@ -1869,6 +2075,7 @@ export default function AthleteAnalyticsScreen() {
               {renderMenuLoadAnalytics()}
             </>
           )}
+          {activeTab === "sleep" && renderSleepStageAnalytics()}
           {activeTab === "comparison" && renderComparisonAnalytics()}
         </View>
       </ScrollView>
