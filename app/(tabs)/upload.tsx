@@ -29,7 +29,15 @@ interface UploadFileItem {
 const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   const lowercaseText = csvText.toLowerCase();
   const lowercaseName = fileName.toLowerCase();
-  if (lowercaseText.includes("部位") && lowercaseText.includes("status")) return "OSTRC (障害調査)";
+  if (
+    (lowercaseText.includes("部位") && lowercaseText.includes("status")) || 
+    lowercaseText.includes("傷害、疾病、あるいは") || 
+    lowercaseText.includes("参加に影響") || 
+    lowercaseText.includes("パフォーマンスへの影響") || 
+    lowercaseText.includes("症状の度合い")
+  ) {
+    return "OSTRC (障害調査)";
+  }
   const hasSoxaiKeywords = 
     (lowercaseText.includes("睡眠スコア") || lowercaseText.includes("qolスコア")) &&
     (lowercaseText.includes("安静時心拍") || lowercaseText.includes("hrv_rmssd") || lowercaseText.includes("睡眠時間"));
@@ -45,12 +53,53 @@ const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
 
 const convertExcelToCsv = (data: ArrayBuffer): string => {
   const workbook = XLSX.read(new Uint8Array(data), { type: "array" });
-  let targetSheetName = workbook.SheetNames.find(name => 
-    name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
-  );
-  if (!targetSheetName) {
-    targetSheetName = workbook.SheetNames[0];
+  
+  let bestSheetName = "";
+  let highestScore = -1;
+
+  for (const name of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[name];
+    if (!worksheet) continue;
+    const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+    const headerRow = rows[0];
+    if (!Array.isArray(headerRow)) continue;
+
+    const headerStr = headerRow.join(",").toLowerCase();
+    let score = 0;
+    
+    if (headerStr.includes("部位") && headerStr.includes("status")) {
+      score += 100;
+    }
+    if (
+      headerStr.includes("タイムスタンプ") || 
+      headerStr.includes("回答者") ||
+      headerStr.includes("名前") ||
+      headerStr.includes("氏名")
+    ) {
+      score += 10;
+    }
+    if (
+      headerStr.includes("傷害、疾病") || 
+      headerStr.includes("参加に影響") || 
+      headerStr.includes("パフォーマンスへの影響") ||
+      headerStr.includes("症状の度合い")
+    ) {
+      score += 50;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestSheetName = name;
+    }
   }
+
+  let targetSheetName = bestSheetName;
+  if (!targetSheetName || highestScore <= 0) {
+    targetSheetName = workbook.SheetNames.find(name => 
+      name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
+    ) || workbook.SheetNames[0];
+  }
+
   const worksheet = workbook.Sheets[targetSheetName];
   if (!worksheet) return "";
   return XLSX.utils.sheet_to_csv(worksheet);

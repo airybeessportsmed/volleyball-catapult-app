@@ -2077,7 +2077,7 @@ export async function importPerformanceCsv(
     const isWellnessOnetap = findHeaderIndex(["項目名", "項目"]) !== -1 && findHeaderIndex(["値", "スコア", "回答", "value"]) !== -1 && (findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name"]) !== -1 || findHeaderIndex(["内訳"]) !== -1);
     const isSRPE = findHeaderIndex(["トレーニング実施日"]) !== -1 && findHeaderIndex(["Session RPE"]) !== -1;
     const isSoxai = (csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数")) || (csvText.includes("QoLスコア") && csvText.includes("睡眠スコア"));
-    const isOstrc = headers.some(h => h.includes("部位")) && headers.some(h => h.includes("Status"));
+    const isOstrc = (headers.some(h => h.includes("部位")) && headers.some(h => h.includes("Status"))) || headers.some(h => h.includes("傷害、疾病") || h.includes("参加に影響") || h.includes("パフォーマンスへの影響") || h.includes("症状の度合い"));
     
     // Enhanced IMA Log detection to prevent misclassification as isMenuLoadLog
     const isImaLog = 
@@ -2153,6 +2153,26 @@ export async function importPerformanceCsv(
       });
 
       if (partIndexGroups.length === 0) {
+        const q1Idx = findHeaderIndex(["参加に影響", "参加への影響", "影響が出ましたか"]);
+        const q2Idx = findHeaderIndex(["参加/変更", "練習の変更", "練習や試合への参加への制限"]);
+        const q3Idx = findHeaderIndex(["パフォーマンス"]);
+        const q4Idx = findHeaderIndex(["症状の度合い", "症状の程度"]);
+        const partIdx = findHeaderIndex(["部位", "場所", "痛みがある", "違和感がある", "身体上の問題は怪我"]);
+
+        if (q1Idx !== -1 || q2Idx !== -1 || q3Idx !== -1 || q4Idx !== -1) {
+          partIndexGroups.push({
+            partIdx: partIdx !== -1 ? partIdx : -1,
+            q1Idx,
+            q2Idx,
+            q3Idx,
+            q4Idx,
+            scoreIdx: -1,
+            statusIdx: -1
+          });
+        }
+      }
+
+      if (partIndexGroups.length === 0) {
         const fallbackPartIndexGroups = [
           { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
           { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
@@ -2185,6 +2205,39 @@ export async function importPerformanceCsv(
         { key: "chest", label: "胸" },
         { key: "abdomen", label: "腹部" }
       ];
+
+      const parseOstrcQuestionScore = (valStr: string, questionType: "q1" | "q2" | "q3" | "q4"): number => {
+        const clean = String(valStr || "").trim();
+        if (!clean) return 0;
+        const num = parseInt(clean, 10);
+        if (!isNaN(num)) return num;
+
+        if (clean.includes("全く影響なし") || clean.includes("影響はなかった") || clean.includes("変更なし") || clean.includes("影響なし") || clean.includes("症状なし") || clean.includes("痛みはない")) {
+          return 0;
+        }
+
+        if (questionType === "q1") {
+          if (clean.includes("参加に影響したが") || clean.includes("制限はなかった")) return 8;
+          if (clean.includes("制限した")) return 17;
+          if (clean.includes("参加できなかった")) return 25;
+        }
+        if (questionType === "q2") {
+          if (clean.includes("量を減らした")) return 8;
+          if (clean.includes("内容を変更した")) return 13;
+          if (clean.includes("全く参加できなかった")) return 25;
+        }
+        if (questionType === "q3") {
+          if (clean.includes("少し低下した")) return 8;
+          if (clean.includes("かなり低下した")) return 13;
+          if (clean.includes("全く参加できなかった")) return 25;
+        }
+        if (questionType === "q4") {
+          if (clean.includes("軽度の痛み") || clean.includes("少し")) return 8;
+          if (clean.includes("中等度の痛み") || clean.includes("かなり")) return 13;
+          if (clean.includes("重度の痛み") || clean.includes("激しい")) return 25;
+        }
+        return 0;
+      };
 
       const findAthlete = (rawName: string) => {
         const nameClean = rawName.trim().replace(/^["']|["']$/g, "");
@@ -2230,45 +2283,89 @@ export async function importPerformanceCsv(
         let maxSeverityScore = 0;
 
         partIndexGroups.forEach(group => {
-          if (group.statusIdx >= vals.length) return;
-          const rawPart = String(vals[group.partIdx] || "").trim();
-          const rawScore = Number(vals[group.scoreIdx]);
-          const rawStatus = String(vals[group.statusIdx] || "").trim();
+          if (group.scoreIdx === -1) {
+            const rawPart = group.partIdx !== -1 && group.partIdx < vals.length 
+              ? String(vals[group.partIdx] || "").trim() 
+              : "全身";
 
-          const q1Val = Number(vals[group.q1Idx] || 0);
-          const q2Val = Number(vals[group.q2Idx] || 0);
-          const q3Val = Number(vals[group.q3Idx] || 0);
-          const q4Val = Number(vals[group.q4Idx] || 0);
+            const q1Val = group.q1Idx !== -1 && group.q1Idx < vals.length ? parseOstrcQuestionScore(vals[group.q1Idx], "q1") : 0;
+            const q2Val = group.q2Idx !== -1 && group.q2Idx < vals.length ? parseOstrcQuestionScore(vals[group.q2Idx], "q2") : 0;
+            const q3Val = group.q3Idx !== -1 && group.q3Idx < vals.length ? parseOstrcQuestionScore(vals[group.q3Idx], "q3") : 0;
+            const q4Val = group.q4Idx !== -1 && group.q4Idx < vals.length ? parseOstrcQuestionScore(vals[group.q4Idx], "q4") : 0;
 
-          if (rawPart && !isNaN(rawScore) && rawScore > 0) {
-            if (rawScore > maxSeverityScore) {
-              maxSeverityScore = rawScore;
+            const calculatedScore = q1Val + q2Val + q3Val + q4Val;
+
+            if (calculatedScore > 0 || (rawPart && rawPart !== "全身")) {
+              if (calculatedScore > maxSeverityScore) {
+                maxSeverityScore = calculatedScore;
+              }
+
+              const match = BODY_PARTS_MAPPING.find(bpm => 
+                rawPart.includes(bpm.label) || bpm.label.includes(rawPart)
+              );
+
+              let severity = "normal";
+              if (q1Val >= 17 || q2Val >= 25 || q3Val >= 25) {
+                severity = "out";
+              } else if (q1Val >= 8 || q2Val >= 13 || q3Val >= 13) {
+                severity = "limited";
+              } else if (calculatedScore > 0) {
+                severity = "caution";
+              }
+
+              injuryDetails.push({
+                partKey: match ? match.key : "other",
+                partLabel: rawPart || "その他",
+                severity: severity,
+                score: calculatedScore,
+                note: undefined,
+                q1: q1Val,
+                q2: q2Val,
+                q3: q3Val,
+                q4: q4Val,
+              });
             }
+          } else {
+            if (group.statusIdx >= vals.length) return;
+            const rawPart = String(vals[group.partIdx] || "").trim();
+            const rawScore = Number(vals[group.scoreIdx]);
+            const rawStatus = String(vals[group.statusIdx] || "").trim();
 
-            const match = BODY_PARTS_MAPPING.find(bpm => 
-              rawPart.includes(bpm.label) || bpm.label.includes(rawPart)
-            );
+            const q1Val = Number(vals[group.q1Idx] || 0);
+            const q2Val = Number(vals[group.q2Idx] || 0);
+            const q3Val = Number(vals[group.q3Idx] || 0);
+            const q4Val = Number(vals[group.q4Idx] || 0);
 
-            let severity = "normal";
-            if (rawStatus.includes("離脱") || rawStatus.includes("out")) {
-              severity = "out";
-            } else if (rawStatus.includes("制限") || rawStatus.includes("limited")) {
-              severity = "limited";
-            } else if (rawStatus.includes("注意") || rawStatus.includes("caution")) {
-              severity = "caution";
+            if (rawPart && !isNaN(rawScore) && rawScore > 0) {
+              if (rawScore > maxSeverityScore) {
+                maxSeverityScore = rawScore;
+              }
+
+              const match = BODY_PARTS_MAPPING.find(bpm => 
+                rawPart.includes(bpm.label) || bpm.label.includes(rawPart)
+              );
+
+              let severity = "normal";
+              if (rawStatus.includes("離脱") || rawStatus.includes("out")) {
+                severity = "out";
+              } else if (rawStatus.includes("制限") || rawStatus.includes("limited")) {
+                severity = "limited";
+              } else if (rawStatus.includes("注意") || rawStatus.includes("caution")) {
+                severity = "caution";
+              }
+
+              injuryDetails.push({
+                partKey: match ? match.key : "other",
+                partLabel: rawPart,
+                severity: severity,
+                score: rawScore,
+                note: rawStatus || undefined,
+                q1: q1Val,
+                q2: q2Val,
+                q3: q3Val,
+                q4: q4Val,
+              });
             }
-
-            injuryDetails.push({
-              partKey: match ? match.key : "other",
-              partLabel: rawPart,
-              severity: severity,
-              score: rawScore,
-              note: rawStatus || undefined,
-              q1: q1Val,
-              q2: q2Val,
-              q3: q3Val,
-              q4: q4Val,
-            });
           }
         });
 
