@@ -2690,7 +2690,7 @@ export default function HomeScreen() {
             {athleteActiveTab === "sleep" && (() => {
               // SOXAIデータが含まれるレコードを日付降順で抽出
               const trend = pastPerformance || [];
-              const sleepRecords = [...trend]
+              let sleepRecords = [...trend]
                 .filter((p: any) => {
                   const hasScore = p.wellnessSleep !== undefined && p.wellnessSleep !== null;
                   const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
@@ -2698,6 +2698,56 @@ export default function HomeScreen() {
                   return hasScore || hasBedTime;
                 })
                 .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+              let isUsingDemoData = false;
+              if (sleepRecords.length === 0) {
+                isUsingDemoData = true;
+                const today = new Date();
+                sleepRecords = [
+                  {
+                    date: new Date(today.getTime() - 0 * 24 * 60 * 60 * 1000),
+                    wellnessSleep: 82,
+                    hrv: "58",
+                    soxaiData: JSON.stringify({
+                      soxaiBedTimeStr: "01:35",
+                      soxaiWakeTimeStr: "05:42",
+                      soxaiDeepSleep: 120,
+                      soxaiLightSleep: 180,
+                      soxaiRemSleep: 60,
+                      soxaiAwakeTime: 40,
+                      soxaiSleepDuration: 360
+                    })
+                  } as any,
+                  {
+                    date: new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000),
+                    wellnessSleep: 79,
+                    hrv: "62",
+                    soxaiData: JSON.stringify({
+                      soxaiBedTimeStr: "23:26",
+                      soxaiWakeTimeStr: "06:03",
+                      soxaiDeepSleep: 90,
+                      soxaiLightSleep: 240,
+                      soxaiRemSleep: 80,
+                      soxaiAwakeTime: 20,
+                      soxaiSleepDuration: 410
+                    })
+                  } as any,
+                  {
+                    date: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
+                    wellnessSleep: 85,
+                    hrv: "65",
+                    soxaiData: JSON.stringify({
+                      soxaiBedTimeStr: "00:21",
+                      soxaiWakeTimeStr: "05:15",
+                      soxaiDeepSleep: 140,
+                      soxaiLightSleep: 160,
+                      soxaiRemSleep: 70,
+                      soxaiAwakeTime: 15,
+                      soxaiSleepDuration: 370
+                    })
+                  } as any
+                ];
+              }
 
               const parseTimeToMinutes = (timeStr: string | null | undefined): number | null => {
                 if (!timeStr) return null;
@@ -2710,10 +2760,36 @@ export default function HomeScreen() {
                 return hrs * 60 + mins;
               };
 
-              // タイムラインの基準時間 (前日21:00〜当日11:00の14時間 = 840分)
-              const timelineStart = 21 * 60; // 1260分
-              const timelineEnd = 35 * 60; // 2100分 (翌日11:00)
+              // タイムラインの基準時間 (前日17:00〜当日17:00の24時間 = 1440分)
+              const timelineStart = 17 * 60; // 1020分
+              const timelineEnd = 41 * 60; // 2460分 (翌日17:00)
               const totalTimelineMins = timelineEnd - timelineStart;
+
+              const getMockedTimelineSegments = (deep: number, light: number, rem: number, awake: number) => {
+                const rawSegments = [
+                  { type: "awake", val: awake * 0.15 },
+                  { type: "light", val: light * 0.20 },
+                  { type: "deep", val: deep * 0.35 },
+                  { type: "light", val: light * 0.25 },
+                  { type: "rem", val: rem * 0.30 },
+                  { type: "deep", val: deep * 0.45 },
+                  { type: "light", val: light * 0.30 },
+                  { type: "rem", val: rem * 0.40 },
+                  { type: "deep", val: deep * 0.20 },
+                  { type: "light", val: light * 0.25 },
+                  { type: "rem", val: rem * 0.30 },
+                  { type: "awake", val: awake * 0.85 }
+                ];
+
+                const filtered = rawSegments.filter(s => s.val > 0);
+                const totalVal = filtered.reduce((acc, cur) => acc + cur.val, 0);
+                if (totalVal === 0) return [];
+                
+                return filtered.map(s => ({
+                  type: s.type,
+                  percent: (s.val / totalVal) * 100
+                }));
+              };
 
               return (
                 <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 16 }}>
@@ -2728,6 +2804,13 @@ export default function HomeScreen() {
                       </View>
                     </View>
                   </View>
+
+                  {isUsingDemoData && (
+                    <View style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE", borderWidth: 1, borderRadius: 12, padding: 12 }}>
+                      <Text style={{ fontSize: 11, color: "#1E40AF", fontWeight: "bold" }}>💡 デモデータ表示中</Text>
+                      <Text style={{ fontSize: 10, color: "#2563EB", marginTop: 2 }}>SOXAIリングの測定データ（CSV）がまだ未登録のため、プレビュー用のサンプルデータを表示しています。CSVデータをアップロードすると、実際の測定結果が自動で反映されます。</Text>
+                    </View>
+                  )}
 
                   {/* 凡例 */}
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12 }}>
@@ -2750,6 +2833,23 @@ export default function HomeScreen() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                       <View style={{ width: 10, height: 10, backgroundColor: "#94A3B8", borderRadius: 2 }} />
                       <Text style={{ fontSize: 9, color: "#475569", fontWeight: "bold" }}>仮眠</Text>
+                    </View>
+                  </View>
+
+                  {/* 時間軸目盛りヘッダー */}
+                  <View style={{ flexDirection: "row", gap: 10, paddingRight: 4, borderBottomWidth: 1, borderColor: "#E2E8F0", paddingBottom: 6 }}>
+                    <View style={{ width: 145 }} /> {/* 日付(80) + スコア(65) + ギャップ */}
+                    <View style={{ flex: 1, height: 16, position: "relative" }}>
+                      {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+                        let targetMins = hour * 60;
+                        if (hour < 17) targetMins += 24 * 60; // 翌日扱い
+                        const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+                        return (
+                          <View key={hour} style={{ position: "absolute", left: `${percent}%`, marginLeft: -10, width: 20, alignItems: "center" }}>
+                            <Text style={{ fontSize: 8, color: "#94A3B8", fontWeight: "bold" }}>{hour}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
                   </View>
 
@@ -2777,26 +2877,14 @@ export default function HomeScreen() {
                         let showTimelineBar = false;
                         let leftMarginPercent = 0;
                         let barWidthPercent = 0;
-                        let deepPercent = 0;
-                        let lightPercent = 0;
-                        let remPercent = 0;
-                        let awakePercent = 0;
+                        let segments: Array<{ type: string; percent: number }> = [];
 
                         if (bedMin !== null && wakeMin !== null && wakeMin > bedMin) {
                           showTimelineBar = true;
                           const totalBedMins = wakeMin - bedMin;
                           leftMarginPercent = Math.max(0, Math.min(100, ((bedMin - timelineStart) / totalTimelineMins) * 100));
                           barWidthPercent = Math.max(10, Math.min(100 - leftMarginPercent, (totalBedMins / totalTimelineMins) * 100));
-
-                          const totalMeasured = deep + light + rem + awake;
-                          if (totalMeasured > 0) {
-                            deepPercent = (deep / totalMeasured) * 100;
-                            lightPercent = (light / totalMeasured) * 100;
-                            remPercent = (rem / totalMeasured) * 100;
-                            awakePercent = (awake / totalMeasured) * 100;
-                          } else {
-                            lightPercent = 100;
-                          }
+                          segments = getMockedTimelineSegments(deep, light, rem, awake);
                         }
 
                         const isNapOnly = !showTimelineBar && (Number(soxai.soxaiSleepDuration) > 0);
@@ -2821,10 +2909,26 @@ export default function HomeScreen() {
                             </View>
 
                             {/* 積み上げグラフ (タイムライン風) */}
-                            <View style={{ flex: 1, height: 26, backgroundColor: "#F8FAFC", borderRadius: 8, overflow: "hidden", position: "relative", justifyContent: "center" }}>
-                              <View style={{ position: "absolute", left: `${((24 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                              <View style={{ position: "absolute", left: `${((27 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                              <View style={{ position: "absolute", left: `${((30 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+                             <View style={{ flex: 1, height: 26, backgroundColor: "#F8FAFC", borderRadius: 8, overflow: "hidden", position: "relative", justifyContent: "center" }}>
+                              {/* 2時間おきのグリッド背景縦線 */}
+                              {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+                                let targetMins = hour * 60;
+                                if (hour < 17) targetMins += 24 * 60;
+                                const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+                                return (
+                                  <View
+                                    key={hour}
+                                    style={{
+                                      position: "absolute",
+                                      left: `${percent}%`,
+                                      top: 0,
+                                      bottom: 0,
+                                      width: 1,
+                                      backgroundColor: "#E2E8F0"
+                                    }}
+                                  />
+                                );
+                              })}
 
                               {showTimelineBar ? (
                                 <View style={{
@@ -2836,10 +2940,24 @@ export default function HomeScreen() {
                                   overflow: "hidden",
                                   flexDirection: "row"
                                 }}>
-                                  {deepPercent > 0 && <View style={{ width: `${deepPercent}%`, height: "100%", backgroundColor: "#4338CA" }} />}
-                                  {lightPercent > 0 && <View style={{ width: `${lightPercent}%`, height: "100%", backgroundColor: "#818CF8" }} />}
-                                  {remPercent > 0 && <View style={{ width: `${remPercent}%`, height: "100%", backgroundColor: "#C7D2FE" }} />}
-                                  {awakePercent > 0 && <View style={{ width: `${awakePercent}%`, height: "100%", backgroundColor: "#FBBF24" }} />}
+                                  {segments.map((seg, sIdx) => {
+                                    const colorsMap: Record<string, string> = {
+                                      deep: "#4338CA",
+                                      light: "#818CF8",
+                                      rem: "#C7D2FE",
+                                      awake: "#FBBF24"
+                                    };
+                                    return (
+                                      <View
+                                        key={sIdx}
+                                        style={{
+                                          width: `${seg.percent}%`,
+                                          height: "100%",
+                                          backgroundColor: colorsMap[seg.type] || "#CBD5E1"
+                                        }}
+                                      />
+                                    );
+                                  })}
                                 </View>
                               ) : isNapOnly ? (
                                 <View style={{
@@ -3170,7 +3288,43 @@ export default function HomeScreen() {
     // 💤 全選手の睡眠ステージ一覧 (指導者向け)
     // ----------------------------------------------------
     const renderTeamSleepTab = () => {
-      const athletes = teamAnalytics?.athletes || [];
+      let athletes = teamAnalytics?.athletes || [];
+
+      // SOXAIデータが1件もないか判定
+      const hasAnySoxai = athletes.some((ath: any) => {
+        const soxai = ath.soxaiData ? (typeof ath.soxaiData === "string" ? JSON.parse(ath.soxaiData) : ath.soxaiData) : {};
+        return soxai.soxaiBedTimeStr || ath.wellnessSleep;
+      });
+
+      let isUsingDemoData = false;
+      if (!hasAnySoxai && athletes.length > 0) {
+        isUsingDemoData = true;
+        athletes = athletes.map((ath: any, index: number) => {
+          const variations = [
+            { bed: "23:15", wake: "06:45", score: 88, hrv: 68, deep: 140, light: 220, rem: 80, awake: 20 },
+            { bed: "23:45", wake: "07:00", score: 79, hrv: 62, deep: 90, light: 240, rem: 80, awake: 20 },
+            { bed: "22:50", wake: "06:30", score: 85, hrv: 65, deep: 160, light: 200, rem: 110, awake: 15 },
+            { bed: "00:10", wake: "06:15", score: 68, hrv: 51, deep: 70, light: 180, rem: 50, awake: 45 },
+            { bed: "23:25", wake: "07:05", score: 82, hrv: 63, deep: 120, light: 220, rem: 75, awake: 25 },
+            { bed: "01:35", wake: "05:42", score: 70, hrv: 58, deep: 100, light: 190, rem: 40, awake: 30 }
+          ];
+          const varObj = variations[index % variations.length];
+          return {
+            ...ath,
+            wellnessSleep: varObj.score,
+            hrv: varObj.hrv,
+            soxaiData: JSON.stringify({
+              soxaiBedTimeStr: varObj.bed,
+              soxaiWakeTimeStr: varObj.wake,
+              soxaiDeepSleep: varObj.deep,
+              soxaiLightSleep: varObj.light,
+              soxaiRemSleep: varObj.rem,
+              soxaiAwakeTime: varObj.awake,
+              soxaiSleepDuration: 420
+            })
+          };
+        });
+      }
 
       const parseTimeToMinutes = (timeStr: string | null | undefined): number | null => {
         if (!timeStr) return null;
@@ -3183,10 +3337,36 @@ export default function HomeScreen() {
         return hrs * 60 + mins;
       };
 
-      // タイムラインの基準時間 (前日21:00〜当日11:00の14時間 = 840分)
-      const timelineStart = 21 * 60; // 1260分
-      const timelineEnd = 35 * 60; // 2100分 (翌日11:00)
+      // タイムラインの基準時間 (前日17:00〜当日17:00の24時間 = 1440分)
+      const timelineStart = 17 * 60; // 1020分
+      const timelineEnd = 41 * 60; // 2460分 (翌日17:00)
       const totalTimelineMins = timelineEnd - timelineStart;
+
+      const getMockedTimelineSegments = (deep: number, light: number, rem: number, awake: number) => {
+        const rawSegments = [
+          { type: "awake", val: awake * 0.15 },
+          { type: "light", val: light * 0.20 },
+          { type: "deep", val: deep * 0.35 },
+          { type: "light", val: light * 0.25 },
+          { type: "rem", val: rem * 0.30 },
+          { type: "deep", val: deep * 0.45 },
+          { type: "light", val: light * 0.30 },
+          { type: "rem", val: rem * 0.40 },
+          { type: "deep", val: deep * 0.20 },
+          { type: "light", val: light * 0.25 },
+          { type: "rem", val: rem * 0.30 },
+          { type: "awake", val: awake * 0.85 }
+        ];
+
+        const filtered = rawSegments.filter(s => s.val > 0);
+        const totalVal = filtered.reduce((acc, cur) => acc + cur.val, 0);
+        if (totalVal === 0) return [];
+        
+        return filtered.map(s => ({
+          type: s.type,
+          percent: (s.val / totalVal) * 100
+        }));
+      };
 
       return (
         <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 16 }}>
@@ -3196,6 +3376,13 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 10, color: "#64748B" }}>選手ごとの就寝・起床リズムおよび睡眠品質の一覧比較</Text>
             </View>
           </View>
+
+          {isUsingDemoData && (
+            <View style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE", borderWidth: 1, borderRadius: 12, padding: 12 }}>
+              <Text style={{ fontSize: 11, color: "#1E40AF", fontWeight: "bold" }}>💡 デモデータ表示中</Text>
+              <Text style={{ fontSize: 10, color: "#2563EB", marginTop: 2 }}>チームに本日分のSOXAIリングの測定データ（CSV）がまだ未登録のため、プレビュー用のサンプルデータを表示しています。CSVデータをアップロードすると、実際の測定結果が自動で反映されます。</Text>
+            </View>
+          )}
 
           {/* 凡例 */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12 }}>
@@ -3221,10 +3408,27 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* 時間軸目盛りヘッダー */}
+          <View style={{ flexDirection: "row", gap: 10, paddingRight: 4, borderBottomWidth: 1, borderColor: "#E2E8F0", paddingBottom: 6 }}>
+            <View style={{ width: 170 }} />
+            <View style={{ flex: 1, height: 16, position: "relative" }}>
+              {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+                let targetMins = hour * 60;
+                if (hour < 17) targetMins += 24 * 60;
+                const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+                return (
+                  <View key={hour} style={{ position: "absolute", left: `${percent}%`, marginLeft: -10, width: 20, alignItems: "center" }}>
+                    <Text style={{ fontSize: 8, color: "#94A3B8", fontWeight: "bold" }}>{hour}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           {/* リスト */}
           <View style={{ gap: 12 }}>
             {athletes.length > 0 ? (
-              athletes.map((ath: any, idx) => {
+              athletes.map((ath: any, idx: number) => {
                 const soxai = ath.soxaiData ? (typeof ath.soxaiData === "string" ? JSON.parse(ath.soxaiData) : ath.soxaiData) : {};
                 
                 const bedTimeStr = soxai.soxaiBedTimeStr || "--:--";
@@ -3244,26 +3448,14 @@ export default function HomeScreen() {
                 let showTimelineBar = false;
                 let leftMarginPercent = 0;
                 let barWidthPercent = 0;
-                let deepPercent = 0;
-                let lightPercent = 0;
-                let remPercent = 0;
-                let awakePercent = 0;
+                let segments: Array<{ type: string; percent: number }> = [];
 
                 if (bedMin !== null && wakeMin !== null && wakeMin > bedMin) {
                   showTimelineBar = true;
                   const totalBedMins = wakeMin - bedMin;
                   leftMarginPercent = Math.max(0, Math.min(100, ((bedMin - timelineStart) / totalTimelineMins) * 100));
                   barWidthPercent = Math.max(10, Math.min(100 - leftMarginPercent, (totalBedMins / totalTimelineMins) * 100));
-
-                  const totalMeasured = deep + light + rem + awake;
-                  if (totalMeasured > 0) {
-                    deepPercent = (deep / totalMeasured) * 100;
-                    lightPercent = (light / totalMeasured) * 100;
-                    remPercent = (rem / totalMeasured) * 100;
-                    awakePercent = (awake / totalMeasured) * 100;
-                  } else {
-                    lightPercent = 100;
-                  }
+                  segments = getMockedTimelineSegments(deep, light, rem, awake);
                 }
 
                 const isNapOnly = !showTimelineBar && (Number(soxai.soxaiSleepDuration) > 0);
@@ -3288,9 +3480,25 @@ export default function HomeScreen() {
 
                     {/* 積み上げグラフ (タイムライン風) */}
                     <View style={{ flex: 1, height: 26, backgroundColor: "#F8FAFC", borderRadius: 8, overflow: "hidden", position: "relative", justifyContent: "center" }}>
-                      <View style={{ position: "absolute", left: `${((24 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                      <View style={{ position: "absolute", left: `${((27 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                      <View style={{ position: "absolute", left: `${((30 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+                      {/* 2時間おきのグリッド背景縦線 */}
+                      {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+                        let targetMins = hour * 60;
+                        if (hour < 17) targetMins += 24 * 60;
+                        const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+                        return (
+                          <View
+                            key={hour}
+                            style={{
+                              position: "absolute",
+                              left: `${percent}%`,
+                              top: 0,
+                              bottom: 0,
+                              width: 1,
+                              backgroundColor: "#E2E8F0"
+                            }}
+                          />
+                        );
+                      })}
 
                       {showTimelineBar ? (
                         <View style={{
@@ -3302,10 +3510,24 @@ export default function HomeScreen() {
                           overflow: "hidden",
                           flexDirection: "row"
                         }}>
-                          {deepPercent > 0 && <View style={{ width: `${deepPercent}%`, height: "100%", backgroundColor: "#4338CA" }} />}
-                          {lightPercent > 0 && <View style={{ width: `${lightPercent}%`, height: "100%", backgroundColor: "#818CF8" }} />}
-                          {remPercent > 0 && <View style={{ width: `${remPercent}%`, height: "100%", backgroundColor: "#C7D2FE" }} />}
-                          {awakePercent > 0 && <View style={{ width: `${awakePercent}%`, height: "100%", backgroundColor: "#FBBF24" }} />}
+                          {segments.map((seg, sIdx) => {
+                            const colorsMap: Record<string, string> = {
+                              deep: "#4338CA",
+                              light: "#818CF8",
+                              rem: "#C7D2FE",
+                              awake: "#FBBF24"
+                            };
+                            return (
+                              <View
+                                key={sIdx}
+                                style={{
+                                  width: `${seg.percent}%`,
+                                  height: "100%",
+                                  backgroundColor: colorsMap[seg.type] || "#CBD5E1"
+                                }}
+                              />
+                            );
+                          })}
                         </View>
                       ) : isNapOnly ? (
                         <View style={{

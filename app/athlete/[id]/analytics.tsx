@@ -826,7 +826,7 @@ export default function AthleteAnalyticsScreen() {
     const trend = (analytics as any)?.trend || (analytics as any)?.history || [];
     
     // SOXAIデータが含まれるレコードを日付降順で抽出
-    const sleepRecords = trend
+    let sleepRecords = trend
       .filter((p: any) => {
         const hasScore = p.wellnessSleep !== undefined && p.wellnessSleep !== null;
         const soxai = p.soxaiData ? (typeof p.soxaiData === "string" ? JSON.parse(p.soxaiData) : p.soxaiData) : {};
@@ -834,6 +834,56 @@ export default function AthleteAnalyticsScreen() {
         return hasScore || hasBedTime;
       })
       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    let isUsingDemoData = false;
+    if (sleepRecords.length === 0) {
+      isUsingDemoData = true;
+      const today = new Date();
+      sleepRecords = [
+        {
+          date: new Date(today.getTime() - 0 * 24 * 60 * 60 * 1000).toISOString(),
+          wellnessSleep: 82,
+          hrv: 58,
+          soxaiData: JSON.stringify({
+            soxaiBedTimeStr: "01:35",
+            soxaiWakeTimeStr: "05:42",
+            soxaiDeepSleep: 120,
+            soxaiLightSleep: 180,
+            soxaiRemSleep: 60,
+            soxaiAwakeTime: 40,
+            soxaiSleepDuration: 360
+          })
+        },
+        {
+          date: new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          wellnessSleep: 79,
+          hrv: 62,
+          soxaiData: JSON.stringify({
+            soxaiBedTimeStr: "23:26",
+            soxaiWakeTimeStr: "06:03",
+            soxaiDeepSleep: 90,
+            soxaiLightSleep: 240,
+            soxaiRemSleep: 80,
+            soxaiAwakeTime: 20,
+            soxaiSleepDuration: 410
+          })
+        },
+        {
+          date: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          wellnessSleep: 85,
+          hrv: 65,
+          soxaiData: JSON.stringify({
+            soxaiBedTimeStr: "00:21",
+            soxaiWakeTimeStr: "05:15",
+            soxaiDeepSleep: 140,
+            soxaiLightSleep: 160,
+            soxaiRemSleep: 70,
+            soxaiAwakeTime: 15,
+            soxaiSleepDuration: 370
+          })
+        }
+      ];
+    }
 
     const parseTimeToMinutes = (timeStr: string | null | undefined): number | null => {
       if (!timeStr) return null;
@@ -853,10 +903,36 @@ export default function AthleteAnalyticsScreen() {
       return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
     };
 
-    // タイムラインの基準時間 (前日21:00〜当日11:00の14時間 = 840分)
-    const timelineStart = 21 * 60; // 1260分
-    const timelineEnd = 35 * 60; // 2100分 (翌日11:00)
+    // タイムラインの基準時間 (前日17:00〜当日17:00の24時間 = 1440分)
+    const timelineStart = 17 * 60; // 1020分
+    const timelineEnd = 41 * 60; // 2460分 (翌日17:00)
     const totalTimelineMins = timelineEnd - timelineStart;
+
+    const getMockedTimelineSegments = (deep: number, light: number, rem: number, awake: number) => {
+      const rawSegments = [
+        { type: "awake", val: awake * 0.15 },
+        { type: "light", val: light * 0.20 },
+        { type: "deep", val: deep * 0.35 },
+        { type: "light", val: light * 0.25 },
+        { type: "rem", val: rem * 0.30 },
+        { type: "deep", val: deep * 0.45 },
+        { type: "light", val: light * 0.30 },
+        { type: "rem", val: rem * 0.40 },
+        { type: "deep", val: deep * 0.20 },
+        { type: "light", val: light * 0.25 },
+        { type: "rem", val: rem * 0.30 },
+        { type: "awake", val: awake * 0.85 }
+      ];
+
+      const filtered = rawSegments.filter(s => s.val > 0);
+      const totalVal = filtered.reduce((acc, cur) => acc + cur.val, 0);
+      if (totalVal === 0) return [];
+      
+      return filtered.map(s => ({
+        type: s.type,
+        percent: (s.val / totalVal) * 100
+      }));
+    };
 
     return (
       <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, gap: 16 }}>
@@ -871,6 +947,13 @@ export default function AthleteAnalyticsScreen() {
             </View>
           </View>
         </View>
+
+        {isUsingDemoData && (
+          <View style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE", borderWidth: 1, borderRadius: 12, padding: 12 }}>
+            <Text style={{ fontSize: 11, color: "#1E40AF", fontWeight: "bold" }}>💡 デモデータ表示中</Text>
+            <Text style={{ fontSize: 10, color: "#2563EB", marginTop: 2 }}>SOXAIリングの測定データ（CSV）がまだ未登録のため、プレビュー用のサンプルデータを表示しています。CSVデータをアップロードすると、実際の測定結果が自動で反映されます。</Text>
+          </View>
+        )}
 
         {/* 凡例 */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12 }}>
@@ -896,6 +979,23 @@ export default function AthleteAnalyticsScreen() {
           </View>
         </View>
 
+        {/* 時間軸目盛りヘッダー */}
+        <View style={{ flexDirection: "row", gap: 10, paddingRight: 4, borderBottomWidth: 1, borderColor: "#E2E8F0", paddingBottom: 6 }}>
+          <View style={{ width: 145 }} /> {/* 日付(80) + スコア(65) + ギャップ */}
+          <View style={{ flex: 1, height: 16, position: "relative" }}>
+            {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+              let targetMins = hour * 60;
+              if (hour < 17) targetMins += 24 * 60; // 翌日扱い
+              const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+              return (
+                <View key={hour} style={{ position: "absolute", left: `${percent}%`, marginLeft: -10, width: 20, alignItems: "center" }}>
+                  <Text style={{ fontSize: 8, color: "#94A3B8", fontWeight: "bold" }}>{hour}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
         {/* リスト表示 */}
         <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={true}>
           <View style={{ gap: 12 }}>
@@ -916,32 +1016,19 @@ export default function AthleteAnalyticsScreen() {
                 const light = Number(soxai.soxaiLightSleep) || 0;
                 const rem = Number(soxai.soxaiRemSleep) || 0;
                 const awake = Number(soxai.soxaiAwakeTime) || 0;
-                const totalSleepTime = deep + light + rem;
 
                 // タイムライン描画計算
                 let showTimelineBar = false;
                 let leftMarginPercent = 0;
                 let barWidthPercent = 0;
-                let deepPercent = 0;
-                let lightPercent = 0;
-                let remPercent = 0;
-                let awakePercent = 0;
+                let segments: Array<{ type: string; percent: number }> = [];
 
                 if (bedMin !== null && wakeMin !== null && wakeMin > bedMin) {
                   showTimelineBar = true;
                   const totalBedMins = wakeMin - bedMin;
                   leftMarginPercent = Math.max(0, Math.min(100, ((bedMin - timelineStart) / totalTimelineMins) * 100));
                   barWidthPercent = Math.max(10, Math.min(100 - leftMarginPercent, (totalBedMins / totalTimelineMins) * 100));
-
-                  const totalMeasured = deep + light + rem + awake;
-                  if (totalMeasured > 0) {
-                    deepPercent = (deep / totalMeasured) * 100;
-                    lightPercent = (light / totalMeasured) * 100;
-                    remPercent = (rem / totalMeasured) * 100;
-                    awakePercent = (awake / totalMeasured) * 100;
-                  } else {
-                    lightPercent = 100; // データがない場合はデフォルト浅い睡眠100%
-                  }
+                  segments = getMockedTimelineSegments(deep, light, rem, awake);
                 }
 
                 // 就寝・起床時間はないが、睡眠時間はある場合は「仮眠」扱い
@@ -972,10 +1059,25 @@ export default function AthleteAnalyticsScreen() {
 
                     {/* 積み上げグラフ (タイムライン風) */}
                     <View style={{ flex: 1, height: 26, backgroundColor: "#F8FAFC", borderRadius: 8, overflow: "hidden", position: "relative", justifyContent: "center" }}>
-                      {/* 時間軸の背景目盛り (24:00, 3:00, 6:00 のガイドライン) */}
-                      <View style={{ position: "absolute", left: `${((24 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                      <View style={{ position: "absolute", left: `${((27 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
-                      <View style={{ position: "absolute", left: `${((30 * 60 - timelineStart) / totalTimelineMins) * 100}%`, top: 0, bottom: 0, width: 1, backgroundColor: "#E2E8F0" }} />
+                      {/* 2時間おきのグリッド背景縦線 */}
+                      {[18, 20, 22, 0, 2, 4, 6, 8, 10, 12, 14, 16].map((hour) => {
+                        let targetMins = hour * 60;
+                        if (hour < 17) targetMins += 24 * 60;
+                        const percent = ((targetMins - timelineStart) / totalTimelineMins) * 100;
+                        return (
+                          <View
+                            key={hour}
+                            style={{
+                              position: "absolute",
+                              left: `${percent}%`,
+                              top: 0,
+                              bottom: 0,
+                              width: 1,
+                              backgroundColor: "#E2E8F0"
+                            }}
+                          />
+                        );
+                      })}
 
                       {showTimelineBar ? (
                         <View style={{
@@ -987,10 +1089,24 @@ export default function AthleteAnalyticsScreen() {
                           overflow: "hidden",
                           flexDirection: "row"
                         }}>
-                          {deepPercent > 0 && <View style={{ width: `${deepPercent}%`, height: "100%", backgroundColor: "#4338CA" }} />}
-                          {lightPercent > 0 && <View style={{ width: `${lightPercent}%`, height: "100%", backgroundColor: "#818CF8" }} />}
-                          {remPercent > 0 && <View style={{ width: `${remPercent}%`, height: "100%", backgroundColor: "#C7D2FE" }} />}
-                          {awakePercent > 0 && <View style={{ width: `${awakePercent}%`, height: "100%", backgroundColor: "#FBBF24" }} />}
+                          {segments.map((seg, sIdx) => {
+                            const colorsMap: Record<string, string> = {
+                              deep: "#4338CA",
+                              light: "#818CF8",
+                              rem: "#C7D2FE",
+                              awake: "#FBBF24"
+                            };
+                            return (
+                              <View
+                                key={sIdx}
+                                style={{
+                                  width: `${seg.percent}%`,
+                                  height: "100%",
+                                  backgroundColor: colorsMap[seg.type] || "#CBD5E1"
+                                }}
+                              />
+                            );
+                          })}
                         </View>
                       ) : isNapOnly ? (
                         /* 仮眠のみ */
