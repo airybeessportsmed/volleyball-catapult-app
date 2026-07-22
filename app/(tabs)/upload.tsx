@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Modal, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { ScreenContainer } from "@/components/screen-container";
@@ -40,6 +41,19 @@ const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   if (lowercaseText.includes("total player load") && lowercaseName.includes("menu")) return "Catapult Menu別PL";
   if (lowercaseText.includes("total player load")) return "Catapult PL (外的負荷)";
   return "CSV (自動判定)";
+};
+
+const convertExcelToCsv = (data: ArrayBuffer): string => {
+  const workbook = XLSX.read(new Uint8Array(data), { type: "array" });
+  let targetSheetName = workbook.SheetNames.find(name => 
+    name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
+  );
+  if (!targetSheetName) {
+    targetSheetName = workbook.SheetNames[0];
+  }
+  const worksheet = workbook.Sheets[targetSheetName];
+  if (!worksheet) return "";
+  return XLSX.utils.sheet_to_csv(worksheet);
 };
 
 export default function CoachUploadScreen() {
@@ -202,7 +216,12 @@ export default function CoachUploadScreen() {
     try {
       setErrorMsg("");
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["text/csv", "text/comma-separated-values", "application/vnd.ms-excel"],
+        type: [
+          "text/csv", 
+          "text/comma-separated-values", 
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ],
         copyToCacheDirectory: true,
         multiple: true,
       });
@@ -214,7 +233,14 @@ export default function CoachUploadScreen() {
       const newFiles = [];
       for (const asset of result.assets) {
         const response = await fetch(asset.uri);
-        const text = await response.text();
+        const nameLower = asset.name.toLowerCase();
+        let text = "";
+        if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
+          const arrayBuffer = await response.arrayBuffer();
+          text = convertExcelToCsv(arrayBuffer);
+        } else {
+          text = await response.text();
+        }
         newFiles.push({
           name: asset.name,
           size: asset.size,
@@ -250,20 +276,29 @@ export default function CoachUploadScreen() {
       const newFiles = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (!file.name.endsWith(".csv")) continue;
+        const nameLower = file.name.toLowerCase();
+        if (!nameLower.endsWith(".csv") && !nameLower.endsWith(".xlsx") && !nameLower.endsWith(".xls")) continue;
 
         const text = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (evt) => {
             const arrayBuffer = evt.target?.result as ArrayBuffer;
-            try {
-              // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
-              const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
-              resolve(utf8Decoder.decode(arrayBuffer));
-            } catch (err) {
-              // Fallback to Shift-JIS for Excel-generated Japanese CSVs
-              const sjisDecoder = new TextDecoder("shift-jis");
-              resolve(sjisDecoder.decode(arrayBuffer));
+            if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
+              try {
+                resolve(convertExcelToCsv(arrayBuffer));
+              } catch (e) {
+                resolve("");
+              }
+            } else {
+              try {
+                // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
+                const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+                resolve(utf8Decoder.decode(arrayBuffer));
+              } catch (err) {
+                // Fallback to Shift-JIS for Excel-generated Japanese CSVs
+                const sjisDecoder = new TextDecoder("shift-jis");
+                resolve(sjisDecoder.decode(arrayBuffer));
+              }
             }
           };
           reader.readAsArrayBuffer(file);
@@ -279,7 +314,7 @@ export default function CoachUploadScreen() {
       if (newFiles.length > 0) {
         addFiles(newFiles);
       } else {
-        setErrorMsg("CSVファイル（.csv）をドロップしてください。");
+        setErrorMsg("CSV（.csv）または Excel（.xlsx, .xls）ファイルをドロップしてください。");
       }
     }
   };
@@ -536,10 +571,10 @@ export default function CoachUploadScreen() {
                   
                   <View className="items-center gap-1 px-4">
                     <Text className="text-sm font-bold text-foreground text-center">
-                      CSVファイルをここにドラッグ＆ドロップ（複数可）
+                      CSVまたはExcelファイルをここにドラッグ＆ドロップ（複数可）
                     </Text>
                     <Text className="text-xs text-muted text-center font-sans">
-                      またはファイルブラウザから選択してください
+                      またはファイルブラウザから選択してください（.csv, .xlsx, .xls 対応）
                     </Text>
                   </View>
 
