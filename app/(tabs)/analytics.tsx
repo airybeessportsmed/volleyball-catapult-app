@@ -441,9 +441,13 @@ export default function AthleteAnalyticsScreen() {
 
         <View className="gap-5">
           {metrics.map((m, idx) => {
-            const ownVal = (own as any)[m.key];
-            const teamVal = (team as any)[m.key];
-            const posVal = (pos as any)[m.key];
+            const getSafeNum = (val: any): number => {
+              const num = Number(val);
+              return isNaN(num) || !isFinite(num) ? 0 : num;
+            };
+            const ownVal = getSafeNum(own ? (own as any)[m.key] : 0);
+            const teamVal = getSafeNum(team ? (team as any)[m.key] : 0);
+            const posVal = getSafeNum(pos ? (pos as any)[m.key] : 0);
             
             const maxVal = Math.max(ownVal, teamVal, posVal, 1);
             
@@ -664,9 +668,14 @@ export default function AthleteAnalyticsScreen() {
       stress: "#3B82F6", // Blue
     };
 
+    const getSafeNum = (val: any): number => {
+      const num = Number(val);
+      return isNaN(num) || !isFinite(num) ? 0 : num;
+    };
+
     // Y values: 1 to 5. So diff is 4.
     const mapY = (val: number) => {
-      const clampedVal = Math.max(1, Math.min(5, val));
+      const clampedVal = Math.max(1, Math.min(5, getSafeNum(val)));
       return paddingTop + graphHeight - ((clampedVal - 1) / 4) * graphHeight;
     };
 
@@ -713,8 +722,8 @@ export default function AthleteAnalyticsScreen() {
             {(() => {
               const wellnessBaseline = analytics.signalLight?.baselines?.wellness;
               if (!wellnessBaseline) return null;
-              const wMean = wellnessBaseline.mean / 4;
-              const wSd = wellnessBaseline.sd / 4;
+              const wMean = getSafeNum(wellnessBaseline.mean) / 4;
+              const wSd = getSafeNum(wellnessBaseline.sd) / 4;
               const yMin = Math.max(1, wMean - wSd);
               const yMax = Math.min(5, wMean + wSd);
               const bandYStart = mapY(yMax);
@@ -794,8 +803,13 @@ export default function AthleteAnalyticsScreen() {
     const trend = analytics.trend;
     if (trend.length === 0) return null;
 
-    const maxLoad = Math.max(...trend.map(t => t.totalLoad), 1) * 1.1;
-    const maxSRPE = Math.max(...trend.map(t => t.sRPE), 1) * 1.1;
+    const getSafeNum = (val: any): number => {
+      const num = Number(val);
+      return isNaN(num) || !isFinite(num) ? 0 : num;
+    };
+
+    const maxLoad = Math.max(...trend.map(t => getSafeNum(t.totalLoad)), 1) * 1.1;
+    const maxSRPE = Math.max(...trend.map(t => getSafeNum(t.sRPE)), 1) * 1.1;
 
     const chartWidth = windowWidth - 40; // Full width minus container padding
     const chartHeight = 180;
@@ -810,15 +824,17 @@ export default function AthleteAnalyticsScreen() {
     const loadPoints = trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxLoad;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (t.totalLoad / valDiff) * graphHeight : 0);
-      return { x, y, value: t.totalLoad, dateStr: t.dateStr };
+      const rawVal = getSafeNum(t.totalLoad);
+      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      return { x, y, value: rawVal, dateStr: t.dateStr };
     });
 
     const srpePoints = trend.map((t, index) => {
       const x = paddingLeft + (index * (trend.length > 1 ? graphWidth / (trend.length - 1) : graphWidth));
       const valDiff = maxSRPE;
-      const y = paddingTop + graphHeight - (valDiff > 0 ? (t.sRPE / valDiff) * graphHeight : 0);
-      return { x, y, value: t.sRPE };
+      const rawVal = getSafeNum(t.sRPE);
+      const y = paddingTop + graphHeight - (valDiff > 0 ? (rawVal / valDiff) * graphHeight : 0);
+      return { x, y, value: rawVal };
     });
 
     let loadLinePath = "";
