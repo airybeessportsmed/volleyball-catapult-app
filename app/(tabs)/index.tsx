@@ -599,6 +599,12 @@ export default function HomeScreen() {
     }
   );
 
+  // Fetch OSTRC data for athlete
+  const { data: ostrcData, isLoading: ostrcLoading } = trpc.performance.getOstrcByAthlete.useQuery(
+    { athleteId: athlete?.id || 0, date: rawDate },
+    { enabled: !!athlete?.id }
+  );
+
   // Fetch team analytics for coach/viewer
   const { data: teamAnalytics, isLoading: teamLoading, refetch: refetchTeam } = trpc.performance.getTeamAnalytics.useQuery(
     { teamId: user?.teamId || 1 },
@@ -1281,6 +1287,104 @@ export default function HomeScreen() {
 
     const latest = analytics?.latestSession;
     const trendData = analytics?.trend || [];
+
+    const renderOstrcCard = () => {
+      if (ostrcLoading) {
+        return (
+          <View className="bg-surface border border-border rounded-3xl p-6 items-center justify-center">
+            <ActivityIndicator size="small" color="#FF6B35" />
+          </View>
+        );
+      }
+
+      if (!ostrcData) {
+        return (
+          <View className="bg-surface border border-dashed border-border rounded-3xl p-6 items-center justify-center gap-2">
+            <IconSymbol size={24} name="doc.text" color="#9CA3AF" />
+            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#64748B" }} className="text-center">本日の OSTRC 回答データはありません</Text>
+          </View>
+        );
+      }
+
+      const details = ostrcData.injuryDetails || [];
+      const sortedDetails = [...details].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+      const maxDetailScore = sortedDetails.reduce((max: number, d: any) => Math.max(max, d.score || 0), 0);
+      
+      const hasSubstantial = details.some((d: any) => (d.q1 || 0) >= 17 || (d.q2 || 0) >= 13 || (d.q3 || 0) >= 13);
+      const isRed = maxDetailScore >= 40 || hasSubstantial;
+      const isYellow = maxDetailScore >= 11 && !isRed;
+
+      let severityBg = "bg-green-500/5";
+      let severityBorder = "border-green-200 dark:border-green-800/40";
+      let badgeBorderColor = "border-green-500/20";
+      let badgeText = "text-green-600 dark:text-green-400";
+      let badgeBg = "bg-green-500/10";
+      
+      if (isRed) {
+        severityBg = "bg-red-500/5";
+        severityBorder = "border-red-200 dark:border-red-800/40";
+        badgeBorderColor = "border-red-500/20";
+        badgeText = "text-red-600 dark:text-red-400";
+        badgeBg = "bg-red-500/10";
+      } else if (isYellow) {
+        severityBg = "bg-amber-500/5";
+        severityBorder = "border-amber-200 dark:border-amber-800/40";
+        badgeBorderColor = "border-amber-500/20";
+        badgeText = "text-amber-600 dark:text-amber-400";
+        badgeBg = "bg-amber-500/10";
+      }
+
+      return (
+        <View style={{ borderRadius: 20, borderWidth: 1, padding: 16, gap: 12, backgroundColor: "#FFFFFF" }} className={`${severityBorder} ${severityBg}`}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>OSTRC 障害調査結果</Text>
+              <View style={{ borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }} className={`${badgeBg} ${badgeBorderColor}`}>
+                <Text style={{ fontSize: 9, fontWeight: "bold" }} className={`${badgeText}`}>最高 {maxDetailScore}点</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 10, color: "#64748B", fontFamily: "monospace" }}>{ostrcData.date}</Text>
+          </View>
+
+          {sortedDetails.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {sortedDetails.map((d: any, idx: number) => {
+                const isDetailRed = d.score >= 40;
+                const isDetailYellow = d.score >= 11 && !isDetailRed;
+                let detailBadgeBg = "bg-blue-500";
+                if (isDetailRed) detailBadgeBg = "bg-red-500";
+                else if (isDetailYellow) detailBadgeBg = "bg-amber-500";
+
+                return (
+                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{d.partLabel}</Text>
+                      <Text style={{ fontSize: 9, color: "#64748B", fontFamily: "monospace" }}>
+                        ({d.q1 || 0}|{d.q2 || 0}|{d.q3 || 0}|{d.q4 || 0})
+                      </Text>
+                      {d.note && (
+                        <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "600" }} numberOfLines={1}>
+                          ({d.note})
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }} className={`${detailBadgeBg}`}>
+                      <Text style={{ fontSize: 10, fontWeight: "bold", color: "#FFFFFF" }}>{d.score}点</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ paddingVertical: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F0FDF4", borderRadius: 12, borderWidth: 1, borderColor: "#DCFCE7" }}>
+              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#166534" }}>
+                痛みや違和感のある部位はありません（良好）
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    };
 
     // ACWR ゲージ描画ヘルパー
     const renderACWRGauge = () => {
@@ -1980,6 +2084,7 @@ export default function HomeScreen() {
 
                 {/* 指導者からのアドバイス & 自主練ガイダンス */}
                 {analytics && renderGuidanceAndAdvice()}
+                {renderOstrcCard()}
               </View>
             )}
 

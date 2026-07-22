@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import fs from "fs";
 import path from "path";
-import { InsertUser, users, teams, athletes, performanceData, csvUploads, teamSettings, InsertAthlete, InsertPerformanceData, InsertCsvUpload, User, Team, Athlete, PerformanceData as PerfData, CsvUpload, TeamSettings } from "../drizzle/schema";
+import { InsertUser, users, teams, athletes, performanceData, csvUploads, teamSettings, ostrcResponses, InsertAthlete, InsertPerformanceData, InsertCsvUpload, User, Team, Athlete, PerformanceData as PerfData, CsvUpload, TeamSettings, InsertOstrcResponse, OstrcResponse } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1897,6 +1897,104 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
   }
 }
 
+export async function upsertOstrcResponse(data: InsertOstrcResponse) {
+  const db = await getDb();
+  if (!db) {
+    const existingIdx = mockOstrcResponses.findIndex(o => o.athleteId === data.athleteId && o.date === data.date);
+    if (existingIdx !== -1) {
+      let mergedDetails: any[] = [];
+      try {
+        const existingDetails = typeof mockOstrcResponses[existingIdx].injuryDetails === "string"
+          ? JSON.parse(mockOstrcResponses[existingIdx].injuryDetails as any)
+          : (mockOstrcResponses[existingIdx].injuryDetails || []);
+        const newDetails = typeof data.injuryDetails === "string"
+          ? JSON.parse(data.injuryDetails as string)
+          : (data.injuryDetails || []);
+
+        const detailsMap = new Map<string, any>();
+        existingDetails.forEach((d: any) => {
+          if (d && d.partLabel) detailsMap.set(d.partLabel.trim(), d);
+        });
+        newDetails.forEach((d: any) => {
+          if (d && d.partLabel) detailsMap.set(d.partLabel.trim(), d);
+        });
+        mergedDetails = Array.from(detailsMap.values());
+      } catch (e) {
+        mergedDetails = data.injuryDetails as any[];
+      }
+
+      const maxScore = mergedDetails.reduce((max, d) => Math.max(max, d.score || 0), 0);
+      mockOstrcResponses[existingIdx] = {
+        ...mockOstrcResponses[existingIdx],
+        ...data,
+        severityScore: Math.max(mockOstrcResponses[existingIdx].severityScore, data.severityScore, maxScore),
+        injuryDetails: mergedDetails,
+        updatedAt: new Date()
+      } as any;
+      return mockOstrcResponses[existingIdx].id;
+    } else {
+      const newRecord = {
+        id: mockOstrcResponses.length + 1,
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as any;
+      mockOstrcResponses.push(newRecord);
+      return newRecord.id;
+    }
+  }
+
+  const existing = await db
+    .select()
+    .from(ostrcResponses)
+    .where(and(eq(ostrcResponses.athleteId, data.athleteId), eq(ostrcResponses.date, data.date)))
+    .limit(1);
+
+  if (existing[0]) {
+    let mergedDetails: any[] = [];
+    try {
+      const existingDetails = typeof existing[0].injuryDetails === "string" 
+        ? JSON.parse(existing[0].injuryDetails) 
+        : (existing[0].injuryDetails || []);
+      const newDetails = typeof data.injuryDetails === "string"
+        ? JSON.parse(data.injuryDetails as string)
+        : (data.injuryDetails || []);
+
+      const detailsMap = new Map<string, any>();
+      existingDetails.forEach((d: any) => {
+        if (d && d.partLabel) {
+          detailsMap.set(d.partLabel.trim(), d);
+        }
+      });
+      newDetails.forEach((d: any) => {
+        if (d && d.partLabel) {
+          detailsMap.set(d.partLabel.trim(), d);
+        }
+      });
+      mergedDetails = Array.from(detailsMap.values());
+    } catch (e) {
+      mergedDetails = data.injuryDetails as any[];
+    }
+
+    const maxScore = mergedDetails.reduce((max, d) => Math.max(max, d.score || 0), 0);
+
+    await db
+      .update(ostrcResponses)
+      .set({
+        ...data,
+        severityScore: Math.max(existing[0].severityScore, data.severityScore, maxScore),
+        injuryDetails: mergedDetails,
+        updatedAt: new Date(),
+      })
+      .where(eq(ostrcResponses.id, existing[0].id));
+    
+    return existing[0].id;
+  } else {
+    const result = await db.insert(ostrcResponses).values(data).returning({ id: ostrcResponses.id });
+    return result[0]?.id;
+  }
+}
+
 export async function importPerformanceCsv(
   teamId: number,
   uploadedBy: number,
@@ -1979,6 +2077,7 @@ export async function importPerformanceCsv(
     const isWellnessOnetap = findHeaderIndex(["項目名", "項目"]) !== -1 && findHeaderIndex(["値", "スコア", "回答", "value"]) !== -1 && (findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name"]) !== -1 || findHeaderIndex(["内訳"]) !== -1);
     const isSRPE = findHeaderIndex(["トレーニング実施日"]) !== -1 && findHeaderIndex(["Session RPE"]) !== -1;
     const isSoxai = (csvText.includes("睡眠スコア") && csvText.includes("安静時心拍数")) || (csvText.includes("QoLスコア") && csvText.includes("睡眠スコア"));
+    const isOstrc = headers.some(h => h.includes("部位")) && headers.some(h => h.includes("Status"));
     
     // Enhanced IMA Log detection to prevent misclassification as isMenuLoadLog
     const isImaLog = 
@@ -2008,7 +2107,7 @@ export async function importPerformanceCsv(
     // Logging import flags for backend diagnosis
     console.log(`[CSV Import] fileName: ${fileName}, fileSize: ${csvText.length} bytes, delimiter: "${delimiter}"`);
     console.log(`[CSV Import] headers: ${JSON.stringify(headers)}`);
-    console.log(`[CSV Import] Flags -> isWellnessOnetap: ${isWellnessOnetap}, isSRPE: ${isSRPE}, isSoxai: ${isSoxai}, isImaLog: ${isImaLog}`);
+    console.log(`[CSV Import] Flags -> isWellnessOnetap: ${isWellnessOnetap}, isSRPE: ${isSRPE}, isSoxai: ${isSoxai}, isImaLog: ${isImaLog}, isOstrc: ${isOstrc}`);
     console.log(`[CSV Import] Flags -> isEventLog: ${isEventLog}, isRpeLog: ${isRpeLog}, isMenuLoadLog: ${isMenuLoadLog}`);
 
     const teamAthletes = await getAthletesByTeamId(teamId);
@@ -2034,7 +2133,159 @@ export async function importPerformanceCsv(
       return values;
     };
 
-    if (isWellnessOnetap) {
+    if (isOstrc) {
+      const dateCol = findHeaderIndex(["タイムスタンプ", "日時", "日付", "date"]) !== -1 ? findHeaderIndex(["タイムスタンプ", "日時", "日付", "date"]) : 0;
+      const nameCol = findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name", "回答者"]) !== -1 ? findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name", "回答者"]) : 1;
+
+      const partIndexGroups: { partIdx: number; q1Idx: number; q2Idx: number; q3Idx: number; q4Idx: number; scoreIdx: number; statusIdx: number; }[] = [];
+      headers.forEach((h, idx) => {
+        if (h.includes("部位") && !h.includes("内訳") && !h.includes("詳細")) {
+          partIndexGroups.push({
+            partIdx: idx,
+            q1Idx: idx + 1,
+            q2Idx: idx + 2,
+            q3Idx: idx + 3,
+            q4Idx: idx + 4,
+            scoreIdx: idx + 5,
+            statusIdx: idx + 6
+          });
+        }
+      });
+
+      if (partIndexGroups.length === 0) {
+        const fallbackPartIndexGroups = [
+          { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
+          { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
+          { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
+          { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
+        ];
+        fallbackPartIndexGroups.forEach(g => {
+          if (g.statusIdx < headers.length) {
+            partIndexGroups.push(g);
+          }
+        });
+      }
+
+      const BODY_PARTS_MAPPING = [
+        { key: "left_shoulder", label: "左肩" },
+        { key: "right_shoulder", label: "右肩" },
+        { key: "left_elbow", label: "左肘" },
+        { key: "right_elbow", label: "右肘" },
+        { key: "left_wrist", label: "左手首" },
+        { key: "right_wrist", label: "右手首" },
+        { key: "left_hip", label: "左股関節" },
+        { key: "right_hip", label: "右股関節" },
+        { key: "left_knee", label: "左膝" },
+        { key: "right_knee", label: "右膝" },
+        { key: "left_ankle", label: "左足首" },
+        { key: "right_ankle", label: "右足首" },
+        { key: "lower_back", label: "腰" },
+        { key: "neck", label: "首" },
+        { key: "back", label: "背中" },
+        { key: "chest", label: "胸" },
+        { key: "abdomen", label: "腹部" }
+      ];
+
+      const findAthlete = (rawName: string) => {
+        const nameClean = rawName.trim().replace(/^["']|["']$/g, "");
+        let athlete = teamAthletes.find(a => a.onetapName === nameClean || a.catapultName === nameClean);
+        if (athlete) return athlete;
+
+        const numMatch = nameClean.match(/#(\d+)/);
+        if (numMatch) {
+          const jerseyNum = parseInt(numMatch[1], 10);
+          athlete = teamAthletes.find(a => a.jerseyNumber === jerseyNum);
+          if (athlete) return athlete;
+        }
+
+        athlete = teamAthletes.find(a => {
+          const user = mockUsers.find(u => u.id === a.userId);
+          const realName = user ? user.name || "" : "";
+          return nameClean.includes(realName) || realName.includes(nameClean);
+        });
+        return athlete;
+      };
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const vals = parseCsvLine(line);
+        if (vals.length <= Math.max(dateCol, nameCol)) continue;
+
+        const dateStrRaw = vals[dateCol];
+        const nameStrRaw = vals[nameCol];
+        if (!dateStrRaw || !nameStrRaw) continue;
+
+        const dateObj = parseDateFlexible(dateStrRaw);
+        if (!dateObj) continue;
+        const dateStr = formatDateKey(dateObj); // YYYY-MM-DD
+
+        const athlete = findAthlete(nameStrRaw);
+        if (!athlete) {
+          unregisteredSet.add(nameStrRaw);
+          continue;
+        }
+
+        const injuryDetails: any[] = [];
+        let maxSeverityScore = 0;
+
+        partIndexGroups.forEach(group => {
+          if (group.statusIdx >= vals.length) return;
+          const rawPart = String(vals[group.partIdx] || "").trim();
+          const rawScore = Number(vals[group.scoreIdx]);
+          const rawStatus = String(vals[group.statusIdx] || "").trim();
+
+          const q1Val = Number(vals[group.q1Idx] || 0);
+          const q2Val = Number(vals[group.q2Idx] || 0);
+          const q3Val = Number(vals[group.q3Idx] || 0);
+          const q4Val = Number(vals[group.q4Idx] || 0);
+
+          if (rawPart && !isNaN(rawScore) && rawScore > 0) {
+            if (rawScore > maxSeverityScore) {
+              maxSeverityScore = rawScore;
+            }
+
+            const match = BODY_PARTS_MAPPING.find(bpm => 
+              rawPart.includes(bpm.label) || bpm.label.includes(rawPart)
+            );
+
+            let severity = "normal";
+            if (rawStatus.includes("離脱") || rawStatus.includes("out")) {
+              severity = "out";
+            } else if (rawStatus.includes("制限") || rawStatus.includes("limited")) {
+              severity = "limited";
+            } else if (rawStatus.includes("注意") || rawStatus.includes("caution")) {
+              severity = "caution";
+            }
+
+            injuryDetails.push({
+              partKey: match ? match.key : "other",
+              partLabel: rawPart,
+              severity: severity,
+              score: rawScore,
+              note: rawStatus || undefined,
+              q1: q1Val,
+              q2: q2Val,
+              q3: q3Val,
+              q4: q4Val,
+            });
+          }
+        });
+
+        await upsertOstrcResponse({
+          athleteId: athlete.id,
+          date: dateStr,
+          severityScore: maxSeverityScore,
+          q1Participation: 0,
+          q2Volume: 0,
+          q3Performance: 0,
+          q4Symptoms: 0,
+          injuryDetails: injuryDetails
+        });
+
+        importedCount++;
+      }
+    } else if (isWellnessOnetap) {
       const dateCol = findHeaderIndex(["日付", "日時", "回答日時", "date"]);
       const nameCol = findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name", "内訳"]);
       const itemCol = findHeaderIndex(["項目名", "項目", "item", "metric"]);
@@ -5204,6 +5455,38 @@ export async function rollbackPerformanceAnomaly(recordId: number): Promise<void
     await db.update(performanceData)
       .set(rollbackFields as any)
       .where(eq(performanceData.id, recordId));
+  }
+}
+
+export let mockOstrcResponses: OstrcResponse[] = [];
+
+export async function getOstrcByAthlete(athleteId: number, date?: string | null) {
+  const db = await getDb();
+  if (!db) {
+    if (date) {
+      return mockOstrcResponses.find(o => o.athleteId === athleteId && o.date === date) || null;
+    } else {
+      const filtered = mockOstrcResponses.filter(o => o.athleteId === athleteId);
+      if (filtered.length === 0) return null;
+      return filtered.sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+    }
+  }
+
+  if (date) {
+    const results = await db
+      .select()
+      .from(ostrcResponses)
+      .where(and(eq(ostrcResponses.athleteId, athleteId), eq(ostrcResponses.date, date)))
+      .limit(1);
+    return results[0] || null;
+  } else {
+    const results = await db
+      .select()
+      .from(ostrcResponses)
+      .where(eq(ostrcResponses.athleteId, athleteId))
+      .orderBy(desc(ostrcResponses.date))
+      .limit(1);
+    return results[0] || null;
   }
 }
 

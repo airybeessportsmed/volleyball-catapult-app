@@ -28,6 +28,7 @@ interface UploadFileItem {
 const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   const lowercaseText = csvText.toLowerCase();
   const lowercaseName = fileName.toLowerCase();
+  if (lowercaseText.includes("部位") && lowercaseText.includes("status")) return "OSTRC (障害調査)";
   const hasSoxaiKeywords = 
     (lowercaseText.includes("睡眠スコア") || lowercaseText.includes("qolスコア")) &&
     (lowercaseText.includes("安静時心拍") || lowercaseText.includes("hrv_rmssd") || lowercaseText.includes("睡眠時間"));

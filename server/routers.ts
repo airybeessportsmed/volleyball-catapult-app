@@ -382,6 +382,13 @@ export const appRouter = router({
     getByAthlete: protectedProcedure
       .input(z.object({ athleteId: z.number(), limit: z.number().optional() }))
       .query(({ input }) => db.getPerformanceDataByAthleteId(input.athleteId, input.limit)),
+
+    getOstrcByAthlete: protectedProcedure
+      .input(z.object({
+        athleteId: z.number(),
+        date: z.string().nullable().optional()
+      }))
+      .query(({ input }) => db.getOstrcByAthlete(input.athleteId, input.date)),
     
     getByTeam: protectedProcedure
       .input(z.object({ 

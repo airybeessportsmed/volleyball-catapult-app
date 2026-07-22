@@ -220,6 +220,12 @@ export default function AthleteAnalyticsScreen() {
     }
   );
 
+  // Fetch OSTRC data for this athlete and date
+  const { data: ostrcData, isLoading: ostrcLoading } = trpc.performance.getOstrcByAthlete.useQuery(
+    { athleteId: athleteId || 0, date: rawDate },
+    { enabled: !!athleteId }
+  );
+
   // Automatically adjust selected date state to match the returned actual session date.
   // This ensures if a player has pre-entered today's wellness check but has no catapult load data yet,
   // we fallback to the latest training day and display that day in the calendar header.
@@ -2073,6 +2079,104 @@ export default function AthleteAnalyticsScreen() {
     );
   };
 
+  const renderOstrcCard = () => {
+    if (ostrcLoading) {
+      return (
+        <View className="bg-surface border border-border rounded-3xl p-6 items-center justify-center">
+          <ActivityIndicator size="small" color="#FF6B35" />
+        </View>
+      );
+    }
+
+    if (!ostrcData) {
+      return (
+        <View className="bg-surface border border-dashed border-border rounded-3xl p-6 items-center justify-center gap-2">
+          <IconSymbol size={24} name="doc.text" color="#9CA3AF" />
+          <Text className="text-xs font-bold text-muted">本日の OSTRC 回答データはありません</Text>
+        </View>
+      );
+    }
+
+    const details = ostrcData.injuryDetails || [];
+    const sortedDetails = [...details].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+    const maxDetailScore = sortedDetails.reduce((max: number, d: any) => Math.max(max, d.score || 0), 0);
+    
+    const hasSubstantial = details.some((d: any) => (d.q1 || 0) >= 17 || (d.q2 || 0) >= 13 || (d.q3 || 0) >= 13);
+    const isRed = maxDetailScore >= 40 || hasSubstantial;
+    const isYellow = maxDetailScore >= 11 && !isRed;
+
+    let severityBg = "bg-green-500/5";
+    let severityBorder = "border-green-200 dark:border-green-800/40";
+    let badgeBorderColor = "border-green-500/20";
+    let badgeText = "text-green-600 dark:text-green-400";
+    let badgeBg = "bg-green-500/10";
+    
+    if (isRed) {
+      severityBg = "bg-red-500/5";
+      severityBorder = "border-red-200 dark:border-red-800/40";
+      badgeBorderColor = "border-red-500/20";
+      badgeText = "text-red-600 dark:text-red-400";
+      badgeBg = "bg-red-500/10";
+    } else if (isYellow) {
+      severityBg = "bg-amber-500/5";
+      severityBorder = "border-amber-200 dark:border-amber-800/40";
+      badgeBorderColor = "border-amber-500/20";
+      badgeText = "text-amber-600 dark:text-amber-400";
+      badgeBg = "bg-amber-500/10";
+    }
+
+    return (
+      <View className={`border rounded-3xl overflow-hidden p-5 gap-4 bg-surface ${severityBorder} ${severityBg}`}>
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2">
+            <Text className="text-sm font-extrabold text-foreground">OSTRC 障害調査</Text>
+            <View className={`border px-2 py-0.5 rounded-full ${badgeBg} ${badgeBorderColor}`}>
+              <Text className={`text-[10px] font-bold ${badgeText}`}>最高 {maxDetailScore}点</Text>
+            </View>
+          </View>
+          <Text className="text-[10px] text-muted font-mono">{ostrcData.date}</Text>
+        </View>
+
+        {sortedDetails.length > 0 ? (
+          <View className="gap-2">
+            {sortedDetails.map((d: any, idx: number) => {
+              const isDetailRed = d.score >= 40;
+              const isDetailYellow = d.score >= 11 && !isDetailRed;
+              let detailBadgeBg = "bg-blue-500";
+              if (isDetailRed) detailBadgeBg = "bg-red-500";
+              else if (isDetailYellow) detailBadgeBg = "bg-amber-500";
+
+              return (
+                <View key={idx} className="flex-row items-center justify-between bg-surface/80 p-3 rounded-2xl border border-border/40 gap-2">
+                  <View className="flex-row items-center gap-2 flex-1 min-w-0">
+                    <Text className="text-xs font-extrabold text-foreground shrink-0">{d.partLabel}</Text>
+                    <Text className="text-[9px] text-muted font-mono shrink-0">
+                      ({d.q1 || 0}|{d.q2 || 0}|{d.q3 || 0}|{d.q4 || 0})
+                    </Text>
+                    {d.note && (
+                      <Text className="text-[10px] text-muted truncate flex-1 font-semibold">
+                        ({d.note})
+                      </Text>
+                    )}
+                  </View>
+                  <View className={`px-2 py-0.5 rounded-full ${detailBadgeBg}`}>
+                    <Text className="text-[10px] font-extrabold text-white">{d.score}点</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View className="py-4 items-center justify-center bg-green-500/10 rounded-2xl border border-green-500/20">
+            <Text className="text-xs font-bold text-green-600 dark:text-green-400">
+              痛みや違和感のある部位はありません（良好）
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <ScreenContainer className="bg-background">
       {/* Header */}
@@ -2182,6 +2286,7 @@ export default function AthleteAnalyticsScreen() {
               {renderACWRGauge()}
               {renderTrendChart()}
               {renderWellnessChart()}
+              {renderOstrcCard()}
             </>
           )}
           {activeTab === "jumps" && renderJumpAnalytics()}

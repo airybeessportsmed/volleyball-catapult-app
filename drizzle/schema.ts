@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, varchar, numeric, boolean, serial } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, varchar, numeric, boolean, serial, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -172,3 +172,30 @@ export type InsertTeamSettings = typeof teamSettings.$inferInsert;
 
 export type CsvUpload = typeof csvUploads.$inferSelect;
 export type InsertCsvUpload = typeof csvUploads.$inferInsert;
+
+export const ostrcResponses = pgTable("ostrcResponses", {
+  id: serial("id").primaryKey(),
+  athleteId: integer("athleteId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  severityScore: integer("severityScore").notNull(),
+  q1Participation: integer("q1Participation").notNull(),
+  q2Volume: integer("q2Volume").notNull(),
+  q3Performance: integer("q3Performance").notNull(),
+  q4Symptoms: integer("q4Symptoms").notNull(),
+  injuryDetails: jsonb("injuryDetails").$type<Array<{
+    partKey: string;
+    partLabel: string;
+    severity: "normal" | "caution" | "limited" | "out";
+    score: number;
+    note?: string;
+    q1?: number;
+    q2?: number;
+    q3?: number;
+    q4?: number;
+  }>>().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type OstrcResponse = typeof ostrcResponses.$inferSelect;
+export type InsertOstrcResponse = typeof ostrcResponses.$inferInsert;
