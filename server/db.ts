@@ -2328,17 +2328,20 @@ export async function importPerformanceCsv(
           } else {
             if (group.statusIdx >= vals.length) return;
             const rawPart = String(vals[group.partIdx] || "").trim();
-            const rawScore = Number(vals[group.scoreIdx]);
             const rawStatus = String(vals[group.statusIdx] || "").trim();
 
-            const q1Val = Number(vals[group.q1Idx] || 0);
-            const q2Val = Number(vals[group.q2Idx] || 0);
-            const q3Val = Number(vals[group.q3Idx] || 0);
-            const q4Val = Number(vals[group.q4Idx] || 0);
+            const q1Val = parseOstrcQuestionScore(vals[group.q1Idx], "q1");
+            const q2Val = parseOstrcQuestionScore(vals[group.q2Idx], "q2");
+            const q3Val = parseOstrcQuestionScore(vals[group.q3Idx], "q3");
+            const q4Val = parseOstrcQuestionScore(vals[group.q4Idx], "q4");
 
-            if (rawPart && !isNaN(rawScore) && rawScore > 0) {
-              if (rawScore > maxSeverityScore) {
-                maxSeverityScore = rawScore;
+            const calculatedScore = q1Val + q2Val + q3Val + q4Val;
+            const csvScore = Number(vals[group.scoreIdx]);
+            const finalScore = !isNaN(csvScore) && csvScore > calculatedScore ? csvScore : calculatedScore;
+
+            if (rawPart && finalScore > 0) {
+              if (finalScore > maxSeverityScore) {
+                maxSeverityScore = finalScore;
               }
 
               const match = BODY_PARTS_MAPPING.find(bpm => 
@@ -2358,7 +2361,7 @@ export async function importPerformanceCsv(
                 partKey: match ? match.key : "other",
                 partLabel: rawPart,
                 severity: severity,
-                score: rawScore,
+                score: finalScore,
                 note: rawStatus || undefined,
                 q1: q1Val,
                 q2: q2Val,
