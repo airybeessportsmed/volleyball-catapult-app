@@ -51,152 +51,156 @@ const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   return "CSV (自動判定)";
 };
 
-const convertExcelToCsv = (data: ArrayBuffer): string => {
-  const workbook = XLSX.read(new Uint8Array(data), { type: "array" });
-  
-  let bestSheetName = "";
-  let highestScore = -1;
+const normalizeOstrcData = (fileContent: ArrayBuffer | string, fileName: string): string => {
+  try {
+    const isCsv = typeof fileContent === "string";
+    const workbook = isCsv 
+      ? XLSX.read(fileContent as string, { type: "string" })
+      : XLSX.read(new Uint8Array(fileContent as ArrayBuffer), { type: "array" });
 
-  for (const name of workbook.SheetNames) {
-    const worksheet = workbook.Sheets[name];
-    if (!worksheet) continue;
-    const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-    const headerRow = rows[0];
-    if (!Array.isArray(headerRow)) continue;
+    let bestSheetName = "";
+    let highestScore = -1;
 
-    const headerStr = headerRow.join(",").toLowerCase();
-    let score = 0;
-    
-    if (headerStr.includes("部位") && headerStr.includes("status")) {
-      score += 100;
+    for (const name of workbook.SheetNames) {
+      const worksheet = workbook.Sheets[name];
+      if (!worksheet) continue;
+      const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      const headerRow = rows[0];
+      if (!Array.isArray(headerRow)) continue;
+
+      const headerStr = headerRow.join(",").toLowerCase();
+      let score = 0;
+      
+      if (headerStr.includes("部位") && headerStr.includes("status")) {
+        score += 100;
+      }
+      if (
+        headerStr.includes("タイムスタンプ") || 
+        headerStr.includes("回答者") ||
+        headerStr.includes("名前") ||
+        headerStr.includes("氏名")
+      ) {
+        score += 10;
+      }
+      if (
+        headerStr.includes("傷害、疾病") || 
+        headerStr.includes("参加に影響") || 
+        headerStr.includes("パフォーマンスへの影響") ||
+        headerStr.includes("症状の度合い")
+      ) {
+        score += 50;
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestSheetName = name;
+      }
     }
-    if (
-      headerStr.includes("タイムスタンプ") || 
-      headerStr.includes("回答者") ||
-      headerStr.includes("名前") ||
-      headerStr.includes("氏名")
-    ) {
-      score += 10;
-    }
-    if (
-      headerStr.includes("傷害、疾病") || 
-      headerStr.includes("参加に影響") || 
-      headerStr.includes("パフォーマンスへの影響") ||
-      headerStr.includes("症状の度合い")
-    ) {
-      score += 50;
+
+    let targetSheetName = bestSheetName;
+    if (!targetSheetName || highestScore <= 0) {
+      targetSheetName = workbook.SheetNames.find(name => 
+        name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
+      ) || workbook.SheetNames[0];
     }
 
-    if (score > highestScore) {
-      highestScore = score;
-      bestSheetName = name;
+    const worksheet = workbook.Sheets[targetSheetName];
+    if (!worksheet) return isCsv ? (fileContent as string) : "";
+
+    const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+    if (rawRows.length <= 1) {
+      return isCsv ? (fileContent as string) : "";
     }
-  }
 
-  let targetSheetName = bestSheetName;
-  if (!targetSheetName || highestScore <= 0) {
-    targetSheetName = workbook.SheetNames.find(name => 
-      name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
-    ) || workbook.SheetNames[0];
-  }
+    const headerRow = rawRows[0];
+    if (!Array.isArray(headerRow)) {
+      return XLSX.utils.sheet_to_csv(worksheet);
+    }
 
-  const worksheet = workbook.Sheets[targetSheetName];
-  if (!worksheet) return "";
+    const dateIdx = 0;
+    const playerIdx = 1;
+    const partIndexGroups = [
+      { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
+      { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
+      { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
+      { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
+    ];
 
-  const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-  if (rawRows.length <= 1) {
-    return "";
-  }
+    const totalCols = headerRow.length;
+    const hasOstrcColumns = totalCols > 60 && partIndexGroups.some(g => {
+      const label = String(headerRow[g.partIdx] || "").toLowerCase();
+      return label.includes("部位") || label.includes("痛み") || label.includes("違和感");
+    });
 
-  const headerRow = rawRows[0];
-  if (!Array.isArray(headerRow)) {
-    return XLSX.utils.sheet_to_csv(worksheet);
-  }
+    if (!hasOstrcColumns) {
+      return XLSX.utils.sheet_to_csv(worksheet);
+    }
 
-  // Treatment Log App の固定列マッピング（絶対インデックス）
-  const dateIdx = 0;
-  const playerIdx = 1;
-  const partIndexGroups = [
-    { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
-    { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
-    { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
-    { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
-  ];
+    const csvLines = ["タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status"];
 
-  const totalCols = headerRow.length;
-  const hasOstrcColumns = totalCols > 60 && partIndexGroups.some(g => {
-    const label = String(headerRow[g.partIdx] || "").toLowerCase();
-    return label.includes("部位") || label.includes("痛み") || label.includes("違和感");
-  });
+    for (let i = 1; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      if (!row || row.length <= playerIdx) continue;
 
-  if (!hasOstrcColumns) {
-    // フォーム生回答形式などの場合は通常の CSV 変換を行う
-    return XLSX.utils.sheet_to_csv(worksheet);
-  }
+      const rawDate = row[dateIdx];
+      if (!rawDate) continue;
 
-  // タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status の一時 CSV を作成
-  const csvLines = ["タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status"];
-
-  for (let i = 1; i < rawRows.length; i++) {
-    const row = rawRows[i];
-    if (!row || row.length <= playerIdx) continue;
-
-    const rawDate = row[dateIdx];
-    if (!rawDate) continue;
-
-    let dateStr = "";
-    try {
-      if (typeof rawDate === "number") {
-        const dateObj = XLSX.SSF.parse_date_code(rawDate);
-        dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-      } else {
-        const dateMatch = String(rawDate).match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
-        if (dateMatch) {
-          dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+      let dateStr = "";
+      try {
+        if (typeof rawDate === "number") {
+          const dateObj = XLSX.SSF.parse_date_code(rawDate);
+          dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
         } else {
-          const d = new Date(String(rawDate));
-          if (!isNaN(d.getTime())) {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            dateStr = `${year}-${month}-${day}`;
+          const dateMatch = String(rawDate).match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
+          if (dateMatch) {
+            dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+          } else {
+            const d = new Date(String(rawDate));
+            if (!isNaN(d.getTime())) {
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              dateStr = `${year}-${month}-${day}`;
+            }
           }
         }
-      }
-    } catch (err) {}
+      } catch (err) {}
 
-    if (!dateStr) continue;
+      if (!dateStr) continue;
 
-    const playerName = String(row[playerIdx] || "").trim();
-    if (!playerName) continue;
+      const playerName = String(row[playerIdx] || "").trim();
+      if (!playerName) continue;
 
-    partIndexGroups.forEach(group => {
-      if (group.statusIdx >= row.length) return;
-      const rawPart = String(row[group.partIdx] || "").trim();
-      const rawScore = String(row[group.scoreIdx] || "").trim();
-      const rawStatus = String(row[group.statusIdx] || "").trim();
+      partIndexGroups.forEach(group => {
+        if (group.statusIdx >= row.length) return;
+        const rawPart = String(row[group.partIdx] || "").trim();
+        const rawScore = String(row[group.scoreIdx] || "").trim();
+        const rawStatus = String(row[group.statusIdx] || "").trim();
 
-      const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
-      const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
-      const q3Val = String(row[group.q3Idx] === undefined || row[group.q3Idx] === null ? "0" : row[group.q3Idx]).trim();
-      const q4Val = String(row[group.q4Idx] === undefined || row[group.q4Idx] === null ? "0" : row[group.q4Idx]).trim();
+        const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
+        const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
+        const q3Val = String(row[group.q3Idx] === undefined || row[group.q3Idx] === null ? "0" : row[group.q3Idx]).trim();
+        const q4Val = String(row[group.q4Idx] === undefined || row[group.q4Idx] === null ? "0" : row[group.q4Idx]).trim();
 
-      const parsedScoreNum = Number(rawScore);
-      if (rawPart && !isNaN(parsedScoreNum) && parsedScoreNum > 0) {
-        const cleanPart = rawPart.replace(/,/g, " ");
-        const cleanStatus = rawStatus.replace(/,/g, " ");
-        const cleanPlayer = playerName.replace(/,/g, " ");
-        
-        csvLines.push(`${dateStr},${cleanPlayer},${cleanPart},${q1Val},${q2Val},${q3Val},${q4Val},${rawScore},${cleanStatus}`);
-      }
-    });
+        const parsedScoreNum = Number(rawScore);
+        if (rawPart && !isNaN(parsedScoreNum) && parsedScoreNum > 0) {
+          const cleanPart = rawPart.replace(/,/g, " ");
+          const cleanStatus = rawStatus.replace(/,/g, " ");
+          const cleanPlayer = playerName.replace(/,/g, " ");
+          
+          csvLines.push(`${dateStr},${cleanPlayer},${cleanPart},${q1Val},${q2Val},${q3Val},${q4Val},${rawScore},${cleanStatus}`);
+        }
+      });
+    }
+
+    if (csvLines.length === 1) {
+      return XLSX.utils.sheet_to_csv(worksheet);
+    }
+
+    return csvLines.join("\n");
+  } catch (err) {
+    return typeof fileContent === "string" ? (fileContent as string) : "";
   }
-
-  if (csvLines.length === 1) {
-    return XLSX.utils.sheet_to_csv(worksheet);
-  }
-
-  return csvLines.join("\n");
 };
 
 export default function CoachUploadScreen() {
@@ -380,9 +384,10 @@ export default function CoachUploadScreen() {
         let text = "";
         if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
           const arrayBuffer = await response.arrayBuffer();
-          text = convertExcelToCsv(arrayBuffer);
+          text = normalizeOstrcData(arrayBuffer, asset.name);
         } else {
-          text = await response.text();
+          const rawText = await response.text();
+          text = normalizeOstrcData(rawText, asset.name);
         }
         newFiles.push({
           name: asset.name,
@@ -428,19 +433,23 @@ export default function CoachUploadScreen() {
             const arrayBuffer = evt.target?.result as ArrayBuffer;
             if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
               try {
-                resolve(convertExcelToCsv(arrayBuffer));
+                resolve(normalizeOstrcData(arrayBuffer, file.name));
               } catch (e) {
                 resolve("");
               }
             } else {
               try {
-                // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
-                const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
-                resolve(utf8Decoder.decode(arrayBuffer));
+                let decoded = "";
+                try {
+                  const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+                  decoded = utf8Decoder.decode(arrayBuffer);
+                } catch (err) {
+                  const sjisDecoder = new TextDecoder("shift-jis");
+                  decoded = sjisDecoder.decode(arrayBuffer);
+                }
+                resolve(normalizeOstrcData(decoded, file.name));
               } catch (err) {
-                // Fallback to Shift-JIS for Excel-generated Japanese CSVs
-                const sjisDecoder = new TextDecoder("shift-jis");
-                resolve(sjisDecoder.decode(arrayBuffer));
+                resolve("");
               }
             }
           };
