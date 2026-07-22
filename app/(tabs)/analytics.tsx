@@ -979,14 +979,14 @@ export default function AthleteAnalyticsScreen() {
           <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">曜日別の平均負荷 (曜日比較)</Text>
           <View className="flex-row justify-between items-end h-24 mt-2 px-1">
             {analytics.dayOfWeekAverages.map((day, idx) => {
-              const maxDowLoad = Math.max(...analytics.dayOfWeekAverages.map(d => d.avgLoad), 1);
-              const barHeight = `${(day.avgLoad / maxDowLoad) * 80}%`;
+              const maxDowLoad = Math.max(...analytics.dayOfWeekAverages.map(d => getSafeNum(d.avgLoad)), 1);
+              const barHeight = `${(getSafeNum(day.avgLoad) / maxDowLoad) * 80}%`;
               const isToday = new Date().getDay() === idx;
 
               return (
                 <View key={idx} className="items-center flex-1 gap-1.5 h-full justify-end">
                   <Text className="text-[7px] font-extrabold text-foreground font-mono">
-                    {day.avgLoad > 0 ? Math.round(day.avgLoad) : ""}
+                    {getSafeNum(day.avgLoad) > 0 ? Math.round(getSafeNum(day.avgLoad)) : ""}
                   </Text>
                   <View 
                     style={{ height: barHeight as any }} 
