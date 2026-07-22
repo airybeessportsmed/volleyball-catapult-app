@@ -102,7 +102,101 @@ const convertExcelToCsv = (data: ArrayBuffer): string => {
 
   const worksheet = workbook.Sheets[targetSheetName];
   if (!worksheet) return "";
-  return XLSX.utils.sheet_to_csv(worksheet);
+
+  const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+  if (rawRows.length <= 1) {
+    return "";
+  }
+
+  const headerRow = rawRows[0];
+  if (!Array.isArray(headerRow)) {
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  // Treatment Log App の固定列マッピング（絶対インデックス）
+  const dateIdx = 0;
+  const playerIdx = 1;
+  const partIndexGroups = [
+    { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
+    { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
+    { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
+    { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
+  ];
+
+  const totalCols = headerRow.length;
+  const hasOstrcColumns = totalCols > 60 && partIndexGroups.some(g => {
+    const label = String(headerRow[g.partIdx] || "").toLowerCase();
+    return label.includes("部位") || label.includes("痛み") || label.includes("違和感");
+  });
+
+  if (!hasOstrcColumns) {
+    // フォーム生回答形式などの場合は通常の CSV 変換を行う
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  // タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status の一時 CSV を作成
+  const csvLines = ["タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status"];
+
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (!row || row.length <= playerIdx) continue;
+
+    const rawDate = row[dateIdx];
+    if (!rawDate) continue;
+
+    let dateStr = "";
+    try {
+      if (typeof rawDate === "number") {
+        const dateObj = XLSX.SSF.parse_date_code(rawDate);
+        dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+      } else {
+        const dateMatch = String(rawDate).match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
+        if (dateMatch) {
+          dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+        } else {
+          const d = new Date(String(rawDate));
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            dateStr = `${year}-${month}-${day}`;
+          }
+        }
+      }
+    } catch (err) {}
+
+    if (!dateStr) continue;
+
+    const playerName = String(row[playerIdx] || "").trim();
+    if (!playerName) continue;
+
+    partIndexGroups.forEach(group => {
+      if (group.statusIdx >= row.length) return;
+      const rawPart = String(row[group.partIdx] || "").trim();
+      const rawScore = String(row[group.scoreIdx] || "").trim();
+      const rawStatus = String(row[group.statusIdx] || "").trim();
+
+      const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
+      const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
+      const q3Val = String(row[group.q3Idx] === undefined || row[group.q3Idx] === null ? "0" : row[group.q3Idx]).trim();
+      const q4Val = String(row[group.q4Idx] === undefined || row[group.q4Idx] === null ? "0" : row[group.q4Idx]).trim();
+
+      const parsedScoreNum = Number(rawScore);
+      if (rawPart && !isNaN(parsedScoreNum) && parsedScoreNum > 0) {
+        const cleanPart = rawPart.replace(/,/g, " ");
+        const cleanStatus = rawStatus.replace(/,/g, " ");
+        const cleanPlayer = playerName.replace(/,/g, " ");
+        
+        csvLines.push(`${dateStr},${cleanPlayer},${cleanPart},${q1Val},${q2Val},${q3Val},${q4Val},${rawScore},${cleanStatus}`);
+      }
+    });
+  }
+
+  if (csvLines.length === 1) {
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  return csvLines.join("\n");
 };
 
 export default function CoachUploadScreen() {
