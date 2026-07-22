@@ -28,7 +28,10 @@ interface UploadFileItem {
 const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   const lowercaseText = csvText.toLowerCase();
   const lowercaseName = fileName.toLowerCase();
-  if (lowercaseText.includes("睡眠スコア") && lowercaseText.includes("安静時心拍変動")) return "SOXAI (睡眠・自律神経)";
+  const hasSoxaiKeywords = 
+    (lowercaseText.includes("睡眠スコア") || lowercaseText.includes("qolスコア")) &&
+    (lowercaseText.includes("安静時心拍") || lowercaseText.includes("hrv_rmssd") || lowercaseText.includes("睡眠時間"));
+  if (hasSoxaiKeywords) return "SOXAI (睡眠・自律神経)";
   if (lowercaseText.includes("項目名") && lowercaseText.includes("値") && lowercaseText.includes("内訳")) return "Wellness (Onetap)";
   if (lowercaseText.includes("トレーニング実施日") && lowercaseText.includes("session rpe")) return "sRPE (主観負荷)";
   if (lowercaseText.includes("of event") && lowercaseText.includes("jump attribute")) return "Catapult IMA (ジャンプ分析)";
