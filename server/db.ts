@@ -1936,6 +1936,29 @@ export async function importPerformanceCsv(
       return new Date();
     };
 
+    const parseDurationToMinutes = (valStr: string): number => {
+      const clean = valStr.trim();
+      if (!clean) return 0;
+      
+      const hhmmMatch = clean.match(/^(\d{1,2}):(\d{2})$/);
+      if (hhmmMatch) {
+        return parseInt(hhmmMatch[1], 10) * 60 + parseInt(hhmmMatch[2], 10);
+      }
+      
+      const jpMatch = clean.match(/^(\d{1,2})時間(\d{1,2})分$/);
+      if (jpMatch) {
+        return parseInt(jpMatch[1], 10) * 60 + parseInt(jpMatch[2], 10);
+      }
+      
+      const enMatch = clean.match(/^(\d{1,2})h\s*(\d{1,2})m$/);
+      if (enMatch) {
+        return parseInt(enMatch[1], 10) * 60 + parseInt(enMatch[2], 10);
+      }
+
+      const num = parseFloat(clean);
+      return isNaN(num) ? 0 : num;
+    };
+
     const runInParallelBatches = async <T>(
       items: T[], 
       batchSize: number, 
@@ -2102,20 +2125,21 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        const fatigueVal = wg.fatigue !== undefined ? Math.round(wg.fatigue) : undefined;
-        const stressVal = wg.motivation !== undefined ? Math.round(wg.motivation) : undefined;
-        const appetiteVal = wg.appetite !== undefined ? Math.round(wg.appetite) : undefined;
+        const scaleVal = (val?: number) => {
+          if (val === undefined) return undefined;
+          return val > 10 ? Math.round(val / 10) : Math.round(val);
+        };
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
           date: wg.dateObj,
-          wellnessFatigue: fatigueVal,
-          wellnessSleep: undefined,
-          wellnessStress: stressVal,
-          wellnessSoreness: appetiteVal,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
-          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+          wellnessFatigue: scaleVal(wg.fatigue),
+          wellnessSleep: scaleVal(wg.appetite), // Appetite mapped to sleep dummy
+          wellnessStress: scaleVal(wg.motivation), // Motivation mapped to stress
+          wellnessSoreness: undefined,
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" })
         });
         importedCount++;
       }
@@ -2303,6 +2327,15 @@ export async function importPerformanceCsv(
               
               if (m.metricKey === "soxaiBedTimeStr" || m.metricKey === "soxaiWakeTimeStr") {
                 rec.soxaiData[m.metricKey] = valStr.trim();
+              } else if (
+                m.metricKey === "soxaiSleepDuration" || 
+                m.metricKey === "soxaiBedTime" || 
+                m.metricKey === "soxaiAwakeTime" || 
+                m.metricKey === "soxaiRemSleep" || 
+                m.metricKey === "soxaiLightSleep" || 
+                m.metricKey === "soxaiDeepSleep"
+              ) {
+                rec.soxaiData[m.metricKey] = parseDurationToMinutes(valStr);
               } else {
                 const val = parseFloat(valStr);
                 if (!isNaN(val)) {
@@ -2336,16 +2369,24 @@ export async function importPerformanceCsv(
         }
 
       } else {
-        // --- 従来の形式：選手別セクションの縦フォーマット ---
+        // --- 従来の形式：選手別セクションの縦フォーマット (動的ヘッダー解決 & soxaiDataの完全抽出) ---
         let currentEmail = "";
-        interface SoxaiRecord {
-          email: string;
-          dateObj: Date;
-          sleepScore: number;
-          rhr: number;
-          hrvVal: number;
-        }
-        const soxaiRecords: SoxaiRecord[] = [];
+        
+        let dateColIdx = -1;
+        let qolColIdx = -1;
+        let sleepScoreColIdx = -1;
+        let sleepDurationColIdx = -1;
+        let bedTimeStrColIdx = -1;
+        let wakeTimeStrColIdx = -1;
+        let napDurationColIdx = -1;
+        let sleepLatencyColIdx = -1;
+        let sleepEfficiencyColIdx = -1;
+        let awakeDurationColIdx = -1;
+        let remSleepColIdx = -1;
+        let lightSleepColIdx = -1;
+        let deepSleepColIdx = -1;
+        let rhrColIdx = -1;
+        let hrvColIdx = -1;
 
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i].trim();
@@ -2353,47 +2394,102 @@ export async function importPerformanceCsv(
 
           if (line.includes("@") && !line.includes("\t") && !line.includes(",")) {
             currentEmail = line.replace(/["']/g, "").trim();
+            dateColIdx = -1; // ヘッダー再検出
             continue;
           }
 
-          if (line.includes("タイムスタンプ")) continue;
+          if (line.includes("タイムスタンプ") || line.includes("日時") || line.includes("QoLスコア")) {
+            const hdrs = parseCsvLine(line).map(h => h.trim().replace(/^["']|["']$/g, ""));
+            const findIdx = (keys: string[]) => hdrs.findIndex(h => keys.some(k => h.includes(k)));
+            
+            dateColIdx = findIdx(["タイムスタンプ", "日時", "日付", "date"]);
+            qolColIdx = findIdx(["QoLスコア", "qol"]);
+            sleepScoreColIdx = findIdx(["睡眠スコア", "睡眠状態スコア"]);
+            sleepDurationColIdx = findIdx(["睡眠時間", "実睡眠時間"]);
+            bedTimeStrColIdx = findIdx(["就寝時間", "就寝時刻", "就床時刻", "就床時間"]);
+            wakeTimeStrColIdx = findIdx(["起床時間", "起床時刻"]);
+            napDurationColIdx = findIdx(["仮眠時間", "仮眠"]);
+            sleepLatencyColIdx = findIdx(["入眠潜時", "入眠時間"]);
+            sleepEfficiencyColIdx = findIdx(["睡眠効率", "効率"]);
+            awakeDurationColIdx = findIdx(["中途覚醒時間", "覚醒時間", "中途覚醒"]);
+            remSleepColIdx = findIdx(["レム睡眠"]);
+            lightSleepColIdx = findIdx(["浅い睡眠"]);
+            deepSleepColIdx = findIdx(["深い睡眠"]);
+            rhrColIdx = findIdx(["安静時心拍", "心拍数", "心拍_平均", "rhr"]);
+            hrvColIdx = findIdx(["心拍変動", "hrv", "HRV_RMSSD"]);
+            continue;
+          }
 
           const vals = parseCsvLine(line);
-          if (vals.length < 16 || !currentEmail) continue;
+          if (dateColIdx === -1 || !currentEmail || vals.length <= dateColIdx) continue;
 
-          const dateStr = vals[0];
-          const sleepScore = parseInt(vals[2], 10);
-          const rhr = parseInt(vals[14], 10);
-          const hrvVal = parseFloat(vals[15]);
-
-          if (!dateStr) continue;
+          const dateStr = vals[dateColIdx];
+          if (!dateStr || dateStr.trim() === "") continue;
           const dateObj = new Date(dateStr);
           if (isNaN(dateObj.getTime())) continue;
 
-          soxaiRecords.push({ email: currentEmail, dateObj, sleepScore, rhr, hrvVal });
-        }
-
-        for (const rec of soxaiRecords) {
           const matchedAthlete = teamAthletes.find(a => 
-            (a.soxaiEmail && a.soxaiEmail.toLowerCase() === rec.email.toLowerCase()) ||
-            (a.user?.email?.toLowerCase() === rec.email.toLowerCase())
+            (a.soxaiEmail && a.soxaiEmail.toLowerCase() === currentEmail.toLowerCase()) ||
+            (a.user?.email?.toLowerCase() === currentEmail.toLowerCase())
           );
           if (!matchedAthlete) {
-            unregisteredSet.add(rec.email);
+            unregisteredSet.add(currentEmail);
             continue;
           }
 
-          const sleepVal = isNaN(rec.sleepScore) ? undefined : Math.round(rec.sleepScore);
+          const sleepScoreVal = sleepScoreColIdx !== -1 ? parseFloat(vals[sleepScoreColIdx]) : NaN;
+          const rhrVal = rhrColIdx !== -1 ? parseFloat(vals[rhrColIdx]) : NaN;
+          const hrvVal = hrvColIdx !== -1 ? parseFloat(vals[hrvColIdx]) : NaN;
+          const qolVal = qolColIdx !== -1 ? parseFloat(vals[qolColIdx]) : NaN;
+
+          const soxaiObj: Record<string, any> = {};
+
+          if (sleepDurationColIdx !== -1 && vals[sleepDurationColIdx]) {
+            soxaiObj.soxaiSleepDuration = parseDurationToMinutes(vals[sleepDurationColIdx]);
+          }
+          if (bedTimeStrColIdx !== -1 && vals[bedTimeStrColIdx]) {
+            soxaiObj.soxaiBedTimeStr = vals[bedTimeStrColIdx].trim();
+          }
+          if (wakeTimeStrColIdx !== -1 && vals[wakeTimeStrColIdx]) {
+            soxaiObj.soxaiWakeTimeStr = vals[wakeTimeStrColIdx].trim();
+          }
+          if (napDurationColIdx !== -1 && vals[napDurationColIdx]) {
+            soxaiObj.soxaiBedTime = parseDurationToMinutes(vals[napDurationColIdx]);
+          }
+          if (sleepEfficiencyColIdx !== -1 && vals[sleepEfficiencyColIdx]) {
+            let eff = parseFloat(vals[sleepEfficiencyColIdx]);
+            if (eff > 0 && eff <= 1.0) eff = Math.round(eff * 100);
+            soxaiObj.soxaiSleepEfficiency = eff;
+          }
+          if (awakeDurationColIdx !== -1 && vals[awakeDurationColIdx]) {
+            soxaiObj.soxaiAwakeTime = parseDurationToMinutes(vals[awakeDurationColIdx]);
+          }
+          if (remSleepColIdx !== -1 && vals[remSleepColIdx]) {
+            soxaiObj.soxaiRemSleep = parseDurationToMinutes(vals[remSleepColIdx]);
+          }
+          if (lightSleepColIdx !== -1 && vals[lightSleepColIdx]) {
+            soxaiObj.soxaiLightSleep = parseDurationToMinutes(vals[lightSleepColIdx]);
+          }
+          if (deepSleepColIdx !== -1 && vals[deepSleepColIdx]) {
+            soxaiObj.soxaiDeepSleep = parseDurationToMinutes(vals[deepSleepColIdx]);
+          }
+
+          const parsedSleep = isNaN(sleepScoreVal) ? undefined : Math.round(sleepScoreVal / 10);
+          const parsedRhr = isNaN(rhrVal) ? undefined : Math.round(rhrVal);
+          const parsedHrv = isNaN(hrvVal) ? undefined : hrvVal;
+          const wellnessFatigue = isNaN(qolVal) ? undefined : Math.max(1, Math.min(7, Math.round((qolVal / 100) * 7)));
 
           await mergePerformanceData(db, teamId, {
             athleteId: matchedAthlete.id,
             teamId,
-            date: rec.dateObj,
-            wellnessSleep: sleepVal,
-            hrv: isNaN(rec.hrvVal) ? undefined : rec.hrvVal.toFixed(2),
-            avgHeartRate: isNaN(rec.rhr) ? undefined : rec.rhr,
-            sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
-            rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+            date: dateObj,
+            wellnessSleep: parsedSleep,
+            hrv: parsedHrv !== undefined ? parsedHrv.toFixed(2) : undefined,
+            avgHeartRate: parsedRhr,
+            wellnessFatigue,
+            sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+            rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" }),
+            soxaiData: Object.keys(soxaiObj).length > 0 ? JSON.stringify(soxaiObj) : null
           });
           importedCount++;
         }
@@ -2778,8 +2874,8 @@ export async function importPerformanceCsv(
           accelCount,
           totalLoad: agg.loads.length > 0 ? agg.loads.reduce((a, b) => a + b, 0).toFixed(2) : undefined,
           duration,
-          sessionType: targetSessionType !== "auto" ? targetSessionType : "practice",
-          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "practice" })
+          sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
+          rawCsvData: JSON.stringify({ note: "Event Log Parser", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" })
         });
         importedCount++;
       }
