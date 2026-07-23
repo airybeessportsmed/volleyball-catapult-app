@@ -126,13 +126,15 @@ const normalizeOstrcData = (fileContent: ArrayBuffer | string, fileName: string)
       { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
     ];
 
-    const totalCols = headerRow.length;
-    const hasOstrcColumns = totalCols > 60 && partIndexGroups.some(g => {
-      const label = String(headerRow[g.partIdx] || "").toLowerCase();
-      return label.includes("部位") || label.includes("痛み") || label.includes("違和感");
-    });
+    const headerStrAll = headerRow.join(",").toLowerCase();
+    const isOstrcSheet = 
+      headerStrAll.includes("傷害、疾病") || 
+      headerStrAll.includes("参加に影響") || 
+      headerStrAll.includes("パフォーマンスへの影響") || 
+      headerStrAll.includes("症状の度合い") ||
+      (headerStrAll.includes("部位") && headerStrAll.includes("status"));
 
-    if (!hasOstrcColumns) {
+    if (!isOstrcSheet) {
       return XLSX.utils.sheet_to_csv(worksheet);
     }
 
@@ -172,10 +174,9 @@ const normalizeOstrcData = (fileContent: ArrayBuffer | string, fileName: string)
       if (!playerName) continue;
 
       partIndexGroups.forEach(group => {
-        if (group.statusIdx >= row.length) return;
-        const rawPart = String(row[group.partIdx] || "").trim();
-        const rawScore = String(row[group.scoreIdx] || "").trim();
-        const rawStatus = String(row[group.statusIdx] || "").trim();
+        const rawPart = String(row[group.partIdx] === undefined || row[group.partIdx] === null ? "" : row[group.partIdx]).trim();
+        const rawScore = String(row[group.scoreIdx] === undefined || row[group.scoreIdx] === null ? "" : row[group.scoreIdx]).trim();
+        const rawStatus = String(row[group.statusIdx] === undefined || row[group.statusIdx] === null ? "" : row[group.statusIdx]).trim();
 
         const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
         const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
