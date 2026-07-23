@@ -383,6 +383,79 @@ export const appRouter = router({
       .input(z.object({ athleteId: z.number(), limit: z.number().optional() }))
       .query(({ input }) => db.getPerformanceDataByAthleteId(input.athleteId, input.limit)),
 
+    importOstrcData: protectedProcedure
+      .input(z.object({
+        rows: z.array(z.object({
+          date: z.string(),
+          playerName: z.string(),
+          searchKey: z.string().optional(),
+          severityScore: z.number(),
+          injuryDetails: z.array(z.object({
+            partKey: z.string(),
+            partLabel: z.string(),
+            severity: z.enum(["out", "normal", "caution", "limited"]),
+            score: z.number(),
+            note: z.string().optional(),
+            q1: z.number().optional(),
+            q2: z.number().optional(),
+            q3: z.number().optional(),
+            q4: z.number().optional(),
+          })),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "coach" && ctx.user.role !== "admin") {
+          throw new Error("Only coaches can import OSTRC data");
+        }
+
+        const teamId = ctx.user.teamId || 1;
+        const teamAthletes = await db.getAthletesByTeamId(teamId);
+        let importCount = 0;
+
+        for (const row of input.rows) {
+          const nameClean = row.playerName.trim();
+          const searchClean = (row.searchKey || "").trim();
+
+          let athlete = teamAthletes.find(a => 
+            a.onetapName === nameClean || 
+            a.catapultName === nameClean || 
+            (searchClean && (a.onetapName === searchClean || a.catapultName === searchClean))
+          );
+
+          if (!athlete) {
+            const numMatch = nameClean.match(/^#?(\d+)$/) || searchClean.match(/^#?(\d+)$/);
+            if (numMatch) {
+              const jerseyNum = parseInt(numMatch[1], 10);
+              athlete = teamAthletes.find(a => a.jerseyNumber === jerseyNum);
+            }
+          }
+
+          if (!athlete) {
+            athlete = teamAthletes.find(a => 
+              (a.onetapName && nameClean.includes(a.onetapName)) || 
+              (a.catapultName && nameClean.includes(a.catapultName))
+            );
+          }
+
+          if (!athlete) continue;
+
+          await db.upsertOstrcResponse({
+            athleteId: athlete.id,
+            date: row.date,
+            severityScore: row.severityScore,
+            q1Participation: 0,
+            q2Volume: 0,
+            q3Performance: 0,
+            q4Symptoms: 0,
+            injuryDetails: row.injuryDetails,
+          });
+
+          importCount++;
+        }
+
+        return { success: true, count: importCount };
+      }),
+
     getOstrcByAthlete: protectedProcedure
       .input(z.object({
         athleteId: z.number(),

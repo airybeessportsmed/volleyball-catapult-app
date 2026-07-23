@@ -238,6 +238,7 @@ export default function CoachUploadScreen() {
   const updateAthleteCsvNamesMutation = trpc.performance.updateAthleteCsvNames.useMutation();
   
   const importMutation = trpc.performance.importCsv.useMutation();
+  const importOstrcDataMutation = trpc.performance.importOstrcData.useMutation();
   const deleteUploadMutation = trpc.performance.deleteCsvUpload.useMutation();
   
   const clearAllUploadsMutation = trpc.performance.clearAllCsvUploads.useMutation();
@@ -281,15 +282,110 @@ export default function CoachUploadScreen() {
       if (file.status !== "pending" && file.status !== "error" && file.status !== "uploading") continue;
 
       try {
-        const res = await importMutation.mutateAsync({
-          teamId,
-          csvText: file.text,
-          fileName: file.name,
-          sessionType: file.sessionType || "auto",
-        });
+        let res;
+        if (file.detectedFormat === "OSTRC (障害調査)") {
+          const lines = file.text.split("\n");
+          const rowsMap = new Map<string, any>();
+
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const vals = line.split(",").map(v => v.trim());
+            if (vals.length < 9) continue;
+
+            const date = vals[0];
+            const playerName = vals[1];
+            const partLabel = vals[2];
+            const q1Val = Number(vals[3] || 0);
+            const q2Val = Number(vals[4] || 0);
+            const q3Val = Number(vals[5] || 0);
+            const q4Val = Number(vals[6] || 0);
+            const scoreVal = Number(vals[7] || 0);
+            const statusVal = vals[8];
+
+            const mapKey = `${playerName}_${date}`;
+
+            const BODY_PARTS_MAPPING = [
+              { key: "left_shoulder", label: "左肩" },
+              { key: "right_shoulder", label: "右肩" },
+              { key: "left_elbow", label: "左肘" },
+              { key: "right_elbow", label: "右肘" },
+              { key: "left_wrist", label: "左手首" },
+              { key: "right_wrist", label: "右手首" },
+              { key: "left_hip", label: "左股関節" },
+              { key: "right_hip", label: "右股関節" },
+              { key: "left_knee", label: "左膝" },
+              { key: "right_knee", label: "右膝" },
+              { key: "left_ankle", label: "左足首" },
+              { key: "right_ankle", label: "右足首" },
+              { key: "lower_back", label: "腰" },
+              { key: "neck", label: "首" },
+              { key: "back", label: "背中" },
+              { key: "chest", label: "胸" },
+              { key: "abdomen", label: "腹部" }
+            ];
+
+            const match = BODY_PARTS_MAPPING.find(bpm => 
+              partLabel.includes(bpm.label) || bpm.label.includes(partLabel)
+            );
+
+            let severity: "out" | "normal" | "caution" | "limited" = "normal";
+            if (statusVal.includes("離脱") || statusVal.includes("out")) {
+              severity = "out";
+            } else if (statusVal.includes("制限") || statusVal.includes("limited")) {
+              severity = "limited";
+            } else if (statusVal.includes("注意") || statusVal.includes("caution")) {
+              severity = "caution";
+            }
+
+            const detail = {
+              partKey: match ? match.key : "other",
+              partLabel,
+              severity,
+              score: scoreVal,
+              note: statusVal || undefined,
+              q1: q1Val,
+              q2: q2Val,
+              q3: q3Val,
+              q4: q4Val,
+            };
+
+            if (!rowsMap.has(mapKey)) {
+              rowsMap.set(mapKey, {
+                date,
+                playerName,
+                severityScore: scoreVal,
+                injuryDetails: [detail]
+              });
+            } else {
+              const existing = rowsMap.get(mapKey);
+              existing.injuryDetails.push(detail);
+              if (scoreVal > existing.severityScore) {
+                existing.severityScore = scoreVal;
+              }
+            }
+          }
+
+          const parsedRows = Array.from(rowsMap.values());
+          if (parsedRows.length === 0) {
+            throw new Error("OSTRCデータ行が空です。");
+          }
+
+          res = await importOstrcDataMutation.mutateAsync({
+            rows: parsedRows
+          });
+        } else {
+          res = await importMutation.mutateAsync({
+            teamId,
+            csvText: file.text,
+            fileName: file.name,
+            sessionType: file.sessionType || "auto",
+          });
+        }
         
-        if (res && res.unregisteredAthletes && res.unregisteredAthletes.length > 0) {
-          res.unregisteredAthletes.forEach(name => {
+        if (res && (res as any).unregisteredAthletes && (res as any).unregisteredAthletes.length > 0) {
+          (res as any).unregisteredAthletes.forEach((name: string) => {
             tempUnmatched.push({
               csvName: name,
               fileId: file.id,
