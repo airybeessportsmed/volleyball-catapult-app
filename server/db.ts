@@ -2270,21 +2270,36 @@ export async function importPerformanceCsv(
             const nameInHeader = match[2] ? match[2].trim() : "";
 
             const matchedAthlete = teamAthletes.find(a => {
-              if (nameInHeader) {
-                const lowerName = nameInHeader.toLowerCase();
-                if (a.soxaiName?.toLowerCase() === lowerName) return true;
-              }
-              if (a.jerseyNumber === jerseyNumber) return true;
+              const lowerName = nameInHeader ? nameInHeader.toLowerCase() : "";
               const aliases = a.csvNames ? a.csvNames.split(",").map(n => n.trim().toLowerCase()) : [];
-              if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
-              if (nameInHeader) {
-                const lowerName = nameInHeader.toLowerCase();
+
+              if (lowerName) {
+                // Prioritize name matches first
+                if (a.soxaiName?.toLowerCase() === lowerName) return true;
                 if (a.onetapName?.toLowerCase() === lowerName || 
                     a.catapultName?.toLowerCase() === lowerName || 
                     a.user?.name?.toLowerCase() === lowerName || 
                     aliases.includes(lowerName)) {
                   return true;
                 }
+
+                // If name is specified in CSV but no athlete matches that name,
+                // fallback to jersey number matching ONLY if no other athlete in the team matches this name.
+                // This prevents mistakenly matching another athlete with the same jersey number but a different name.
+                const hasAnyNameMatch = teamAthletes.some(other => 
+                  other.soxaiName?.toLowerCase() === lowerName ||
+                  other.onetapName?.toLowerCase() === lowerName ||
+                  other.user?.name?.toLowerCase() === lowerName
+                );
+                
+                if (!hasAnyNameMatch) {
+                  if (a.jerseyNumber === jerseyNumber) return true;
+                  if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
+                }
+              } else {
+                // If no name is specified in header, match by jersey number
+                if (a.jerseyNumber === jerseyNumber) return true;
+                if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
               }
               return false;
             });
