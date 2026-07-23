@@ -4221,8 +4221,52 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 )}
 
-                {/* 🚨 OSTRC 障害調査アラート (Treatment Log App と同様のチーム一覧カード) */}
-                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 3, gap: 16 }}>
+                <TouchableOpacity 
+                  onPress={handleExportCsv}
+                  style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2E8F0", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
+                >
+                  <IconSymbol size={16} name="square.and.arrow.up" color="#0F172A" />
+                  <Text style={{ color: "#0F172A", fontWeight: "bold", fontSize: 13 }}>{t("コンディションレポート出力 (CSV)", "Export Condition Report (CSV)")}</Text>
+                </TouchableOpacity>
+
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#EF4444", marginBottom: 10 }}>{t("🔴 要確認 (", "🔴 Check (")}{redAthletes.length}{t("名)", " athletes)")}</Text>
+                  {redAthletes.length > 0 ? (
+                    redAthletes.map(ath => renderSummaryAthleteCard(ath))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
+                  )}
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#F59E0B", marginBottom: 10 }}>{t("🟡 注意 (", "🟡 Caution (")}{yellowAthletes.length}{t("名)", " athletes)")}</Text>
+                  {yellowAthletes.length > 0 ? (
+                    yellowAthletes.map(ath => renderSummaryAthleteCard(ath))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
+                  )}
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#10B981", marginBottom: 10 }}>{t("🟢 良好 (", "🟢 Good (")}{greenAthletes.length}{t("名)", " athletes)")}</Text>
+                  {greenAthletes.length > 0 ? (
+                    greenAthletes.map(ath => renderSummaryAthleteCard(ath))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
+                  )}
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#64748B", marginBottom: 10 }}>{t("⚪ 未入力 / データ不足 (", "⚪ Unreported / Insufficient (")}{pendingAthletes.length}{t("名)", " athletes)")}</Text>
+                  {pendingAthletes.length > 0 ? (
+                    pendingAthletes.map(ath => renderSummaryAthleteCard(ath))
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
+                  )}
+                </View>
+
+                {/* 🚨 OSTRC 障害調査アラート (Treatment Log App と同様のチーム一覧カード) - 最下部に配置 */}
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 3, gap: 16, marginTop: 12 }}>
                   <View style={{ borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 12, gap: 4 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -4377,50 +4421,6 @@ export default function HomeScreen() {
                         現在アクティブな OSTRC アラートはありません
                       </Text>
                     </View>
-                  )}
-                </View>
-
-                <TouchableOpacity 
-                  onPress={handleExportCsv}
-                  style={{ backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2E8F0", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
-                >
-                  <IconSymbol size={16} name="square.and.arrow.up" color="#0F172A" />
-                  <Text style={{ color: "#0F172A", fontWeight: "bold", fontSize: 13 }}>{t("コンディションレポート出力 (CSV)", "Export Condition Report (CSV)")}</Text>
-                </TouchableOpacity>
-
-                <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#EF4444", marginBottom: 10 }}>{t("🔴 要確認 (", "🔴 Check (")}{redAthletes.length}{t("名)", " athletes)")}</Text>
-                  {redAthletes.length > 0 ? (
-                    redAthletes.map(ath => renderSummaryAthleteCard(ath))
-                  ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
-                  )}
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#F59E0B", marginBottom: 10 }}>{t("🟡 注意 (", "🟡 Caution (")}{yellowAthletes.length}{t("名)", " athletes)")}</Text>
-                  {yellowAthletes.length > 0 ? (
-                    yellowAthletes.map(ath => renderSummaryAthleteCard(ath))
-                  ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
-                  )}
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#10B981", marginBottom: 10 }}>{t("🟢 良好 (", "🟢 Good (")}{greenAthletes.length}{t("名)", " athletes)")}</Text>
-                  {greenAthletes.length > 0 ? (
-                    greenAthletes.map(ath => renderSummaryAthleteCard(ath))
-                  ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
-                  )}
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 15, fontWeight: "bold", color: "#64748B", marginBottom: 10 }}>{t("⚪ 未入力 / データ不足 (", "⚪ Unreported / Insufficient (")}{pendingAthletes.length}{t("名)", " athletes)")}</Text>
-                  {pendingAthletes.length > 0 ? (
-                    pendingAthletes.map(ath => renderSummaryAthleteCard(ath))
-                  ) : (
-                    <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
                   )}
                 </View>
               </View>

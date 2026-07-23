@@ -416,11 +416,18 @@ export const appRouter = router({
           const nameClean = row.playerName.trim();
           const searchClean = (row.searchKey || "").trim();
 
-          let athlete = teamAthletes.find(a => 
-            a.onetapName === nameClean || 
-            a.catapultName === nameClean || 
-            (searchClean && (a.onetapName === searchClean || a.catapultName === searchClean))
-          );
+          const nameNoSpace = nameClean.replace(/[\s　]+/g, "");
+          const searchNoSpace = searchClean.replace(/[\s　]+/g, "");
+
+          let athlete = teamAthletes.find(a => {
+            const onetapNoSpace = (a.onetapName || "").replace(/[\s　]+/g, "");
+            const catapultNoSpace = (a.catapultName || "").replace(/[\s　]+/g, "");
+            return (
+              onetapNoSpace === nameNoSpace || 
+              catapultNoSpace === nameNoSpace || 
+              (searchNoSpace && (onetapNoSpace === searchNoSpace || catapultNoSpace === searchNoSpace))
+            );
+          });
 
           if (!athlete) {
             const numMatch = nameClean.match(/^#?(\d+)$/) || searchClean.match(/^#?(\d+)$/);
@@ -431,10 +438,16 @@ export const appRouter = router({
           }
 
           if (!athlete) {
-            athlete = teamAthletes.find(a => 
-              (a.onetapName && nameClean.includes(a.onetapName)) || 
-              (a.catapultName && nameClean.includes(a.catapultName))
-            );
+            athlete = teamAthletes.find(a => {
+              const onetapNoSpace = (a.onetapName || "").replace(/[\s　]+/g, "");
+              const catapultNoSpace = (a.catapultName || "").replace(/[\s　]+/g, "");
+              return (
+                (onetapNoSpace && nameNoSpace.includes(onetapNoSpace)) || 
+                (catapultNoSpace && nameNoSpace.includes(catapultNoSpace)) ||
+                (onetapNoSpace && onetapNoSpace.includes(nameNoSpace)) ||
+                (catapultNoSpace && catapultNoSpace.includes(nameNoSpace))
+              );
+            });
           }
 
           if (!athlete) continue;
