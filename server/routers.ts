@@ -462,6 +462,10 @@ export const appRouter = router({
         date: z.string().nullable().optional()
       }))
       .query(({ input }) => db.getOstrcByAthlete(input.athleteId, input.date)),
+
+    getLatestOstrcAlerts: protectedProcedure
+      .input(z.object({ teamId: z.number() }))
+      .query(({ input }) => db.getLatestOstrcAlerts(input.teamId)),
     
     getByTeam: protectedProcedure
       .input(z.object({ 

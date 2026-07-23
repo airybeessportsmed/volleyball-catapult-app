@@ -5593,4 +5593,69 @@ export async function getOstrcByAthlete(athleteId: number, date?: string | null)
   }
 }
 
+export async function getLatestOstrcAlerts(teamId: number) {
+  const db = await getDb();
+  if (!db) {
+    const latestMap = new Map<number, OstrcResponse>();
+    mockOstrcResponses.forEach(r => {
+      const athlete = mockAthletes.find(a => a.id === r.athleteId && a.teamId === teamId);
+      if (athlete) {
+        const existing = latestMap.get(r.athleteId);
+        if (!existing || r.date > existing.date) {
+          latestMap.set(r.athleteId, r);
+        }
+      }
+    });
+
+    const rows = Array.from(latestMap.values()).map(r => {
+      const athlete = mockAthletes.find(a => a.id === r.athleteId)!;
+      return {
+        id: r.id,
+        athleteId: r.athleteId,
+        athleteName: athlete.onetapName || athlete.catapultName || "選手",
+        athleteNumber: athlete.jerseyNumber || 0,
+        date: r.date,
+        severityScore: r.severityScore,
+        q1Participation: r.q1Participation,
+        q2Volume: r.q2Volume,
+        q3Performance: r.q3Performance,
+        q4Symptoms: r.q4Symptoms,
+        injuryDetails: r.injuryDetails,
+      };
+    });
+
+    return rows.sort((a, b) => b.severityScore - a.severityScore);
+  }
+
+  const rows = await db
+    .select({
+      id: ostrcResponses.id,
+      athleteId: ostrcResponses.athleteId,
+      athleteName: athletes.onetapName,
+      athleteNumber: athletes.jerseyNumber,
+      date: ostrcResponses.date,
+      severityScore: ostrcResponses.severityScore,
+      q1Participation: ostrcResponses.q1Participation,
+      q2Volume: ostrcResponses.q2Volume,
+      q3Performance: ostrcResponses.q3Performance,
+      q4Symptoms: ostrcResponses.q4Symptoms,
+      injuryDetails: ostrcResponses.injuryDetails,
+    })
+    .from(ostrcResponses)
+    .innerJoin(athletes, eq(ostrcResponses.athleteId, athletes.id))
+    .where(
+      and(
+        eq(athletes.teamId, teamId),
+        sql`${ostrcResponses.date} = (
+          SELECT MAX(r2.date) 
+          FROM ostrc_responses r2 
+          WHERE r2.athlete_id = ${ostrcResponses.athleteId}
+        )`
+      )
+    )
+    .orderBy(desc(ostrcResponses.severityScore));
+
+  return rows;
+}
+
 

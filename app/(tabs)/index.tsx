@@ -616,6 +616,11 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
+  const { data: ostrcAlerts, refetch: refetchOstrcAlerts } = trpc.performance.getLatestOstrcAlerts.useQuery(
+    { teamId: user?.teamId || 1 },
+    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
+  );
+
   const correctAnomalyMutation = trpc.performance.correctAnomaly.useMutation();
   const bulkApproveAnomaliesMutation = trpc.performance.bulkApproveAnomaliesWithoutCorrection.useMutation();
   const [anomalyModalOpen, setAnomalyModalOpen] = useState(false);
@@ -3920,6 +3925,132 @@ export default function HomeScreen() {
                     <IconSymbol size={16} name="chevron.right" color="#EF4444" />
                   </TouchableOpacity>
                 )}
+
+                {/* 🚨 OSTRC 障害調査アラート (Treatment Log App と同様のチーム一覧カード) */}
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 3, gap: 16 }}>
+                  <View style={{ borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 12, gap: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <IconSymbol size={20} name="exclamationmark.triangle.fill" color="#EF4444" />
+                      <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>OSTRC 傷害調査アラート</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: "#64748B" }}>選手から提出された週次の傷害調査データに基づき、要注意・要制限・離脱状態の選手を一覧表示します。</Text>
+                    <Text style={{ fontSize: 9, color: "#94A3B8", fontWeight: "bold", marginTop: 2 }}>
+                      ※ 内訳の見方: (Q1:参加 | Q2:練習の変更 | Q3:パフォーマンス | Q4:症状の程度)
+                    </Text>
+                  </View>
+
+                  {ostrcAlerts && ostrcAlerts.length > 0 ? (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                      {ostrcAlerts.map((alert: any) => {
+                        const details = (typeof alert.injuryDetails === "string" ? JSON.parse(alert.injuryDetails) : alert.injuryDetails) || [];
+                        const sortedDetails = [...details].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+                        const maxDetailScore = sortedDetails.reduce((max: number, d: any) => Math.max(max, d.score || 0), 0);
+
+                        const hasSubstantial = 
+                          (alert.q1Participation || 0) >= 17 || 
+                          (alert.q2Volume || 0) >= 13 || 
+                          (alert.q3Performance || 0) >= 13;
+                        const isRed = maxDetailScore >= 40 || hasSubstantial;
+                        const isYellow = maxDetailScore >= 11 && !isRed;
+
+                        const cardBgColor = isRed ? "#FEF2F2" : isYellow ? "#FFFBEB" : "#F0FDF4";
+                        const cardBorderColor = isRed ? "#FCA5A5" : isYellow ? "#FDE68A" : "#BBF7D0";
+                        const scoreTextColor = isRed ? "#DC2626" : isYellow ? "#D97706" : "#16A34A";
+                        const scoreBgColor = isRed ? "#FEE2E2" : isYellow ? "#FEF3C7" : "#DCFCE7";
+
+                        return (
+                          <View
+                            key={alert.id}
+                            style={{
+                              width: windowWidth > 768 ? "31%" : "100%",
+                              minWidth: 260,
+                              backgroundColor: cardBgColor,
+                              borderColor: cardBorderColor,
+                              borderWidth: 1,
+                              borderRadius: 16,
+                              padding: 16,
+                              gap: 10,
+                            }}
+                          >
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>
+                                  #{alert.athleteNumber} {alert.athleteName}
+                                </Text>
+                                <View style={{ backgroundColor: scoreBgColor, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: cardBorderColor }}>
+                                  <Text style={{ fontSize: 10, fontWeight: "bold", color: scoreTextColor }}>
+                                    最高 {maxDetailScore}点
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={{ fontSize: 10, color: "#64748B", fontFamily: "monospace" }}>
+                                {alert.date}
+                              </Text>
+                            </View>
+
+                            {sortedDetails.length > 0 ? (
+                              <View style={{ gap: 6 }}>
+                                {sortedDetails.map((d: any, idx: number) => {
+                                  const isDetailRed = d.score >= 40;
+                                  const isDetailYellow = d.score >= 11 && !isDetailRed;
+                                  const badgeBgColor = isDetailRed ? "#EF4444" : isDetailYellow ? "#F59E0B" : "#3B82F6";
+
+                                  return (
+                                    <View
+                                      key={idx}
+                                      style={{
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        backgroundColor: "#FFFFFF",
+                                        padding: 8,
+                                        borderRadius: 10,
+                                        borderWidth: 1,
+                                        borderColor: "#E2E8F0",
+                                        gap: 4
+                                      }}
+                                    >
+                                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#1E293B" }}>
+                                          {d.partLabel}
+                                        </Text>
+                                        <Text style={{ fontSize: 9, color: "#64748B", fontFamily: "monospace" }}>
+                                          ({d.q1 || 0}|{d.q2 || 0}|{d.q3 || 0}|{d.q4 || 0})
+                                        </Text>
+                                        {d.note && (
+                                          <Text style={{ fontSize: 9, color: "#64748B", fontStyle: "italic" }} numberOfLines={1}>
+                                            ({d.note})
+                                          </Text>
+                                        )}
+                                      </View>
+                                      <View style={{ backgroundColor: badgeBgColor, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                                        <Text style={{ fontSize: 9.5, fontWeight: "bold", color: "#FFFFFF" }}>
+                                          {d.score}点
+                                        </Text>
+                                      </View>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            ) : (
+                              <View style={{ paddingVertical: 8, alignItems: "center", backgroundColor: "#DCFCE7", borderRadius: 10, borderWidth: 1, borderColor: "#BBF7D0" }}>
+                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#15803D" }}>
+                                  痛みや違和感のある部位はありません（良好）
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={{ paddingVertical: 32, alignItems: "center", justifyContent: "center", borderStyle: "dashed", borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#64748B" }}>
+                        現在アクティブな OSTRC アラートはありません
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 <TouchableOpacity 
                   onPress={handleExportCsv}
