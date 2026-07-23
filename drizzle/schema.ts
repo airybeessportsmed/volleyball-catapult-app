@@ -61,6 +61,7 @@ export const athletes = pgTable("athletes", {
   onetapName: varchar("onetapName", { length: 100 }),
   catapultName: varchar("catapultName", { length: 100 }),
   soxaiEmail: varchar("soxaiEmail", { length: 100 }),
+  soxaiName: varchar("soxaiName", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

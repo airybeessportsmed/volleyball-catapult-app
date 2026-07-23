@@ -20,6 +20,7 @@ interface EditableAthlete {
   onetapName: string | null;
   catapultName: string | null;
   soxaiEmail: string | null;
+  soxaiName: string | null;
   password?: string | null;
   isDeleted?: boolean;
 }
@@ -83,6 +84,7 @@ export default function CoachTeamScreen() {
           onetapName: a.onetapName || "",
           catapultName: a.catapultName || "",
           soxaiEmail: a.soxaiEmail || "",
+          soxaiName: (a as any).soxaiName || "",
           password: "",
           isDeleted: false,
         }))
@@ -110,6 +112,7 @@ export default function CoachTeamScreen() {
         onetapName: "",
         catapultName: "",
         soxaiEmail: "",
+        soxaiName: "",
         password: "",
         isDeleted: false,
       }
@@ -164,6 +167,7 @@ export default function CoachTeamScreen() {
         onetapName: a.onetapName ? a.onetapName.trim() : null,
         catapultName: a.catapultName ? a.catapultName.trim() : null,
         soxaiEmail: a.soxaiEmail ? a.soxaiEmail.trim() : null,
+        soxaiName: a.soxaiName ? a.soxaiName.trim() : null,
         isDeleted: a.isDeleted,
       }))
     });
@@ -276,6 +280,9 @@ export default function CoachTeamScreen() {
                     </View>
                     <View style={{ width: 180 }} className="justify-center px-2">
                       <Text className="font-bold text-xs text-muted">SOXAIメール</Text>
+                    </View>
+                    <View style={{ width: 140 }} className="justify-center px-2">
+                      <Text className="font-bold text-xs text-muted">SOXAI登録名</Text>
                     </View>
                     <View style={{ width: 180 }} className="justify-center px-2">
                       <Text className="font-bold text-xs text-muted">CSV用別名 (カンマ区切り)</Text>
@@ -400,6 +407,18 @@ export default function CoachTeamScreen() {
                             placeholderTextColor="#9CA3AF"
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            editable={!athlete.isDeleted}
+                            className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm"
+                          />
+                        </View>
+
+                        {/* SOXAI登録名 */}
+                        <View style={{ width: 140 }} className="px-1">
+                          <TextInput
+                            value={athlete.soxaiName || ""}
+                            onChangeText={(val) => handleFieldChange(index, "soxaiName", val)}
+                            placeholder="ユウキ"
+                            placeholderTextColor="#9CA3AF"
                             editable={!athlete.isDeleted}
                             className="bg-muted/10 border border-border/50 px-2 py-1.5 rounded-lg text-foreground text-sm"
                           />

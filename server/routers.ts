@@ -332,6 +332,7 @@ export const appRouter = router({
           onetapName: z.string().nullable().optional(),
           catapultName: z.string().nullable().optional(),
           soxaiEmail: z.string().nullable().optional(),
+          soxaiName: z.string().nullable().optional(),
           password: z.string().nullable().optional(),
           isDeleted: z.boolean().optional(),
         }))

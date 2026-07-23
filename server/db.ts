@@ -134,6 +134,7 @@ let mockAthletes: Athlete[] = [
     onetapName: "宮下 さくら",
     catapultName: "Sakura Miyashita",
     soxaiEmail: "sakura@example.com",
+    soxaiName: "ユウキ",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -151,6 +152,7 @@ let mockAthletes: Athlete[] = [
     onetapName: "日向 ひなた",
     catapultName: "Hinata Hyuga",
     soxaiEmail: "hinata@example.com",
+    soxaiName: "バタコ",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -168,6 +170,7 @@ let mockAthletes: Athlete[] = [
     onetapName: "長谷川 みお",
     catapultName: "Mio Hasegawa",
     soxaiEmail: "mio@example.com",
+    soxaiName: "ミナミ",
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -852,6 +855,7 @@ export async function createAthlete(data: InsertAthlete) {
       onetapName: null,
       catapultName: null,
       soxaiEmail: null,
+      soxaiName: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -947,6 +951,7 @@ export interface BatchSaveAthleteInput {
   onetapName?: string | null;
   catapultName?: string | null;
   soxaiEmail?: string | null;
+  soxaiName?: string | null;
   password?: string | null;
   isDeleted?: boolean;
 }
@@ -984,6 +989,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           athlete.onetapName = item.onetapName || null;
           athlete.catapultName = item.catapultName || null;
           athlete.soxaiEmail = item.soxaiEmail || null;
+          athlete.soxaiName = item.soxaiName || null;
           athlete.updatedAt = new Date();
           
           const user = mockUsers.find(u => u.id === athlete.userId);
@@ -1029,6 +1035,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           onetapName: item.onetapName || null,
           catapultName: item.catapultName || null,
           soxaiEmail: item.soxaiEmail || null,
+          soxaiName: item.soxaiName || null,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1082,6 +1089,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
               onetapName: item.onetapName || null,
               catapultName: item.catapultName || null,
               soxaiEmail: item.soxaiEmail || null,
+              soxaiName: item.soxaiName || null,
               updatedAt: new Date()
             })
             .where(eq(athletes.id, item.id));
@@ -1115,6 +1123,7 @@ export async function batchSaveAthletes(teamId: number, athletesInput: BatchSave
           onetapName: item.onetapName || null,
           catapultName: item.catapultName || null,
           soxaiEmail: item.soxaiEmail || null,
+          soxaiName: item.soxaiName || null,
         });
       }
     }
@@ -2266,6 +2275,10 @@ export async function importPerformanceCsv(
             const nameInHeader = match[2] ? match[2].trim() : "";
 
             const matchedAthlete = teamAthletes.find(a => {
+              if (nameInHeader) {
+                const lowerName = nameInHeader.toLowerCase();
+                if (a.soxaiName?.toLowerCase() === lowerName) return true;
+              }
               if (a.jerseyNumber === jerseyNumber) return true;
               const aliases = a.csvNames ? a.csvNames.split(",").map(n => n.trim().toLowerCase()) : [];
               if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
@@ -2273,6 +2286,7 @@ export async function importPerformanceCsv(
                 const lowerName = nameInHeader.toLowerCase();
                 if (a.onetapName?.toLowerCase() === lowerName || 
                     a.catapultName?.toLowerCase() === lowerName || 
+                    a.user?.name?.toLowerCase() === lowerName || 
                     aliases.includes(lowerName)) {
                   return true;
                 }
