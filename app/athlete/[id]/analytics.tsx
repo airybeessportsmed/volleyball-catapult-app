@@ -1290,36 +1290,24 @@ export default function AthleteAnalyticsScreen() {
   const renderManualAnomalyHandler = () => {
     if (!latest) return null;
 
-    const handleCorrect = async (useAverage: boolean) => {
+    const handleApproveRaw = async () => {
       try {
-        const metrics: string[] = [];
-        if (useAverage) {
-          if (correctLoad) metrics.push("totalLoad");
-          if (correctJumps) {
-            metrics.push("totalJumps");
-            metrics.push("avgJumpHeight");
-            metrics.push("top5JumpHeight");
-          }
-          if (correctAccel) metrics.push("accelCount");
-        }
+        // Passing empty array to approve raw data as-is without any modification
         await correctAnomalyMutation.mutateAsync({
           recordId: latest.id,
-          metricsToCorrect: metrics
+          metricsToCorrect: []
         });
-        alert(useAverage 
-          ? "指定したデータをポジション平均値で補正・承認しました。"
-          : "データを生データのまま正常として承認しました。"
-        );
+        alert("データを生データのまま正常として承認しました。");
         refetch();
       } catch (e: any) {
-        alert(`処理に失敗しました: ${e.message}`);
+        alert(`承認処理に失敗しました: ${e.message}`);
       }
     };
 
     const handleRollback = async () => {
       try {
         await rollbackAnomalyMutation.mutateAsync({ recordId: latest.id });
-        alert("補正を取り消し、元の生データに戻しました。");
+        alert("承認を取り消し、元の生データに戻しました。");
         refetch();
       } catch (e: any) {
         alert(`ロールバックに失敗しました: ${e.message}`);
@@ -1340,7 +1328,7 @@ export default function AthleteAnalyticsScreen() {
           <IconSymbol size={18} name="exclamationmark.triangle.fill" color={latest.isCorrected ? "#64748B" : "#EF4444"} />
           <Text style={{ fontSize: 13, fontWeight: "bold", color: latest.isCorrected ? "#334155" : "#991B1B" }}>
             {latest.isAnomaly 
-              ? (latest.isCorrected ? "測定不良データ (補正・承認済)" : "自動検知された測定不良データ (未補正)")
+              ? (latest.isCorrected ? "測定不良データ (承認済)" : "自動検知された測定不良データ (未承認)")
               : "この日の測定データは自動検知では正常と判定されています"
             }
           </Text>
@@ -1355,75 +1343,23 @@ export default function AthleteAnalyticsScreen() {
         {!latest.isCorrected ? (
           <View style={{ gap: 10, marginTop: 4, paddingLeft: 26 }}>
             <Text style={{ fontSize: 10, color: "#64748B", lineHeight: 14 }}>
-              ※測定不良が生じている場合、補正する項目（指標）を選んでポジション平均値に置き換えることができます。
+              ※測定不良が生じている場合、手動で数値を修正するか、生データのまま正常データとして承認してください。
             </Text>
-
-            {/* 項目選択チェックボックス */}
-            <View style={{ gap: 8, marginVertical: 4 }}>
-              {/* PlayerLoad */}
-              <TouchableOpacity 
-                onPress={() => setCorrectLoad(!correctLoad)}
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctLoad ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
-                  {correctLoad && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
-                </View>
-                <Text style={{ fontSize: 12, color: "#1E293B" }}>PlayerLoad (全体負荷を平均値で補正)</Text>
-              </TouchableOpacity>
-
-              {/* Jumps */}
-              <TouchableOpacity 
-                onPress={() => setCorrectJumps(!correctJumps)}
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctJumps ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
-                  {correctJumps && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
-                </View>
-                <Text style={{ fontSize: 12, color: "#1E293B" }}>Jumps (ジャンプ数・平均高さを平均値で補正)</Text>
-              </TouchableOpacity>
-
-              {/* Acceleration */}
-              <TouchableOpacity 
-                onPress={() => setCorrectAccel(!correctAccel)}
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 2, borderColor: "#FF6B35", backgroundColor: correctAccel ? "#FF6B35" : "transparent", alignItems: "center", justifyContent: "center" }}>
-                  {correctAccel && <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>}
-                </View>
-                <Text style={{ fontSize: 12, color: "#1E293B" }}>IMA (加速回数を平均値で補正)</Text>
-              </TouchableOpacity>
-            </View>
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
               <TouchableOpacity
-                onPress={() => handleCorrect(true)}
+                onPress={handleApproveRaw}
                 style={{
-                  flex: 1.8,
-                  backgroundColor: "#EF4444",
-                  paddingVertical: 10,
-                  borderRadius: 10,
+                  flex: 1,
+                  backgroundColor: "#0F172A",
+                  paddingVertical: 12,
+                  borderRadius: 12,
                   alignItems: "center",
                   justifyContent: "center"
                 }}
               >
                 <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
-                  選択項目を補正し承認
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleCorrect(false)}
-                style={{
-                  flex: 1.2,
-                  backgroundColor: "#E2E8F0",
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>
-                  補正なしで承認
+                  生データのまま正常として承認
                 </Text>
               </TouchableOpacity>
             </View>
