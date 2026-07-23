@@ -8,7 +8,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import Svg, { Path, Circle, Rect, G, Text as SvgText, Line, Polyline } from "react-native-svg";
 import * as XLSX from "xlsx";
 import * as DocumentPicker from "expo-document-picker";
-import { useTranslation } from "react-i18next";
 
 const MINI_CHART_HEIGHT = 80;
 
