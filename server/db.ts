@@ -2250,6 +2250,7 @@ export async function importPerformanceCsv(
 
       if (isWideSoxai) {
         // --- 新形式：全選手横並びのワイドフォーマット ---
+        console.log(`[SOXAI Import] Starting wide format parsing. Total team athletes in DB: ${teamAthletes.length}`);
         interface WideSoxaiMapping {
           colIdx: number;
           athleteId: number;
@@ -2297,9 +2298,11 @@ export async function importPerformanceCsv(
               }
 
               if (metricKey) {
+                console.log(`[SOXAI Import] Header matched: "${h}" -> Athlete: "${matchedAthlete.onetapName}" (ID: ${matchedAthlete.id}, 背番号: ${jerseyNumber}) -> Key: ${metricKey}`);
                 mappings.push({ colIdx, athleteId: matchedAthlete.id, metricKey });
               }
             } else {
+              console.warn(`[SOXAI Import] Header NOT matched: "${h}" -> 背番号 #${jerseyNumber} の選手がDBに存在しません`);
               unregisteredSet.add(`#${jerseyNumber}`);
             }
           }
@@ -2374,13 +2377,19 @@ export async function importPerformanceCsv(
           });
 
           // 選手ごとにマージ処理
+          const batchCount = Object.keys(athleteBatch).length;
+          if (batchCount > 0) {
+            console.log(`[SOXAI Import] Date: ${formatDateKey(dateObj)} - Processing ${batchCount} athletes for this row.`);
+          }
           for (const athId of Object.keys(athleteBatch).map(Number)) {
             const rawRec = athleteBatch[athId];
             rawRec.soxaiData = JSON.stringify(rawRec.soxaiData);
+            console.log(`[SOXAI Import] Merging data for Athlete ID: ${athId}, Date: ${formatDateKey(dateObj)}, SleepScore: ${rawRec.wellnessSleep}, HRV: ${rawRec.hrv}, HeartRate: ${rawRec.avgHeartRate}, SoxaiDataSize: ${rawRec.soxaiData.length} chars`);
             await mergePerformanceData(db, teamId, rawRec);
             importedCount++;
           }
         }
+        console.log(`[SOXAI Import] Wide format parsing completed. Total imports: ${importedCount}, Unregistered: ${JSON.stringify(Array.from(unregisteredSet))}`);
 
       } else {
         // --- 従来の形式：選手別セクションの縦フォーマット (動的ヘッダー解決 & soxaiDataの完全抽出) ---
