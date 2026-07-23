@@ -272,6 +272,22 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(Number(latestHinata!.wellnessSleep)).toBe(88);
     expect(Number(latestHinata!.hrv)).toBe(68.2);
   });
+
+  it("should parse SOXAI wide format with yearless Japanese dates (e.g. 7月22日)", async () => {
+    // #1 (Sakura)
+    const csv = `日時	QoLスコア (#1 ユウキ)	睡眠スコア (#1 ユウキ)	睡眠時HRV_RMSSD_平均 (ms) (#1 ユウキ)
+7月22日	80	90	75.5`;
+
+    // File name contains year (soxai_2026_data.csv) -> fallback year is 2026
+    const result = await importPerformanceCsv(1, 1, csv, "soxai_2026_data.csv");
+    expect(result.success).toBe(true);
+
+    const records = await getPerformanceDataByAthleteId(1);
+    const latest = records.find(p => formatDateKey(p.date) === "2026-07-22");
+    expect(latest).toBeDefined();
+    expect(Number(latest!.wellnessSleep)).toBe(90);
+    expect(Number(latest!.hrv)).toBe(75.5);
+  });
 });
 
 function formatDateKey(date: Date) {

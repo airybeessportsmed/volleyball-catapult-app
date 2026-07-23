@@ -1455,7 +1455,7 @@ export async function updateCsvUploadStatus(uploadId: number, status: "pending" 
 // CSV PARSING & IMPORT LOGIC
 // ==========================================
 
-const parseDateFlexible = (dateStr: string): Date | null => {
+const parseDateFlexible = (dateStr: string, fallbackYear?: number): Date | null => {
   if (!dateStr) return null;
   const cleaned = dateStr.trim().replace(/^["']|["']$/g, "");
   
@@ -1473,6 +1473,17 @@ const parseDateFlexible = (dateStr: string): Date | null => {
     const parsed = new Date(year, month, day);
     if (!isNaN(parsed.getTime())) return parsed;
   }
+
+  // 3. Try format without year like MM/DD, M/D or MM月DD日, M月D日
+  const noYearMatch = cleaned.match(/(\d{1,2})[-/月\s](\d{1,2})[日]?/);
+  if (noYearMatch) {
+    const year = fallbackYear || new Date().getFullYear();
+    const month = parseInt(noYearMatch[1], 10) - 1;
+    const day = parseInt(noYearMatch[2], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
   return null;
 };
 
@@ -2294,6 +2305,9 @@ export async function importPerformanceCsv(
           }
         });
 
+        const fallbackDate = getFallbackDate(fileName);
+        const fallbackYear = fallbackDate.getFullYear();
+
         // 2行目以降 of データ行をループ
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
@@ -2303,8 +2317,8 @@ export async function importPerformanceCsv(
           const dateStr = vals[0];
           if (!dateStr) continue;
 
-          const dateObj = new Date(dateStr);
-          if (isNaN(dateObj.getTime())) continue;
+          const dateObj = parseDateFlexible(dateStr, fallbackYear);
+          if (!dateObj || isNaN(dateObj.getTime())) continue;
 
           // 同一選手・同一日付のパラメータを統合してmergeするためのバッファ
           const athleteBatch: Record<number, any> = {};
@@ -2425,8 +2439,10 @@ export async function importPerformanceCsv(
 
           const dateStr = vals[dateColIdx];
           if (!dateStr || dateStr.trim() === "") continue;
-          const dateObj = new Date(dateStr);
-          if (isNaN(dateObj.getTime())) continue;
+          const fallbackDate = getFallbackDate(fileName);
+          const fallbackYear = fallbackDate.getFullYear();
+          const dateObj = parseDateFlexible(dateStr, fallbackYear);
+          if (!dateObj || isNaN(dateObj.getTime())) continue;
 
           const matchedAthlete = teamAthletes.find(a => 
             (a.soxaiEmail && a.soxaiEmail.toLowerCase() === currentEmail.toLowerCase()) ||
