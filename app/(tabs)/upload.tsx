@@ -297,11 +297,11 @@ export default function CoachUploadScreen() {
             const date = vals[0];
             const playerName = vals[1];
             const partLabel = vals[2];
-            const q1Val = Number(vals[3] || 0);
-            const q2Val = Number(vals[4] || 0);
-            const q3Val = Number(vals[5] || 0);
-            const q4Val = Number(vals[6] || 0);
-            const scoreVal = Number(vals[7] || 0);
+            const q1Val = isNaN(Number(vals[3])) ? 0 : Number(vals[3]);
+            const q2Val = isNaN(Number(vals[4])) ? 0 : Number(vals[4]);
+            const q3Val = isNaN(Number(vals[5])) ? 0 : Number(vals[5]);
+            const q4Val = isNaN(Number(vals[6])) ? 0 : Number(vals[6]);
+            const scoreVal = isNaN(Number(vals[7])) ? 0 : Number(vals[7]);
             const statusVal = vals[8];
 
             const mapKey = `${playerName}_${date}`;
