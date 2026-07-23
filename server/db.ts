@@ -4596,6 +4596,14 @@ export async function seedDatabase() {
   }
 
   try {
+    // Dynamic schema hotpatch to guarantee "soxaiName" column exists in PostgreSQL
+    try {
+      await db.execute(sql`ALTER TABLE "athletes" ADD COLUMN IF NOT EXISTS "soxaiName" varchar(100);`);
+      console.log("[Database] Automatically ensured 'soxaiName' column exists in 'athletes' table.");
+    } catch (columnError) {
+      console.warn("[Database] Failed to auto-create 'soxaiName' column (it might already exist):", columnError);
+    }
+
     // Fix auto-increment sequences in PostgreSQL if any manual IDs or tables were inserted
     try {
       await db.execute(sql`SELECT setval('athletes_id_seq', COALESCE((SELECT MAX(id)+1 FROM athletes), 1), false);`);
