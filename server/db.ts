@@ -2259,10 +2259,26 @@ export async function importPerformanceCsv(
         const mappings: WideSoxaiMapping[] = [];
 
         headers.forEach((h, colIdx) => {
-          const match = h.match(/#(\d+)/);
+          // Extract jersey number and name inside parenthesis, e.g. "#16 ユウキ" -> "16", "ユウキ"
+          const match = h.match(/#(\d+)\s*([^)]*)/);
           if (match) {
             const jerseyNumber = parseInt(match[1], 10);
-            const matchedAthlete = teamAthletes.find(a => a.jerseyNumber === jerseyNumber);
+            const nameInHeader = match[2] ? match[2].trim() : "";
+
+            const matchedAthlete = teamAthletes.find(a => {
+              if (a.jerseyNumber === jerseyNumber) return true;
+              const aliases = a.csvNames ? a.csvNames.split(",").map(n => n.trim().toLowerCase()) : [];
+              if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
+              if (nameInHeader) {
+                const lowerName = nameInHeader.toLowerCase();
+                if (a.onetapName?.toLowerCase() === lowerName || 
+                    a.catapultName?.toLowerCase() === lowerName || 
+                    aliases.includes(lowerName)) {
+                  return true;
+                }
+              }
+              return false;
+            });
             if (matchedAthlete) {
               let metricKey = "";
               if (h.includes("睡眠スコア")) {
