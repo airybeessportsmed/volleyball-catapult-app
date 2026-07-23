@@ -636,6 +636,9 @@ export default function HomeScreen() {
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
 
+  const importOstrcDataMutation = trpc.performance.importOstrcData.useMutation();
+  const [isOstrcImporting, setIsOstrcImporting] = useState(false);
+
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [adviceText, setAdviceText] = useState("");
   const [activeTab, setActiveTab] = useState<"summary" | "dashboard" | "raw" | "catapult" | "settings" | "sleep">("summary");
@@ -3467,9 +3470,6 @@ export default function HomeScreen() {
         </ScreenContainer>
       );
     }
-
-    const importOstrcDataMutation = trpc.performance.importOstrcData.useMutation();
-    const [isOstrcImporting, setIsOstrcImporting] = useState(false);
 
     const handleOstrcImportDirect = async () => {
       try {
