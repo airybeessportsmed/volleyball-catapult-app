@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Modal, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
-import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { ScreenContainer } from "@/components/screen-container";
@@ -29,15 +28,6 @@ interface UploadFileItem {
 const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   const lowercaseText = csvText.toLowerCase();
   const lowercaseName = fileName.toLowerCase();
-  if (
-    (lowercaseText.includes("部位") && lowercaseText.includes("status")) || 
-    lowercaseText.includes("傷害、疾病、あるいは") || 
-    lowercaseText.includes("参加に影響") || 
-    lowercaseText.includes("パフォーマンスへの影響") || 
-    lowercaseText.includes("症状の度合い")
-  ) {
-    return "OSTRC (障害調査)";
-  }
   const hasSoxaiKeywords = 
     (lowercaseText.includes("睡眠スコア") || lowercaseText.includes("qolスコア")) &&
     (lowercaseText.includes("安静時心拍") || lowercaseText.includes("hrv_rmssd") || lowercaseText.includes("睡眠時間"));
@@ -49,159 +39,6 @@ const detectFormatOnFrontend = (csvText: string, fileName: string): string => {
   if (lowercaseText.includes("total player load") && lowercaseName.includes("menu")) return "Catapult Menu別PL";
   if (lowercaseText.includes("total player load")) return "Catapult PL (外的負荷)";
   return "CSV (自動判定)";
-};
-
-const normalizeOstrcData = (fileContent: ArrayBuffer | string, fileName: string): string => {
-  try {
-    const isCsv = typeof fileContent === "string";
-    const workbook = isCsv 
-      ? XLSX.read(fileContent as string, { type: "string" })
-      : XLSX.read(new Uint8Array(fileContent as ArrayBuffer), { type: "array" });
-
-    let bestSheetName = "";
-    let highestScore = -1;
-
-    for (const name of workbook.SheetNames) {
-      const worksheet = workbook.Sheets[name];
-      if (!worksheet) continue;
-      const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-      const headerRow = rows[0];
-      if (!Array.isArray(headerRow)) continue;
-
-      const headerStr = headerRow.join(",").toLowerCase();
-      let score = 0;
-      
-      if (headerStr.includes("部位") && headerStr.includes("status")) {
-        score += 100;
-      }
-      if (
-        headerStr.includes("タイムスタンプ") || 
-        headerStr.includes("回答者") ||
-        headerStr.includes("名前") ||
-        headerStr.includes("氏名")
-      ) {
-        score += 10;
-      }
-      if (
-        headerStr.includes("傷害、疾病") || 
-        headerStr.includes("参加に影響") || 
-        headerStr.includes("パフォーマンスへの影響") ||
-        headerStr.includes("症状の度合い")
-      ) {
-        score += 50;
-      }
-
-      if (score > highestScore) {
-        highestScore = score;
-        bestSheetName = name;
-      }
-    }
-
-    let targetSheetName = bestSheetName;
-    if (!targetSheetName || highestScore <= 0) {
-      targetSheetName = workbook.SheetNames.find(name => 
-        name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
-      ) || workbook.SheetNames[0];
-    }
-
-    const worksheet = workbook.Sheets[targetSheetName];
-    if (!worksheet) return isCsv ? (fileContent as string) : "";
-
-    const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-    if (rawRows.length <= 1) {
-      return isCsv ? (fileContent as string) : "";
-    }
-
-    const headerRow = rawRows[0];
-    if (!Array.isArray(headerRow)) {
-      return XLSX.utils.sheet_to_csv(worksheet);
-    }
-
-    const dateIdx = 0;
-    const playerIdx = 1;
-    const partIndexGroups = [
-      { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
-      { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
-      { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
-      { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
-    ];
-
-    const headerStrAll = headerRow.join(",").toLowerCase();
-    const isOstrcSheet = 
-      headerStrAll.includes("傷害、疾病") || 
-      headerStrAll.includes("参加に影響") || 
-      headerStrAll.includes("パフォーマンスへの影響") || 
-      headerStrAll.includes("症状の度合い") ||
-      (headerStrAll.includes("部位") && headerStrAll.includes("status"));
-
-    if (!isOstrcSheet) {
-      return XLSX.utils.sheet_to_csv(worksheet);
-    }
-
-    const csvLines = ["タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status"];
-
-    for (let i = 1; i < rawRows.length; i++) {
-      const row = rawRows[i];
-      if (!row || row.length <= playerIdx) continue;
-
-      const rawDate = row[dateIdx];
-      if (!rawDate) continue;
-
-      let dateStr = "";
-      try {
-        if (typeof rawDate === "number") {
-          const dateObj = XLSX.SSF.parse_date_code(rawDate);
-          dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-        } else {
-          const dateMatch = String(rawDate).match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
-          if (dateMatch) {
-            dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
-          } else {
-            const d = new Date(String(rawDate));
-            if (!isNaN(d.getTime())) {
-              const year = d.getFullYear();
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const day = String(d.getDate()).padStart(2, '0');
-              dateStr = `${year}-${month}-${day}`;
-            }
-          }
-        }
-      } catch (err) {}
-
-      if (!dateStr) continue;
-
-      const playerName = String(row[playerIdx] || "").trim();
-      if (!playerName) continue;
-
-      partIndexGroups.forEach(group => {
-        const rawPart = String(row[group.partIdx] === undefined || row[group.partIdx] === null ? "" : row[group.partIdx]).trim();
-        const rawScore = String(row[group.scoreIdx] === undefined || row[group.scoreIdx] === null ? "" : row[group.scoreIdx]).trim();
-        const rawStatus = String(row[group.statusIdx] === undefined || row[group.statusIdx] === null ? "" : row[group.statusIdx]).trim();
-
-        const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
-        const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
-        const q3Val = String(row[group.q3Idx] === undefined || row[group.q3Idx] === null ? "0" : row[group.q3Idx]).trim();
-        const q4Val = String(row[group.q4Idx] === undefined || row[group.q4Idx] === null ? "0" : row[group.q4Idx]).trim();
-
-        const parsedScoreNum = Number(rawScore);
-        if (rawPart && !isNaN(parsedScoreNum) && parsedScoreNum > 0) {
-          const cleanPart = rawPart.replace(/,/g, " ");
-          const cleanStatus = rawStatus.replace(/,/g, " ");
-          const cleanPlayer = playerName.replace(/,/g, " ");
-          
-          csvLines.push(`${dateStr},${cleanPlayer},${cleanPart},${q1Val},${q2Val},${q3Val},${q4Val},${rawScore},${cleanStatus}`);
-        }
-      });
-    }
-
-    if (csvLines.length === 1) {
-      return XLSX.utils.sheet_to_csv(worksheet);
-    }
-
-    return csvLines.join("\n");
-  } catch (err) {
-    return typeof fileContent === "string" ? (fileContent as string) : "";
-  }
 };
 
 export default function CoachUploadScreen() {
@@ -238,7 +75,6 @@ export default function CoachUploadScreen() {
   const updateAthleteCsvNamesMutation = trpc.performance.updateAthleteCsvNames.useMutation();
   
   const importMutation = trpc.performance.importCsv.useMutation();
-  const importOstrcDataMutation = trpc.performance.importOstrcData.useMutation();
   const deleteUploadMutation = trpc.performance.deleteCsvUpload.useMutation();
   
   const clearAllUploadsMutation = trpc.performance.clearAllCsvUploads.useMutation();
@@ -282,110 +118,15 @@ export default function CoachUploadScreen() {
       if (file.status !== "pending" && file.status !== "error" && file.status !== "uploading") continue;
 
       try {
-        let res;
-        if (file.detectedFormat === "OSTRC (障害調査)") {
-          const lines = file.text.split("\n");
-          const rowsMap = new Map<string, any>();
-
-          for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            
-            const vals = line.split(",").map(v => v.trim());
-            if (vals.length < 9) continue;
-
-            const date = vals[0];
-            const playerName = vals[1];
-            const partLabel = vals[2];
-            const q1Val = isNaN(Number(vals[3])) ? 0 : Number(vals[3]);
-            const q2Val = isNaN(Number(vals[4])) ? 0 : Number(vals[4]);
-            const q3Val = isNaN(Number(vals[5])) ? 0 : Number(vals[5]);
-            const q4Val = isNaN(Number(vals[6])) ? 0 : Number(vals[6]);
-            const scoreVal = isNaN(Number(vals[7])) ? 0 : Number(vals[7]);
-            const statusVal = vals[8];
-
-            const mapKey = `${playerName}_${date}`;
-
-            const BODY_PARTS_MAPPING = [
-              { key: "left_shoulder", label: "左肩" },
-              { key: "right_shoulder", label: "右肩" },
-              { key: "left_elbow", label: "左肘" },
-              { key: "right_elbow", label: "右肘" },
-              { key: "left_wrist", label: "左手首" },
-              { key: "right_wrist", label: "右手首" },
-              { key: "left_hip", label: "左股関節" },
-              { key: "right_hip", label: "右股関節" },
-              { key: "left_knee", label: "左膝" },
-              { key: "right_knee", label: "右膝" },
-              { key: "left_ankle", label: "左足首" },
-              { key: "right_ankle", label: "右足首" },
-              { key: "lower_back", label: "腰" },
-              { key: "neck", label: "首" },
-              { key: "back", label: "背中" },
-              { key: "chest", label: "胸" },
-              { key: "abdomen", label: "腹部" }
-            ];
-
-            const match = BODY_PARTS_MAPPING.find(bpm => 
-              partLabel.includes(bpm.label) || bpm.label.includes(partLabel)
-            );
-
-            let severity: "out" | "normal" | "caution" | "limited" = "normal";
-            if (statusVal.includes("離脱") || statusVal.includes("out")) {
-              severity = "out";
-            } else if (statusVal.includes("制限") || statusVal.includes("limited")) {
-              severity = "limited";
-            } else if (statusVal.includes("注意") || statusVal.includes("caution")) {
-              severity = "caution";
-            }
-
-            const detail = {
-              partKey: match ? match.key : "other",
-              partLabel,
-              severity,
-              score: scoreVal,
-              note: statusVal || undefined,
-              q1: q1Val,
-              q2: q2Val,
-              q3: q3Val,
-              q4: q4Val,
-            };
-
-            if (!rowsMap.has(mapKey)) {
-              rowsMap.set(mapKey, {
-                date,
-                playerName,
-                severityScore: scoreVal,
-                injuryDetails: [detail]
-              });
-            } else {
-              const existing = rowsMap.get(mapKey);
-              existing.injuryDetails.push(detail);
-              if (scoreVal > existing.severityScore) {
-                existing.severityScore = scoreVal;
-              }
-            }
-          }
-
-          const parsedRows = Array.from(rowsMap.values());
-          if (parsedRows.length === 0) {
-            throw new Error("OSTRCデータ行が空です。");
-          }
-
-          res = await importOstrcDataMutation.mutateAsync({
-            rows: parsedRows
-          });
-        } else {
-          res = await importMutation.mutateAsync({
-            teamId,
-            csvText: file.text,
-            fileName: file.name,
-            sessionType: file.sessionType || "auto",
-          });
-        }
+        const res = await importMutation.mutateAsync({
+          teamId,
+          csvText: file.text,
+          fileName: file.name,
+          sessionType: file.sessionType || "auto",
+        });
         
-        if (res && (res as any).unregisteredAthletes && (res as any).unregisteredAthletes.length > 0) {
-          (res as any).unregisteredAthletes.forEach((name: string) => {
+        if (res && res.unregisteredAthletes && res.unregisteredAthletes.length > 0) {
+          res.unregisteredAthletes.forEach(name => {
             tempUnmatched.push({
               csvName: name,
               fileId: file.id,
@@ -460,12 +201,7 @@ export default function CoachUploadScreen() {
     try {
       setErrorMsg("");
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "text/csv", 
-          "text/comma-separated-values", 
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ],
+        type: ["text/csv", "text/comma-separated-values", "application/vnd.ms-excel"],
         copyToCacheDirectory: true,
         multiple: true,
       });
@@ -477,15 +213,7 @@ export default function CoachUploadScreen() {
       const newFiles = [];
       for (const asset of result.assets) {
         const response = await fetch(asset.uri);
-        const nameLower = asset.name.toLowerCase();
-        let text = "";
-        if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
-          const arrayBuffer = await response.arrayBuffer();
-          text = normalizeOstrcData(arrayBuffer, asset.name);
-        } else {
-          const rawText = await response.text();
-          text = normalizeOstrcData(rawText, asset.name);
-        }
+        const text = await response.text();
         newFiles.push({
           name: asset.name,
           size: asset.size,
@@ -521,33 +249,20 @@ export default function CoachUploadScreen() {
       const newFiles = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const nameLower = file.name.toLowerCase();
-        if (!nameLower.endsWith(".csv") && !nameLower.endsWith(".xlsx") && !nameLower.endsWith(".xls")) continue;
+        if (!file.name.endsWith(".csv")) continue;
 
         const text = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (evt) => {
             const arrayBuffer = evt.target?.result as ArrayBuffer;
-            if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
-              try {
-                resolve(normalizeOstrcData(arrayBuffer, file.name));
-              } catch (e) {
-                resolve("");
-              }
-            } else {
-              try {
-                let decoded = "";
-                try {
-                  const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
-                  decoded = utf8Decoder.decode(arrayBuffer);
-                } catch (err) {
-                  const sjisDecoder = new TextDecoder("shift-jis");
-                  decoded = sjisDecoder.decode(arrayBuffer);
-                }
-                resolve(normalizeOstrcData(decoded, file.name));
-              } catch (err) {
-                resolve("");
-              }
+            try {
+              // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
+              const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+              resolve(utf8Decoder.decode(arrayBuffer));
+            } catch (err) {
+              // Fallback to Shift-JIS for Excel-generated Japanese CSVs
+              const sjisDecoder = new TextDecoder("shift-jis");
+              resolve(sjisDecoder.decode(arrayBuffer));
             }
           };
           reader.readAsArrayBuffer(file);
@@ -563,7 +278,7 @@ export default function CoachUploadScreen() {
       if (newFiles.length > 0) {
         addFiles(newFiles);
       } else {
-        setErrorMsg("CSV（.csv）または Excel（.xlsx, .xls）ファイルをドロップしてください。");
+        setErrorMsg("CSVファイル（.csv）をドロップしてください。");
       }
     }
   };
@@ -820,10 +535,10 @@ export default function CoachUploadScreen() {
                   
                   <View className="items-center gap-1 px-4">
                     <Text className="text-sm font-bold text-foreground text-center">
-                      CSVまたはExcelファイルをここにドラッグ＆ドロップ（複数可）
+                      CSVファイルをここにドラッグ＆ドロップ（複数可）
                     </Text>
                     <Text className="text-xs text-muted text-center font-sans">
-                      またはファイルブラウザから選択してください（.csv, .xlsx, .xls 対応）
+                      またはファイルブラウザから選択してください
                     </Text>
                   </View>
 

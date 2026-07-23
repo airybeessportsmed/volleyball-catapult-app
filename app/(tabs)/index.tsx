@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal, TextInput, Platform } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, useWindowDimensions, Modal, TextInput } from "react-native";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
@@ -6,8 +6,6 @@ import { trpc } from "@/lib/trpc";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import Svg, { Path, Circle, Rect, G, Text as SvgText, Line, Polyline } from "react-native-svg";
-import * as XLSX from "xlsx";
-import * as DocumentPicker from "expo-document-picker";
 
 const MINI_CHART_HEIGHT = 80;
 
@@ -601,12 +599,6 @@ export default function HomeScreen() {
     }
   );
 
-  // Fetch OSTRC data for athlete
-  const { data: ostrcData, isLoading: ostrcLoading } = trpc.performance.getOstrcByAthlete.useQuery(
-    { athleteId: athlete?.id || 0, date: rawDate },
-    { enabled: !!athlete?.id }
-  );
-
   // Fetch team analytics for coach/viewer
   const { data: teamAnalytics, isLoading: teamLoading, refetch: refetchTeam } = trpc.performance.getTeamAnalytics.useQuery(
     { teamId: user?.teamId || 1 },
@@ -614,11 +606,6 @@ export default function HomeScreen() {
   );
 
   const { data: uncorrectedAnomalies, refetch: refetchAnomalies } = trpc.performance.getUncorrectedAnomalies.useQuery(
-    { teamId: user?.teamId || 1 },
-    { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
-  );
-
-  const { data: ostrcAlerts, refetch: refetchOstrcAlerts } = trpc.performance.getLatestOstrcAlerts.useQuery(
     { teamId: user?.teamId || 1 },
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
@@ -635,9 +622,6 @@ export default function HomeScreen() {
     { teamId: user?.teamId || 1 },
     { enabled: isAuthenticated && (user?.role === "coach" || user?.role === "viewer") }
   );
-
-  const importOstrcDataMutation = trpc.performance.importOstrcData.useMutation();
-  const [isOstrcImporting, setIsOstrcImporting] = useState(false);
 
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null);
   const [adviceText, setAdviceText] = useState("");
@@ -1297,104 +1281,6 @@ export default function HomeScreen() {
 
     const latest = analytics?.latestSession;
     const trendData = analytics?.trend || [];
-
-    const renderOstrcCard = () => {
-      if (ostrcLoading) {
-        return (
-          <View className="bg-surface border border-border rounded-3xl p-6 items-center justify-center">
-            <ActivityIndicator size="small" color="#FF6B35" />
-          </View>
-        );
-      }
-
-      if (!ostrcData) {
-        return (
-          <View className="bg-surface border border-dashed border-border rounded-3xl p-6 items-center justify-center gap-2">
-            <IconSymbol size={24} name="doc.text" color="#9CA3AF" />
-            <Text style={{ fontSize: 12, fontWeight: "bold", color: "#64748B" }} className="text-center">本日の OSTRC 回答データはありません</Text>
-          </View>
-        );
-      }
-
-      const details = ostrcData.injuryDetails || [];
-      const sortedDetails = [...details].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
-      const maxDetailScore = sortedDetails.reduce((max: number, d: any) => Math.max(max, d.score || 0), 0);
-      
-      const hasSubstantial = details.some((d: any) => (d.q1 || 0) >= 17 || (d.q2 || 0) >= 13 || (d.q3 || 0) >= 13);
-      const isRed = maxDetailScore >= 40 || hasSubstantial;
-      const isYellow = maxDetailScore >= 11 && !isRed;
-
-      let severityBg = "bg-green-500/5";
-      let severityBorder = "border-green-200 dark:border-green-800/40";
-      let badgeBorderColor = "border-green-500/20";
-      let badgeText = "text-green-600 dark:text-green-400";
-      let badgeBg = "bg-green-500/10";
-      
-      if (isRed) {
-        severityBg = "bg-red-500/5";
-        severityBorder = "border-red-200 dark:border-red-800/40";
-        badgeBorderColor = "border-red-500/20";
-        badgeText = "text-red-600 dark:text-red-400";
-        badgeBg = "bg-red-500/10";
-      } else if (isYellow) {
-        severityBg = "bg-amber-500/5";
-        severityBorder = "border-amber-200 dark:border-amber-800/40";
-        badgeBorderColor = "border-amber-500/20";
-        badgeText = "text-amber-600 dark:text-amber-400";
-        badgeBg = "bg-amber-500/10";
-      }
-
-      return (
-        <View style={{ borderRadius: 20, borderWidth: 1, padding: 16, gap: 12, backgroundColor: "#FFFFFF" }} className={`${severityBorder} ${severityBg}`}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>OSTRC 障害調査結果</Text>
-              <View style={{ borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }} className={`${badgeBg} ${badgeBorderColor}`}>
-                <Text style={{ fontSize: 9, fontWeight: "bold" }} className={`${badgeText}`}>最高 {maxDetailScore}点</Text>
-              </View>
-            </View>
-            <Text style={{ fontSize: 10, color: "#64748B", fontFamily: "monospace" }}>{ostrcData.date}</Text>
-          </View>
-
-          {sortedDetails.length > 0 ? (
-            <View style={{ gap: 8 }}>
-              {sortedDetails.map((d: any, idx: number) => {
-                const isDetailRed = d.score >= 40;
-                const isDetailYellow = d.score >= 11 && !isDetailRed;
-                let detailBadgeBg = "bg-blue-500";
-                if (isDetailRed) detailBadgeBg = "bg-red-500";
-                else if (isDetailYellow) detailBadgeBg = "bg-amber-500";
-
-                return (
-                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0" }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#0F172A" }}>{d.partLabel}</Text>
-                      <Text style={{ fontSize: 9, color: "#64748B", fontFamily: "monospace" }}>
-                        ({d.q1 || 0}|{d.q2 || 0}|{d.q3 || 0}|{d.q4 || 0})
-                      </Text>
-                      {d.note && (
-                        <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "600" }} numberOfLines={1}>
-                          ({d.note})
-                        </Text>
-                      )}
-                    </View>
-                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }} className={`${detailBadgeBg}`}>
-                      <Text style={{ fontSize: 10, fontWeight: "bold", color: "#FFFFFF" }}>{d.score}点</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={{ paddingVertical: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F0FDF4", borderRadius: 12, borderWidth: 1, borderColor: "#DCFCE7" }}>
-              <Text style={{ fontSize: 12, fontWeight: "bold", color: "#166534" }}>
-                痛みや違和感のある部位はありません（良好）
-              </Text>
-            </View>
-          )}
-        </View>
-      );
-    };
 
     // ACWR ゲージ描画ヘルパー
     const renderACWRGauge = () => {
@@ -2094,7 +1980,6 @@ export default function HomeScreen() {
 
                 {/* 指導者からのアドバイス & 自主練ガイダンス */}
                 {analytics && renderGuidanceAndAdvice()}
-                {renderOstrcCard()}
               </View>
             )}
 
@@ -3308,159 +3193,6 @@ export default function HomeScreen() {
     );
   }
 
-  const normalizeOstrcData = (fileContent: ArrayBuffer | string, fileName: string): string => {
-    try {
-      const isCsv = typeof fileContent === "string";
-      const workbook = isCsv 
-        ? XLSX.read(fileContent as string, { type: "string" })
-        : XLSX.read(new Uint8Array(fileContent as ArrayBuffer), { type: "array" });
-
-      let bestSheetName = "";
-      let highestScore = -1;
-
-      for (const name of workbook.SheetNames) {
-        const worksheet = workbook.Sheets[name];
-        if (!worksheet) continue;
-        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-        const headerRow = rows[0];
-        if (!Array.isArray(headerRow)) continue;
-
-        const headerStr = headerRow.join(",").toLowerCase();
-        let score = 0;
-        
-        if (headerStr.includes("部位") && headerStr.includes("status")) {
-          score += 100;
-        }
-        if (
-          headerStr.includes("タイムスタンプ") || 
-          headerStr.includes("回答者") ||
-          headerStr.includes("名前") ||
-          headerStr.includes("氏名")
-        ) {
-          score += 10;
-        }
-        if (
-          headerStr.includes("傷害、疾病") || 
-          headerStr.includes("参加に影響") || 
-          headerStr.includes("パフォーマンスへの影響") ||
-          headerStr.includes("症状の度合い")
-        ) {
-          score += 50;
-        }
-
-        if (score > highestScore) {
-          highestScore = score;
-          bestSheetName = name;
-        }
-      }
-
-      let targetSheetName = bestSheetName;
-      if (!targetSheetName || highestScore <= 0) {
-        targetSheetName = workbook.SheetNames.find(name => 
-          name.includes("シート1") || name.toLowerCase().includes("sheet1") || name.includes("フォーム")
-        ) || workbook.SheetNames[0];
-      }
-
-      const worksheet = workbook.Sheets[targetSheetName];
-      if (!worksheet) return isCsv ? (fileContent as string) : "";
-
-      const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-      if (rawRows.length <= 1) {
-        return isCsv ? (fileContent as string) : "";
-      }
-
-      const headerRow = rawRows[0];
-      if (!Array.isArray(headerRow)) {
-        return XLSX.utils.sheet_to_csv(worksheet);
-      }
-
-      const dateIdx = 0;
-      const playerIdx = 1;
-      const partIndexGroups = [
-        { partIdx: 59, q1Idx: 60, q2Idx: 61, q3Idx: 62, q4Idx: 63, scoreIdx: 64, statusIdx: 65 },
-        { partIdx: 66, q1Idx: 67, q2Idx: 68, q3Idx: 69, q4Idx: 70, scoreIdx: 71, statusIdx: 72 },
-        { partIdx: 73, q1Idx: 74, q2Idx: 75, q3Idx: 76, q4Idx: 77, scoreIdx: 78, statusIdx: 79 },
-        { partIdx: 80, q1Idx: 81, q2Idx: 82, q3Idx: 83, q4Idx: 84, scoreIdx: 85, statusIdx: 86 },
-      ];
-
-      const headerStrAll = headerRow.join(",").toLowerCase();
-      const isOstrcSheet = 
-        headerStrAll.includes("傷害、疾病") || 
-        headerStrAll.includes("参加に影響") || 
-        headerStrAll.includes("パフォーマンスへの影響") || 
-        headerStrAll.includes("症状の度合い") ||
-        (headerStrAll.includes("部位") && headerStrAll.includes("status"));
-
-      if (!isOstrcSheet) {
-        return XLSX.utils.sheet_to_csv(worksheet);
-      }
-
-      const csvLines = ["タイムスタンプ,回答者,部位,Q1,Q2,Q3,Q4,合計,Status"];
-
-      for (let i = 1; i < rawRows.length; i++) {
-        const row = rawRows[i];
-        if (!row || row.length <= playerIdx) continue;
-
-        const rawDate = row[dateIdx];
-        if (!rawDate) continue;
-
-        let dateStr = "";
-        try {
-          if (typeof rawDate === "number") {
-            const dateObj = XLSX.SSF.parse_date_code(rawDate);
-            dateStr = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-          } else {
-            const dateMatch = String(rawDate).match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
-            if (dateMatch) {
-              dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
-            } else {
-              const d = new Date(String(rawDate));
-              if (!isNaN(d.getTime())) {
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                dateStr = `${year}-${month}-${day}`;
-              }
-            }
-          }
-        } catch (err) {}
-
-        if (!dateStr) continue;
-
-        const playerName = String(row[playerIdx] || "").trim();
-        if (!playerName) continue;
-
-        partIndexGroups.forEach(group => {
-          const rawPart = String(row[group.partIdx] === undefined || row[group.partIdx] === null ? "" : row[group.partIdx]).trim();
-          const rawScore = String(row[group.scoreIdx] === undefined || row[group.scoreIdx] === null ? "" : row[group.scoreIdx]).trim();
-          const rawStatus = String(row[group.statusIdx] === undefined || row[group.statusIdx] === null ? "" : row[group.statusIdx]).trim();
-
-          const q1Val = String(row[group.q1Idx] === undefined || row[group.q1Idx] === null ? "0" : row[group.q1Idx]).trim();
-          const q2Val = String(row[group.q2Idx] === undefined || row[group.q2Idx] === null ? "0" : row[group.q2Idx]).trim();
-          const q3Val = String(row[group.q3Idx] === undefined || row[group.q3Idx] === null ? "0" : row[group.q3Idx]).trim();
-          const q4Val = String(row[group.q4Idx] === undefined || row[group.q4Idx] === null ? "0" : row[group.q4Idx]).trim();
-
-          const parsedScoreNum = Number(rawScore);
-          if (rawPart && !isNaN(parsedScoreNum) && parsedScoreNum > 0) {
-            const cleanPart = rawPart.replace(/,/g, " ");
-            const cleanStatus = rawStatus.replace(/,/g, " ");
-            const cleanPlayer = playerName.replace(/,/g, " ");
-            
-            csvLines.push(`${dateStr},${cleanPlayer},${cleanPart},${q1Val},${q2Val},${q3Val},${q4Val},${rawScore},${cleanStatus}`);
-          }
-        });
-      }
-
-      if (csvLines.length === 1) {
-        return XLSX.utils.sheet_to_csv(worksheet);
-      }
-
-      return csvLines.join("\n");
-    } catch (err) {
-      return typeof fileContent === "string" ? (fileContent as string) : "";
-    }
-  };
-
   // Coach Dashboard (accessible by coach and viewer roles)
   if (user?.role === "coach" || user?.role === "viewer") {
     if (teamLoading) {
@@ -3470,143 +3202,6 @@ export default function HomeScreen() {
         </ScreenContainer>
       );
     }
-
-    const handleOstrcImportDirect = async () => {
-      try {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: [
-            "text/csv", 
-            "text/comma-separated-values", 
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ],
-          copyToCacheDirectory: true,
-          multiple: false,
-        });
-
-        if (result.canceled || !result.assets || result.assets.length === 0) {
-          return;
-        }
-
-        setIsOstrcImporting(true);
-        const asset = result.assets[0];
-        const response = await fetch(asset.uri);
-        const nameLower = asset.name.toLowerCase();
-        let text = "";
-
-        if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls")) {
-          const arrayBuffer = await response.arrayBuffer();
-          text = normalizeOstrcData(arrayBuffer, asset.name);
-        } else {
-          const rawText = await response.text();
-          text = normalizeOstrcData(rawText, asset.name);
-        }
-
-        if (!text) {
-          throw new Error("ファイルの読み込みまたはパースに失敗しました。");
-        }
-
-        const lines = text.split("\n");
-        const rowsMap = new Map<string, any>();
-
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          const vals = line.split(",").map(v => v.trim());
-          if (vals.length < 9) continue;
-
-          const date = vals[0];
-          const playerName = vals[1];
-          const partLabel = vals[2];
-          const q1Val = isNaN(Number(vals[3])) ? 0 : Number(vals[3]);
-          const q2Val = isNaN(Number(vals[4])) ? 0 : Number(vals[4]);
-          const q3Val = isNaN(Number(vals[5])) ? 0 : Number(vals[5]);
-          const q4Val = isNaN(Number(vals[6])) ? 0 : Number(vals[6]);
-          const scoreVal = isNaN(Number(vals[7])) ? 0 : Number(vals[7]);
-          const statusVal = vals[8];
-
-          const mapKey = `${playerName}_${date}`;
-
-          const BODY_PARTS_MAPPING = [
-            { key: "left_shoulder", label: "左肩" },
-            { key: "right_shoulder", label: "右肩" },
-            { key: "left_elbow", label: "左肘" },
-            { key: "right_elbow", label: "右肘" },
-            { key: "left_wrist", label: "左手首" },
-            { key: "right_wrist", label: "右手首" },
-            { key: "left_hip", label: "左股関節" },
-            { key: "right_hip", label: "右股関節" },
-            { key: "left_knee", label: "左膝" },
-            { key: "right_knee", label: "右膝" },
-            { key: "left_ankle", label: "左足首" },
-            { key: "right_ankle", label: "右足首" },
-            { key: "lower_back", label: "腰" },
-            { key: "neck", label: "首" },
-            { key: "back", label: "背中" },
-            { key: "chest", label: "胸" },
-            { key: "abdomen", label: "腹部" }
-          ];
-
-          const match = BODY_PARTS_MAPPING.find(bpm => 
-            partLabel.includes(bpm.label) || bpm.label.includes(partLabel)
-          );
-
-          let severity: "out" | "normal" | "caution" | "limited" = "normal";
-          if (statusVal.includes("離脱") || statusVal.includes("out")) {
-            severity = "out";
-          } else if (statusVal.includes("制限") || statusVal.includes("limited")) {
-            severity = "limited";
-          } else if (statusVal.includes("注意") || statusVal.includes("caution")) {
-            severity = "caution";
-          }
-
-          const detail = {
-            partKey: match ? match.key : "other",
-            partLabel,
-            severity,
-            score: scoreVal,
-            note: statusVal || undefined,
-            q1: q1Val,
-            q2: q2Val,
-            q3: q3Val,
-            q4: q4Val,
-          };
-
-          if (!rowsMap.has(mapKey)) {
-            rowsMap.set(mapKey, {
-              date,
-              playerName,
-              severityScore: scoreVal,
-              injuryDetails: [detail]
-            });
-          } else {
-            const existing = rowsMap.get(mapKey);
-            existing.injuryDetails.push(detail);
-            if (scoreVal > existing.severityScore) {
-              existing.severityScore = scoreVal;
-            }
-          }
-        }
-
-        const parsedRows = Array.from(rowsMap.values());
-        if (parsedRows.length === 0) {
-          throw new Error("OSTRCデータ行が空です。");
-        }
-
-        await importOstrcDataMutation.mutateAsync({
-          rows: parsedRows
-        });
-
-        alert("OSTRCデータを正常にインポートしました！");
-        refetchOstrcAlerts();
-      } catch (err: any) {
-        alert(err.message || "インポート中にエラーが発生しました。");
-        console.error(err);
-      } finally {
-        setIsOstrcImporting(false);
-      }
-    };
 
     const allAthletes = teamAnalytics?.athletes || [];
     const redAthletes = allAthletes.filter(a => a.overallStatus === "red");
@@ -4262,165 +3857,6 @@ export default function HomeScreen() {
                     pendingAthletes.map(ath => renderSummaryAthleteCard(ath))
                   ) : (
                     <Text style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", paddingLeft: 8, marginBottom: 8 }}>{t("該当選手はいません。", "No athletes in this status.")}</Text>
-                  )}
-                </View>
-
-                {/* 🚨 OSTRC 障害調査アラート (Treatment Log App と同様のチーム一覧カード) - 最下部に配置 */}
-                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 3, gap: 16, marginTop: 12 }}>
-                  <View style={{ borderBottomWidth: 1, borderColor: "#F1F5F9", paddingBottom: 12, gap: 4 }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <IconSymbol size={20} name="exclamationmark.triangle.fill" color="#EF4444" />
-                        <Text style={{ fontSize: 16, fontWeight: "bold", color: "#0F172A" }}>OSTRC 傷害調査アラート</Text>
-                      </View>
-                      {user?.role !== "viewer" && (
-                        <TouchableOpacity
-                          disabled={isOstrcImporting}
-                          onPress={handleOstrcImportDirect}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                            backgroundColor: "#FFFFFF",
-                            borderWidth: 1,
-                            borderColor: "#E2E8F0",
-                            paddingVertical: 6,
-                            paddingHorizontal: 12,
-                            borderRadius: 10,
-                            shadowColor: "#0F172A",
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.05,
-                            shadowRadius: 2,
-                            elevation: 1
-                          }}
-                        >
-                          {isOstrcImporting ? (
-                            <ActivityIndicator size="small" color="#0F172A" />
-                          ) : (
-                            <IconSymbol size={14} name="square.and.arrow.down" color="#0F172A" />
-                          )}
-                          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0F172A" }}>
-                            {isOstrcImporting ? "インポート中..." : "データをインポート"}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    <Text style={{ fontSize: 11, color: "#64748B" }}>選手から提出された週次の傷害調査データに基づき、要注意・要制限・離脱状態の選手を一覧表示します。</Text>
-                    <Text style={{ fontSize: 9, color: "#94A3B8", fontWeight: "bold", marginTop: 2 }}>
-                      ※ 内訳の見方: (Q1:参加 | Q2:練習の変更 | Q3:パフォーマンス | Q4:症状の程度)
-                    </Text>
-                  </View>
-
-                  {ostrcAlerts && ostrcAlerts.length > 0 ? (
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-                      {ostrcAlerts.map((alert: any) => {
-                        const details = (typeof alert.injuryDetails === "string" ? JSON.parse(alert.injuryDetails) : alert.injuryDetails) || [];
-                        const sortedDetails = [...details].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
-                        const maxDetailScore = sortedDetails.reduce((max: number, d: any) => Math.max(max, d.score || 0), 0);
-
-                        const hasSubstantial = 
-                          (alert.q1Participation || 0) >= 17 || 
-                          (alert.q2Volume || 0) >= 13 || 
-                          (alert.q3Performance || 0) >= 13;
-                        const isRed = maxDetailScore >= 40 || hasSubstantial;
-                        const isYellow = maxDetailScore >= 11 && !isRed;
-
-                        const cardBgColor = isRed ? "#FEF2F2" : isYellow ? "#FFFBEB" : "#F0FDF4";
-                        const cardBorderColor = isRed ? "#FCA5A5" : isYellow ? "#FDE68A" : "#BBF7D0";
-                        const scoreTextColor = isRed ? "#DC2626" : isYellow ? "#D97706" : "#16A34A";
-                        const scoreBgColor = isRed ? "#FEE2E2" : isYellow ? "#FEF3C7" : "#DCFCE7";
-
-                        return (
-                          <View
-                            key={alert.id}
-                            style={{
-                              width: windowWidth > 768 ? "31%" : "100%",
-                              minWidth: 260,
-                              backgroundColor: cardBgColor,
-                              borderColor: cardBorderColor,
-                              borderWidth: 1,
-                              borderRadius: 16,
-                              padding: 16,
-                              gap: 10,
-                            }}
-                          >
-                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1E293B" }}>
-                                  #{alert.athleteNumber} {alert.athleteName}
-                                </Text>
-                                <View style={{ backgroundColor: scoreBgColor, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: cardBorderColor }}>
-                                  <Text style={{ fontSize: 10, fontWeight: "bold", color: scoreTextColor }}>
-                                    最高 {maxDetailScore}点
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text style={{ fontSize: 10, color: "#64748B", fontFamily: "monospace" }}>
-                                {alert.date}
-                              </Text>
-                            </View>
-
-                            {sortedDetails.length > 0 ? (
-                              <View style={{ gap: 6 }}>
-                                {sortedDetails.map((d: any, idx: number) => {
-                                  const isDetailRed = d.score >= 40;
-                                  const isDetailYellow = d.score >= 11 && !isDetailRed;
-                                  const badgeBgColor = isDetailRed ? "#EF4444" : isDetailYellow ? "#F59E0B" : "#3B82F6";
-
-                                  return (
-                                    <View
-                                      key={idx}
-                                      style={{
-                                        flexDirection: "row",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        backgroundColor: "#FFFFFF",
-                                        padding: 8,
-                                        borderRadius: 10,
-                                        borderWidth: 1,
-                                        borderColor: "#E2E8F0",
-                                        gap: 4
-                                      }}
-                                    >
-                                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
-                                        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#1E293B" }}>
-                                          {d.partLabel}
-                                        </Text>
-                                        <Text style={{ fontSize: 9, color: "#64748B", fontFamily: "monospace" }}>
-                                          ({d.q1 || 0}|{d.q2 || 0}|{d.q3 || 0}|{d.q4 || 0})
-                                        </Text>
-                                        {d.note && (
-                                          <Text style={{ fontSize: 9, color: "#64748B", fontStyle: "italic" }} numberOfLines={1}>
-                                            ({d.note})
-                                          </Text>
-                                        )}
-                                      </View>
-                                      <View style={{ backgroundColor: badgeBgColor, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
-                                        <Text style={{ fontSize: 9.5, fontWeight: "bold", color: "#FFFFFF" }}>
-                                          {d.score}点
-                                        </Text>
-                                      </View>
-                                    </View>
-                                  );
-                                })}
-                              </View>
-                            ) : (
-                              <View style={{ paddingVertical: 8, alignItems: "center", backgroundColor: "#DCFCE7", borderRadius: 10, borderWidth: 1, borderColor: "#BBF7D0" }}>
-                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#15803D" }}>
-                                  痛みや違和感のある部位はありません（良好）
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={{ paddingVertical: 32, alignItems: "center", justifyContent: "center", borderStyle: "dashed", borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 16 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "bold", color: "#64748B" }}>
-                        現在アクティブな OSTRC アラートはありません
-                      </Text>
-                    </View>
                   )}
                 </View>
               </View>
