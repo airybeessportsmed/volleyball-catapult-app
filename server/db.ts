@@ -2147,8 +2147,7 @@ export async function importPerformanceCsv(
 
         const scaleVal = (val?: number) => {
           if (val === undefined) return undefined;
-          const val10 = val > 10 ? val / 10 : val;
-          return Math.max(1, Math.min(7, Math.round((val10 / 10) * 7)));
+          return val > 10 ? Math.round(val / 10) : Math.round(val);
         };
 
         const scaleSleep = (val?: number) => {

@@ -193,10 +193,10 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     const records = await getPerformanceDataByAthleteId(1);
     const latest = records.find(p => formatDateKey(p.date) === "2026-06-01");
     expect(latest).toBeDefined();
-    expect(Number(latest!.wellnessFatigue)).toBe(6);   // normalized to 1-7 scale (80 -> 8 -> 6)
+    expect(Number(latest!.wellnessFatigue)).toBe(8);   // normalized to 1-10 scale (80 -> 8)
     expect(Number(latest!.wellnessSleep)).toBe(70);    // sleep mapped and scaled to 100 max (7 -> 70)
-    expect(Number(latest!.wellnessStress)).toBe(6);   // motivation normalized to 1-7 scale (90 -> 9 -> 6)
-    expect(Number(latest!.wellnessSoreness)).toBe(5); // appetite mapped to soreness, normalized to 1-7 scale (70 -> 7 -> 5)
+    expect(Number(latest!.wellnessStress)).toBe(9);   // motivation normalized to 1-10 scale (90 -> 9)
+    expect(Number(latest!.wellnessSoreness)).toBe(7); // appetite mapped to soreness, normalized to 1-10 scale (70 -> 7)
   });
 
   it("should parse sRPE format, sum Session RPE, and find max RPE", async () => {
