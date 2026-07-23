@@ -2147,7 +2147,13 @@ export async function importPerformanceCsv(
 
         const scaleVal = (val?: number) => {
           if (val === undefined) return undefined;
-          return val > 10 ? Math.round(val / 10) : Math.round(val);
+          const val10 = val > 10 ? val / 10 : val;
+          return Math.max(1, Math.min(7, Math.round((val10 / 10) * 7)));
+        };
+
+        const scaleSleep = (val?: number) => {
+          if (val === undefined) return undefined;
+          return val <= 10 ? Math.round(val * 10) : Math.round(val);
         };
 
         await mergePerformanceData(db, teamId, {
@@ -2155,9 +2161,9 @@ export async function importPerformanceCsv(
           teamId,
           date: wg.dateObj,
           wellnessFatigue: scaleVal(wg.fatigue),
-          wellnessSleep: scaleVal(wg.appetite), // Appetite mapped to sleep dummy
+          wellnessSleep: scaleSleep(wg.sleep), // Map sleep to sleep column (scaled to 100 max)
           wellnessStress: scaleVal(wg.motivation), // Motivation mapped to stress
-          wellnessSoreness: undefined,
+          wellnessSoreness: scaleVal(wg.appetite), // Appetite mapped to soreness (食欲)
           sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" })
         });
@@ -2529,7 +2535,7 @@ export async function importPerformanceCsv(
             soxaiObj.soxaiDeepSleep = parseDurationToMinutes(vals[deepSleepColIdx]);
           }
 
-          const parsedSleep = isNaN(sleepScoreVal) ? undefined : Math.round(sleepScoreVal / 10);
+          const parsedSleep = isNaN(sleepScoreVal) ? undefined : Math.round(sleepScoreVal);
           const parsedRhr = isNaN(rhrVal) ? undefined : Math.round(rhrVal);
           const parsedHrv = isNaN(hrvVal) ? undefined : hrvVal;
           const wellnessFatigue = isNaN(qolVal) ? undefined : Math.max(1, Math.min(7, Math.round((qolVal / 100) * 7)));

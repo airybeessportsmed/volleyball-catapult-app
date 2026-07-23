@@ -184,6 +184,7 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     const csv = `日付\t選手名\tチーム内ID\t項目名\t値\t内訳\t備考\tポジション
 2026/6/1\t宮下 さくら\t16\t疲労感\t80\t\t\tOH
 2026/6/1\t宮下 さくら\t16\t気分・モチベーション\t90\t\t\tOH
+2026/6/1\t宮下 さくら\t16\t睡眠の質\t7\t\t\tOH
 2026/6/1\t宮下 さくら\t16\t食欲\t70\t\t\tOH`;
 
     const result = await importPerformanceCsv(1, 1, csv, "onetap_wellness.csv");
@@ -192,9 +193,10 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     const records = await getPerformanceDataByAthleteId(1);
     const latest = records.find(p => formatDateKey(p.date) === "2026-06-01");
     expect(latest).toBeDefined();
-    expect(Number(latest!.wellnessFatigue)).toBe(8); // scaled to 1-10
-    expect(Number(latest!.wellnessSleep)).toBe(7);    // appetite mapped to sleep dummy
-    expect(Number(latest!.wellnessStress)).toBe(9);   // motivation mapped to stress
+    expect(Number(latest!.wellnessFatigue)).toBe(6);   // normalized to 1-7 scale (80 -> 8 -> 6)
+    expect(Number(latest!.wellnessSleep)).toBe(70);    // sleep mapped and scaled to 100 max (7 -> 70)
+    expect(Number(latest!.wellnessStress)).toBe(6);   // motivation normalized to 1-7 scale (90 -> 9 -> 6)
+    expect(Number(latest!.wellnessSoreness)).toBe(5); // appetite mapped to soreness, normalized to 1-7 scale (70 -> 7 -> 5)
   });
 
   it("should parse sRPE format, sum Session RPE, and find max RPE", async () => {
@@ -223,7 +225,7 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     const records = await getPerformanceDataByAthleteId(1);
     const latest = records.find(p => formatDateKey(p.date) === "2026-06-03");
     expect(latest).toBeDefined();
-    expect(Number(latest!.wellnessSleep)).toBe(9); // scaled sleep score
+    expect(Number(latest!.wellnessSleep)).toBe(85); // raw sleep score
     expect(Number(latest!.hrv)).toBe(81.5);
     expect(latest!.avgHeartRate).toBe(52);
   });
