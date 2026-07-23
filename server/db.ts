@@ -2145,24 +2145,14 @@ export async function importPerformanceCsv(
           continue;
         }
 
-        const scaleVal = (val?: number) => {
-          if (val === undefined) return undefined;
-          return val > 10 ? Math.round(val / 10) : Math.round(val);
-        };
-
-        const scaleSleep = (val?: number) => {
-          if (val === undefined) return undefined;
-          return val <= 10 ? Math.round(val * 10) : Math.round(val);
-        };
-
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
           teamId,
           date: wg.dateObj,
-          wellnessFatigue: scaleVal(wg.fatigue),
-          wellnessSleep: scaleSleep(wg.sleep), // Map sleep to sleep column (scaled to 100 max)
-          wellnessStress: scaleVal(wg.motivation), // Motivation mapped to stress
-          wellnessSoreness: scaleVal(wg.appetite), // Appetite mapped to soreness (食欲)
+          wellnessFatigue: wg.fatigue,
+          wellnessSleep: wg.sleep,
+          wellnessStress: wg.motivation,
+          wellnessSoreness: wg.appetite,
           sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" })
         });
@@ -2398,9 +2388,9 @@ export async function importPerformanceCsv(
                   } else if (m.metricKey === "avgHeartRate") {
                     rec.avgHeartRate = Math.round(val);
                   } else if (m.metricKey === "wellnessFatigue") {
-                    rec.wellnessFatigue = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                    rec.wellnessFatigue = Math.round(val);
                   } else if (m.metricKey === "wellnessStress") {
-                    rec.wellnessStress = Math.max(1, Math.min(7, Math.round((val / 100) * 7)));
+                    rec.wellnessStress = Math.round(val);
                   } else if (m.metricKey === "accelCount") {
                     rec.accelCount = Math.round(val);
                   } else {
@@ -2537,7 +2527,7 @@ export async function importPerformanceCsv(
           const parsedSleep = isNaN(sleepScoreVal) ? undefined : Math.round(sleepScoreVal);
           const parsedRhr = isNaN(rhrVal) ? undefined : Math.round(rhrVal);
           const parsedHrv = isNaN(hrvVal) ? undefined : hrvVal;
-          const wellnessFatigue = isNaN(qolVal) ? undefined : Math.max(1, Math.min(7, Math.round((qolVal / 100) * 7)));
+          const wellnessFatigue = isNaN(qolVal) ? undefined : Math.round(qolVal);
 
           await mergePerformanceData(db, teamId, {
             athleteId: matchedAthlete.id,

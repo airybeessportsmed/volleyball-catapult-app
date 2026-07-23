@@ -193,10 +193,10 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     const records = await getPerformanceDataByAthleteId(1);
     const latest = records.find(p => formatDateKey(p.date) === "2026-06-01");
     expect(latest).toBeDefined();
-    expect(Number(latest!.wellnessFatigue)).toBe(8);   // normalized to 1-10 scale (80 -> 8)
-    expect(Number(latest!.wellnessSleep)).toBe(70);    // sleep mapped and scaled to 100 max (7 -> 70)
-    expect(Number(latest!.wellnessStress)).toBe(9);   // motivation normalized to 1-10 scale (90 -> 9)
-    expect(Number(latest!.wellnessSoreness)).toBe(7); // appetite mapped to soreness, normalized to 1-10 scale (70 -> 7)
+    expect(Number(latest!.wellnessFatigue)).toBe(80);   // raw CSV value
+    expect(Number(latest!.wellnessSleep)).toBe(7);      // raw CSV value
+    expect(Number(latest!.wellnessStress)).toBe(90);    // raw CSV value
+    expect(Number(latest!.wellnessSoreness)).toBe(70);  // raw CSV value
   });
 
   it("should parse sRPE format, sum Session RPE, and find max RPE", async () => {
@@ -264,8 +264,8 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(Number(latestSakura!.wellnessSleep)).toBe(90);
     expect(Number(latestSakura!.hrv)).toBe(75.5);
     expect(latestSakura!.avgHeartRate).toBe(55);
-    expect(Number(latestSakura!.wellnessFatigue)).toBe(6); // scaled 85/100 * 7 = 5.95 -> 6
-    expect(Number(latestSakura!.wellnessStress)).toBe(6); // scaled 80/100 * 7 = 5.6 -> 6
+    expect(Number(latestSakura!.wellnessFatigue)).toBe(85); // raw value
+    expect(Number(latestSakura!.wellnessStress)).toBe(80); // raw value
     expect(latestSakura!.accelCount).toBe(8500);
 
     const recordsHinata = await getPerformanceDataByAthleteId(2);
