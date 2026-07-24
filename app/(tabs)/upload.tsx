@@ -213,7 +213,15 @@ export default function CoachUploadScreen() {
       const newFiles = [];
       for (const asset of result.assets) {
         const response = await fetch(asset.uri);
-        const text = await response.text();
+        const arrayBuffer = await response.arrayBuffer();
+        let text = "";
+        try {
+          const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+          text = utf8Decoder.decode(arrayBuffer);
+        } catch (err) {
+          const sjisDecoder = new TextDecoder("shift-jis");
+          text = sjisDecoder.decode(arrayBuffer);
+        }
         newFiles.push({
           name: asset.name,
           size: asset.size,
