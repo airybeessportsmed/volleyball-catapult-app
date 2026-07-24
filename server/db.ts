@@ -2250,7 +2250,20 @@ export async function importPerformanceCsv(
       }
 
     } else if (isSoxai) {
-      const isWideSoxai = headers.some(h => h.includes("(#"));
+      const isWideSoxai = headers.some(hdr => {
+        const mList = hdr.match(/\(([^)]+)\)/g);
+        if (!mList) return false;
+        return mList.some(mStr => {
+          const inner = mStr.replace(/[()]/g, "").trim();
+          if (inner.startsWith("#") || /^\d+$/.test(inner)) return true;
+          const lowerInner = inner.toLowerCase();
+          return teamAthletes.some(a => 
+            (a.soxaiName && lowerInner.includes(a.soxaiName.toLowerCase())) ||
+            (a.onetapName && lowerInner.includes(a.onetapName.toLowerCase())) ||
+            (a.user?.name && lowerInner.includes(a.user.name.toLowerCase()))
+          );
+        });
+      });
 
       if (isWideSoxai) {
         // --- 新形式：全選手横並びのワイドフォーマット ---
@@ -2263,10 +2276,10 @@ export async function importPerformanceCsv(
         const mappings: WideSoxaiMapping[] = [];
 
         headers.forEach((h, colIdx) => {
-          // Extract jersey number and name inside parenthesis, e.g. "#16 ユウキ" -> "16", "ユウキ"
-          const match = h.match(/#(\d+)\s*([^)]*)/);
+          // Extract jersey number and name inside the last parenthesis, supporting both (#16 ユウキ) and (16 ユウキ) or (ユウキ)
+          const match = h.match(/\((?:#?(\d+))?\s*([^)]*)\)(?=[^()]*$)/);
           if (match) {
-            const jerseyNumber = parseInt(match[1], 10);
+            const jerseyNumber = match[1] ? parseInt(match[1], 10) : NaN;
             const nameInHeader = match[2] ? match[2].trim() : "";
 
             const matchedAthlete = teamAthletes.find(a => {
@@ -2292,14 +2305,16 @@ export async function importPerformanceCsv(
                   other.user?.name?.toLowerCase() === lowerName
                 );
                 
-                if (!hasAnyNameMatch) {
+                if (!hasAnyNameMatch && !isNaN(jerseyNumber)) {
                   if (a.jerseyNumber === jerseyNumber) return true;
                   if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
                 }
               } else {
                 // If no name is specified in header, match by jersey number
-                if (a.jerseyNumber === jerseyNumber) return true;
-                if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
+                if (!isNaN(jerseyNumber)) {
+                  if (a.jerseyNumber === jerseyNumber) return true;
+                  if (aliases.includes(`#${jerseyNumber}`) || aliases.includes(String(jerseyNumber))) return true;
+                }
               }
               return false;
             });
