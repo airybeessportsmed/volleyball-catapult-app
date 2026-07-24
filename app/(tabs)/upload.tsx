@@ -7,6 +7,20 @@ import { trpc } from "@/lib/trpc";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
+// Safe helper to obtain TextDecoder constructor across Web / Bundler / Node.js environments
+const getTextDecoder = (encoding: string, options?: any) => {
+  if (typeof TextDecoder !== "undefined") {
+    return new TextDecoder(encoding, options);
+  }
+  // Fallback to Node.js util.TextDecoder during SSR/Bundling process if not globally available
+  try {
+    const { TextDecoder: NodeTextDecoder } = require("util");
+    return new NodeTextDecoder(encoding, options);
+  } catch (e) {
+    throw new Error("TextDecoder is not supported in this environment");
+  }
+};
+
 const SAMPLE_CSV = `Category,Tag,start_time,DF Event,Intensity,Duration,Height (m),Basketball Load
 宮下 さくら,Basketball Jump,1783339201000,Basketball Jumping,1.04 Left,1.16,0.35,1.04
 宮下 さくら,IMA Jump,1783339202000,IMA Jump,,0.35,0.58,
@@ -216,10 +230,10 @@ export default function CoachUploadScreen() {
         const arrayBuffer = await response.arrayBuffer();
         let text = "";
         try {
-          const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+          const utf8Decoder = getTextDecoder("utf-8", { fatal: true });
           text = utf8Decoder.decode(arrayBuffer);
         } catch (err) {
-          const sjisDecoder = new TextDecoder("shift-jis");
+          const sjisDecoder = getTextDecoder("shift-jis");
           text = sjisDecoder.decode(arrayBuffer);
         }
         newFiles.push({
@@ -265,11 +279,11 @@ export default function CoachUploadScreen() {
             const arrayBuffer = evt.target?.result as ArrayBuffer;
             try {
               // Try decoding as UTF-8 first (fatal: true will throw on invalid UTF-8 bytes)
-              const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+              const utf8Decoder = getTextDecoder("utf-8", { fatal: true });
               resolve(utf8Decoder.decode(arrayBuffer));
             } catch (err) {
               // Fallback to Shift-JIS for Excel-generated Japanese CSVs
-              const sjisDecoder = new TextDecoder("shift-jis");
+              const sjisDecoder = getTextDecoder("shift-jis");
               resolve(sjisDecoder.decode(arrayBuffer));
             }
           };
