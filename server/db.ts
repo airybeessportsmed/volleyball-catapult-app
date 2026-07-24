@@ -2355,10 +2355,6 @@ export async function importPerformanceCsv(
                 metricKey = "hrv";
               } else if (h.includes("心拍_平均") || h.includes("睡眠時心拍_平均")) {
                 metricKey = "avgHeartRate";
-              } else if (h.includes("体調スコア")) {
-                metricKey = "wellnessFatigue";
-              } else if (h.includes("QoLスコア")) {
-                metricKey = "wellnessStress";
               } else if (h.includes("歩数")) {
                 metricKey = "accelCount";
               } else if (h.includes("睡眠時間")) {
@@ -2586,7 +2582,6 @@ export async function importPerformanceCsv(
           const parsedSleep = isNaN(sleepScoreVal) ? undefined : Math.round(sleepScoreVal);
           const parsedRhr = isNaN(rhrVal) ? undefined : Math.round(rhrVal);
           const parsedHrv = isNaN(hrvVal) ? undefined : hrvVal;
-          const wellnessFatigue = isNaN(qolVal) ? undefined : Math.round(qolVal);
 
           await mergePerformanceData(db, teamId, {
             athleteId: matchedAthlete.id,
@@ -2595,7 +2590,6 @@ export async function importPerformanceCsv(
             wellnessSleep: parsedSleep,
             hrv: parsedHrv !== undefined ? parsedHrv.toFixed(2) : undefined,
             avgHeartRate: parsedRhr,
-            wellnessFatigue,
             sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
             rawCsvData: JSON.stringify({ note: "SOXAI biometric", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" }),
             soxaiData: Object.keys(soxaiObj).length > 0 ? JSON.stringify(soxaiObj) : null

@@ -264,8 +264,6 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(Number(latestSakura!.wellnessSleep)).toBe(90);
     expect(Number(latestSakura!.hrv)).toBe(75.5);
     expect(latestSakura!.avgHeartRate).toBe(55);
-    expect(Number(latestSakura!.wellnessFatigue)).toBe(85); // raw value
-    expect(Number(latestSakura!.wellnessStress)).toBe(80); // raw value
     expect(latestSakura!.accelCount).toBe(8500);
 
     const recordsHinata = await getPerformanceDataByAthleteId(2);
