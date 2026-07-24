@@ -1470,13 +1470,20 @@ const parseDateFlexible = (dateStr: string, fallbackYear?: number): Date | null 
   
   let d: Date | null = null;
   
-  // 1. Try standard JS Date parsing
-  const parsedD = new Date(cleaned);
-  if (!isNaN(parsedD.getTime())) d = parsedD;
+  // 1. Try format without year first to prevent JS parsing "07/23" to Year 2001.
+  // Check that there is no 4-digit or 2-digit year prepended.
+  const hasNoYear = !cleaned.match(/^\d{2,4}[-/年]/) && cleaned.match(/^(\d{1,2})[-/月\s](\d{1,2})[日]?/);
+  if (hasNoYear) {
+    const year = fallbackYear || new Date().getFullYear();
+    const month = parseInt(hasNoYear[1], 10) - 1;
+    const day = parseInt(hasNoYear[2], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) d = parsed;
+  }
 
+  // 2. Try format with YYYY/MM/DD, YY/MM/DD, etc.
   if (!d) {
-    // 2. Try extraction using regex for format like YYYY/MM/DD, YY/MM/DD or YYYY年MM月DD日
-    const match = cleaned.match(/(\d{4}|\d{2})[-/年\s](\d{1,2})[-/月\s](\d{1,2})[日]?/);
+    const match = cleaned.match(/^(\d{4}|\d{2})[-/年\s](\d{1,2})[-/月\s](\d{1,2})[日]?/);
     if (match) {
       let year = parseInt(match[1], 10);
       if (year < 100) year += 2000; // Correct 2-digit years
@@ -1487,15 +1494,16 @@ const parseDateFlexible = (dateStr: string, fallbackYear?: number): Date | null 
     }
   }
 
+  // 3. Fallback to standard JS Date parsing
   if (!d) {
-    // 3. Try format without year like MM/DD, M/D or MM月DD日, M月D日
-    const noYearMatch = cleaned.match(/(\d{1,2})[-/月\s](\d{1,2})[日]?/);
-    if (noYearMatch) {
-      const year = fallbackYear || new Date().getFullYear();
-      const month = parseInt(noYearMatch[1], 10) - 1;
-      const day = parseInt(noYearMatch[2], 10);
-      const parsed = new Date(year, month, day);
-      if (!isNaN(parsed.getTime())) d = parsed;
+    const parsedD = new Date(cleaned);
+    if (!isNaN(parsedD.getTime())) {
+      // If parsed as Year 2001 due to MM/DD fallback mismatch, force overwrite with fallback/current year
+      if (parsedD.getFullYear() === 2001) {
+        const year = fallbackYear || new Date().getFullYear();
+        parsedD.setFullYear(year);
+      }
+      d = parsedD;
     }
   }
 
