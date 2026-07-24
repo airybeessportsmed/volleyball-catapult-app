@@ -1468,29 +1468,41 @@ const parseDateFlexible = (dateStr: string, fallbackYear?: number): Date | null 
   if (!dateStr) return null;
   const cleaned = dateStr.trim().replace(/^["']|["']$/g, "");
   
+  let d: Date | null = null;
+  
   // 1. Try standard JS Date parsing
-  const d = new Date(cleaned);
-  if (!isNaN(d.getTime())) return d;
+  const parsedD = new Date(cleaned);
+  if (!isNaN(parsedD.getTime())) d = parsedD;
 
-  // 2. Try extraction using regex for format like YYYY/MM/DD, YY/MM/DD or YYYY年MM月DD日
-  const match = cleaned.match(/(\d{4}|\d{2})[-/年\s](\d{1,2})[-/月\s](\d{1,2})[日]?/);
-  if (match) {
-    let year = parseInt(match[1], 10);
-    if (year < 100) year += 2000; // Correct 2-digit years
-    const month = parseInt(match[2], 10) - 1;
-    const day = parseInt(match[3], 10);
-    const parsed = new Date(year, month, day);
-    if (!isNaN(parsed.getTime())) return parsed;
+  if (!d) {
+    // 2. Try extraction using regex for format like YYYY/MM/DD, YY/MM/DD or YYYY年MM月DD日
+    const match = cleaned.match(/(\d{4}|\d{2})[-/年\s](\d{1,2})[-/月\s](\d{1,2})[日]?/);
+    if (match) {
+      let year = parseInt(match[1], 10);
+      if (year < 100) year += 2000; // Correct 2-digit years
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) d = parsed;
+    }
   }
 
-  // 3. Try format without year like MM/DD, M/D or MM月DD日, M月D日
-  const noYearMatch = cleaned.match(/(\d{1,2})[-/月\s](\d{1,2})[日]?/);
-  if (noYearMatch) {
-    const year = fallbackYear || new Date().getFullYear();
-    const month = parseInt(noYearMatch[1], 10) - 1;
-    const day = parseInt(noYearMatch[2], 10);
-    const parsed = new Date(year, month, day);
-    if (!isNaN(parsed.getTime())) return parsed;
+  if (!d) {
+    // 3. Try format without year like MM/DD, M/D or MM月DD日, M月D日
+    const noYearMatch = cleaned.match(/(\d{1,2})[-/月\s](\d{1,2})[日]?/);
+    if (noYearMatch) {
+      const year = fallbackYear || new Date().getFullYear();
+      const month = parseInt(noYearMatch[1], 10) - 1;
+      const day = parseInt(noYearMatch[2], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) d = parsed;
+    }
+  }
+
+  if (d && !isNaN(d.getTime())) {
+    // FORCE zeroing out time to prevent timezone shift bugs (JST <-> UTC mismatch on Render)
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 
   return null;
@@ -2283,15 +2295,16 @@ export async function importPerformanceCsv(
             const nameInHeader = match[2] ? match[2].trim() : "";
 
             const matchedAthlete = teamAthletes.find(a => {
-              const lowerName = nameInHeader ? nameInHeader.toLowerCase() : "";
-              const aliases = a.csvNames ? a.csvNames.split(",").map(n => n.trim().toLowerCase()) : [];
+              const cleanString = (s: string | null | undefined) => s ? s.replace(/\s+/g, "").toLowerCase() : "";
+              const lowerName = nameInHeader ? nameInHeader.replace(/\s+/g, "").toLowerCase() : "";
+              const aliases = a.csvNames ? a.csvNames.split(",").map(n => n.trim().replace(/\s+/g, "").toLowerCase()) : [];
 
               if (lowerName) {
                 // Prioritize name matches first
-                if (a.soxaiName?.toLowerCase() === lowerName) return true;
-                if (a.onetapName?.toLowerCase() === lowerName || 
-                    a.catapultName?.toLowerCase() === lowerName || 
-                    a.user?.name?.toLowerCase() === lowerName || 
+                if (cleanString(a.soxaiName) === lowerName) return true;
+                if (cleanString(a.onetapName) === lowerName || 
+                    cleanString(a.catapultName) === lowerName || 
+                    cleanString(a.user?.name) === lowerName || 
                     aliases.includes(lowerName)) {
                   return true;
                 }
@@ -2300,9 +2313,9 @@ export async function importPerformanceCsv(
                 // fallback to jersey number matching ONLY if no other athlete in the team matches this name.
                 // This prevents mistakenly matching another athlete with the same jersey number but a different name.
                 const hasAnyNameMatch = teamAthletes.some(other => 
-                  other.soxaiName?.toLowerCase() === lowerName ||
-                  other.onetapName?.toLowerCase() === lowerName ||
-                  other.user?.name?.toLowerCase() === lowerName
+                  cleanString(other.soxaiName) === lowerName ||
+                  cleanString(other.onetapName) === lowerName ||
+                  cleanString(other.user?.name) === lowerName
                 );
                 
                 if (!hasAnyNameMatch && !isNaN(jerseyNumber)) {
