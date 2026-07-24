@@ -2102,6 +2102,7 @@ export async function importPerformanceCsv(
       const nameCol = findHeaderIndex(["選手名", "選手", "名前", "氏名", "氏名・ニックネーム", "name", "内訳"]);
       const itemCol = findHeaderIndex(["項目名", "項目", "item", "metric"]);
       const valCol = findHeaderIndex(["値", "スコア", "回答", "value"]);
+      const jerseyCol = findHeaderIndex(["チーム内id", "id", "番号", "背番号", "jersey", "no"]);
 
       if (dateCol === -1 || nameCol === -1 || itemCol === -1 || valCol === -1) {
         throw new Error("Wellness (Onetap) headers are missing.");
@@ -2109,6 +2110,7 @@ export async function importPerformanceCsv(
 
       interface WellnessGroup {
         athleteName: string;
+        jerseyNumber?: number;
         dateObj: Date;
         fatigue?: number;
         sleep?: number;
@@ -2129,6 +2131,8 @@ export async function importPerformanceCsv(
         const nameStr = vals[nameCol];
         const itemStr = vals[itemCol];
         const valNum = parseFloat(vals[valCol]);
+        const jerseyStr = jerseyCol !== -1 ? vals[jerseyCol] : "";
+        const jerseyNumber = jerseyStr ? parseInt(jerseyStr.replace(/\D/g, ""), 10) : undefined;
 
         if (!dateStr || !nameStr || isNaN(valNum)) continue;
 
@@ -2139,7 +2143,7 @@ export async function importPerformanceCsv(
         const groupKey = `${nameStr}_${dateKey}`;
 
         if (!wellnessGroups.has(groupKey)) {
-          wellnessGroups.set(groupKey, { athleteName: nameStr, dateObj });
+          wellnessGroups.set(groupKey, { athleteName: nameStr, jerseyNumber, dateObj });
         }
         const g = wellnessGroups.get(groupKey)!;
         const cleanedItem = itemStr.replace(/\s+/g, "").toLowerCase();
@@ -2159,7 +2163,11 @@ export async function importPerformanceCsv(
 
       const wellnessList = Array.from(wellnessGroups.values());
       for (const wg of wellnessList) {
-        const matchedAthlete = findAthleteByCsvName(teamAthletes, wg.athleteName, "onetap");
+        let matchedAthlete = findAthleteByCsvName(teamAthletes, wg.athleteName, "onetap");
+        if (!matchedAthlete && wg.jerseyNumber) {
+          // Fallback to jersey number if name has kanji differences (e.g. 川岸夕紗 vs 川岸友沙)
+          matchedAthlete = teamAthletes.find(a => a.jerseyNumber === wg.jerseyNumber);
+        }
         if (!matchedAthlete) {
           unregisteredSet.add(wg.athleteName);
           continue;

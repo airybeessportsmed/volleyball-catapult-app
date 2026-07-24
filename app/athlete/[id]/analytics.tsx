@@ -1531,10 +1531,18 @@ export default function AthleteAnalyticsScreen() {
       stress: "#3B82F6", // Blue
     };
 
-    // Y values: 1 to 5. So diff is 4.
+    // Determine the max Y value dynamically based on values in trend (default min to 5)
+    const allValues = wellnessTrend.flatMap(t => [
+      t.wellnessFatigue ? Number(t.wellnessFatigue) : 0,
+      t.wellnessSoreness ? Number(t.wellnessSoreness) : 0,
+      t.wellnessStress ? Number(t.wellnessStress) : 0
+    ]);
+    const maxValInTrend = Math.max(...allValues, 5);
+    const maxRange = maxValInTrend > 10 ? 100 : (maxValInTrend > 7 ? 10 : 7);
+
     const mapY = (val: number) => {
-      const clampedVal = Math.max(1, Math.min(5, val));
-      return paddingTop + graphHeight - ((clampedVal - 1) / 4) * graphHeight;
+      const clampedVal = Math.max(0, Math.min(maxRange, val));
+      return paddingTop + graphHeight - (clampedVal / maxRange) * graphHeight;
     };
 
     const getLinePath = (key: "wellnessFatigue" | "wellnessSoreness" | "wellnessStress") => {
@@ -1555,7 +1563,7 @@ export default function AthleteAnalyticsScreen() {
       <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-4">
         <View>
           <Text className="text-sm font-bold text-foreground">Wellness コンディション推移</Text>
-          <Text className="text-[10px] text-muted font-medium">主観コンディション (1:不良 〜 5:良好)</Text>
+          <Text className="text-[10px] text-muted font-medium">主観コンディション (0:不良 〜 {maxRange}:良好)</Text>
         </View>
 
         {/* Legend */}
@@ -1580,10 +1588,10 @@ export default function AthleteAnalyticsScreen() {
             {(() => {
               const wellnessBaseline = analytics.signalLight?.baselines?.wellness;
               if (!wellnessBaseline) return null;
-              const wMean = wellnessBaseline.mean / 4;
-              const wSd = wellnessBaseline.sd / 4;
-              const yMin = Math.max(1, wMean - wSd);
-              const yMax = Math.min(5, wMean + wSd);
+              const wMean = wellnessBaseline.mean;
+              const wSd = wellnessBaseline.sd;
+              const yMin = Math.max(0, wMean - wSd);
+              const yMax = Math.min(maxRange, wMean + wSd);
               const bandYStart = mapY(yMax);
               const bandYEnd = mapY(yMin);
               const bandHeight = bandYEnd - bandYStart;
@@ -1600,33 +1608,33 @@ export default function AthleteAnalyticsScreen() {
               );
             })()}
 
-            {/* Grid lines (1 to 5) */}
-            {[1, 2, 3, 4, 5].map((val) => {
+            {/* Grid lines */}
+            {(maxRange === 100 ? [0, 25, 50, 75, 100] : (maxRange === 10 ? [0, 2, 4, 6, 8, 10] : [0, 1, 2, 3, 4, 5, 6, 7])).map((val) => {
               const y = mapY(val);
               return (
                 <Line 
-                  key={val}
-                  x1={paddingLeft} 
-                  y1={y} 
-                  x2={chartWidth - paddingRight} 
-                  y2={y} 
-                  stroke={val === 1 ? "#E5E7EB" : "#F3F4F6"} 
-                  strokeWidth={val === 1 ? "1.5" : "1"}
+                   key={val}
+                   x1={paddingLeft} 
+                   y1={y} 
+                   x2={chartWidth - paddingRight} 
+                   y2={y} 
+                   stroke={val === 0 ? "#E5E7EB" : "#F3F4F6"} 
+                   strokeWidth={val === 0 ? "1.5" : "1"}
                 />
               );
             })}
 
             {/* Y axis labels */}
-            {[1, 3, 5].map((val) => {
+            {(maxRange === 100 ? [0, 50, 100] : (maxRange === 10 ? [0, 5, 10] : [1, 4, 7])).map((val) => {
               const y = mapY(val);
               return (
                 <SvgText 
-                  key={val}
-                  x={paddingLeft - 6} 
-                  y={y + 3} 
-                  fontSize="8" 
-                  fill="#9CA3AF" 
-                  textAnchor="end"
+                   key={val}
+                   x={paddingLeft - 6} 
+                   y={y + 3} 
+                   fontSize="8" 
+                   fill="#9CA3AF" 
+                   textAnchor="end"
                 >
                   {val}
                 </SvgText>
