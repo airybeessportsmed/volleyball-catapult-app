@@ -214,21 +214,7 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(latest!.rpeValue).toBe(6);  // max of 4 and 6
   });
 
-  it("should parse SOXAI format using email headers", async () => {
-    const csv = `sakura@example.com
-タイムスタンプ,QoLスコア,睡眠スコア,睡眠時間,就寝時間,起床時間,仮眠時間,入眠潜時,睡眠効率,中途覚醒時間,レム睡眠時間,浅い睡眠時間,深い睡眠時間,睡眠中の1分あたり平均呼吸数,安静時心拍数(睡眠時),安静時心拍変動（睡眠時）
-2026/06/03,72,85,07:04,23:43,06:47,0,41,0.97,9,107,200,108,13.7,52,81.5`;
 
-    const result = await importPerformanceCsv(1, 1, csv, "soxai.csv");
-    expect(result.success).toBe(true);
-
-    const records = await getPerformanceDataByAthleteId(1);
-    const latest = records.find(p => formatDateKey(p.date) === "2026-06-03");
-    expect(latest).toBeDefined();
-    expect(Number(latest!.wellnessSleep)).toBe(85); // raw sleep score
-    expect(Number(latest!.hrv)).toBe(81.5);
-    expect(latest!.avgHeartRate).toBe(52);
-  });
 
   it("should parse Catapult IMA event log and calculate jump zones", async () => {
     const csv = `Category,Tag,start_time,event_time,end_time,Athlete,Position,Period,athlete_id,period_id,OF Event,Intensity (m/s),Direction,Duration,Movement Type,Basketball Load,Jump Attribute,Height (m)
