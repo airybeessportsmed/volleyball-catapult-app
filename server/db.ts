@@ -1796,8 +1796,52 @@ async function mergePerformanceData(db: any, teamId: number, data: any) {
       delete mergedMenuObj[key]["total"];
     }
   }
+  // jumpsDetail and accelsDetail safe deep merge
+  const detailedKeys = ["jumpsDetail", "accelsDetail"];
+  for (const key of detailedKeys) {
+    if (newMenuObj[key]) {
+      mergedMenuObj[key] = mergedMenuObj[key] || {};
+      const newDetail = newMenuObj[key];
+      const mergedDetail = mergedMenuObj[key];
+
+      const subMenuKey = key === "jumpsDetail" ? "menuJumps" : "menuAccels";
+      if (newDetail[subMenuKey]) {
+        mergedDetail[subMenuKey] = mergedDetail[subMenuKey] || {};
+        for (const mName of Object.keys(newDetail[subMenuKey])) {
+          if (mName === "全体" || mName === "Total" || mName === "ALL" || mName === "total") continue;
+          mergedDetail[subMenuKey][mName] = newDetail[subMenuKey][mName];
+        }
+      }
+
+      const subZoneKey = key === "jumpsDetail" ? "zoneJumps" : "zoneAccels";
+      if (newDetail[subZoneKey]) {
+        mergedDetail[subZoneKey] = mergedDetail[subZoneKey] || {};
+        for (const zName of Object.keys(newDetail[subZoneKey])) {
+          const valNew = Number(newDetail[subZoneKey][zName]) || 0;
+          const valExist = Number(mergedDetail[subZoneKey][zName]) || 0;
+          mergedDetail[subZoneKey][zName] = valNew + valExist;
+        }
+      }
+
+      if (key === "accelsDetail" && newDetail.directionAccels) {
+        mergedDetail.directionAccels = mergedDetail.directionAccels || {};
+        for (const dName of Object.keys(newDetail.directionAccels)) {
+          mergedDetail.directionAccels[dName] = mergedDetail.directionAccels[dName] || { count: 0, volume: 0 };
+          const valNewCount = Number(newDetail.directionAccels[dName].count) || 0;
+          const valNewVol = Number(newDetail.directionAccels[dName].volume) || 0;
+          const valExistCount = Number(mergedDetail.directionAccels[dName].count) || 0;
+          const valExistVol = Number(mergedDetail.directionAccels[dName].volume) || 0;
+
+          mergedDetail.directionAccels[dName].count = valNewCount + valExistCount;
+          mergedDetail.directionAccels[dName].volume = parseFloat((valNewVol + valExistVol).toFixed(2));
+        }
+      }
+    }
+  }
+
+  const keysToSkip = [...keysToMerge, ...detailedKeys, "全体", "Total", "ALL"];
   for (const key of Object.keys(newMenuObj)) {
-    if (!keysToMerge.includes(key) && key !== "全体" && key !== "Total" && key !== "ALL") {
+    if (!keysToSkip.includes(key)) {
       mergedMenuObj[key] = newMenuObj[key];
     }
   }
@@ -2476,12 +2520,25 @@ export async function importPerformanceCsv(
       }
 
     } else if (isImaLog) {
-      const athleteCol = findHeaderIndex(["athlete", "選手", "名前", "athlete_id", "name"]);
-      const tagCol = findHeaderIndex(["tag", "移動", "of event"]);
-      const heightCol = findHeaderIndex(["height", "高さ", "jump height"]);
-      const intensityCol = findHeaderIndex(["intensity", "強度"]);
-      const eventTimeCol = findHeaderIndex(["event_time", "time", "時間"]);
-      const periodCol = findHeaderIndex(["period", "ピリオド", "メニュー", "セッション"]);
+      let athleteCol = findHeaderIndex(["athlete", "選手", "名前", "athlete_id", "name"]);
+      if (athleteCol === -1 && headers.length > 5) athleteCol = 5; // F列
+
+      let tagCol = findHeaderIndex(["tag", "移動", "of event"]);
+      if (tagCol === -1 && headers.length > 1) tagCol = 1; // B列
+
+      let heightCol = findHeaderIndex(["height", "高さ", "jump height", "height (m)"]);
+      if (heightCol === -1 && headers.length > 17) heightCol = 17; // R列
+
+      let intensityCol = findHeaderIndex(["intensity", "強度", "intensity (m/s)"]);
+      if (intensityCol === -1 && headers.length > 11) intensityCol = 11; // L列
+
+      let periodCol = findHeaderIndex(["period", "ピリオド", "メニュー", "セッション"]);
+      if (periodCol === -1 && headers.length > 7) periodCol = 7; // H列
+
+      let directionCol = findHeaderIndex(["direction", "方向"]);
+      if (directionCol === -1 && headers.length > 12) directionCol = 12; // M列
+
+      let eventTimeCol = findHeaderIndex(["event_time", "time", "時間"]);
 
       if (athleteCol === -1 || tagCol === -1) {
         throw new Error("IMA log is missing Athlete or Tag headers");
@@ -2496,6 +2553,7 @@ export async function importPerformanceCsv(
         accelerations: number[];
         menuJumps: Record<string, number[]>;
         menuAccelerations: Record<string, number[]>;
+        directionAccelerations: Record<string, number[]>;
       }
       const imaGroups = new Map<string, ImaGroup>();
 
@@ -2544,11 +2602,13 @@ export async function importPerformanceCsv(
             jumps: [],
             accelerations: [],
             menuJumps: {},
-            menuAccelerations: {}
+            menuAccelerations: {},
+            directionAccelerations: {}
           });
         }
         const g = imaGroups.get(groupKey)!;
         const periodName = periodCol !== -1 && vals[periodCol] ? vals[periodCol].trim() : "全体";
+        const directionVal = directionCol !== -1 && vals[directionCol] ? vals[directionCol].trim() : "Unknown";
 
         if (tag.includes("Jump") || tag.includes("Jumping")) {
           if (heightCol !== -1 && vals[heightCol]) {
@@ -2567,6 +2627,8 @@ export async function importPerformanceCsv(
               g.accelerations.push(intVal);
               g.menuAccelerations[periodName] = g.menuAccelerations[periodName] || [];
               g.menuAccelerations[periodName].push(intVal);
+              g.directionAccelerations[directionVal] = g.directionAccelerations[directionVal] || [];
+              g.directionAccelerations[directionVal].push(intVal);
             }
           }
         }
@@ -2613,27 +2675,84 @@ export async function importPerformanceCsv(
         const totalJumps = ig.jumps.length;
         const jumpVolume = ig.jumps.length > 0 ? ig.jumps.reduce((a, b) => a + b, 0) : 0;
         const jumpsOver40cm = ig.jumps.filter(j => j >= 40).length;
-        const jumpZone1Count = ig.jumps.filter(j => j < 20).length;
-        const jumpZone2Count = ig.jumps.filter(j => j >= 20 && j < 30).length;
-        const jumpZone3Count = ig.jumps.filter(j => j >= 30 && j < 40).length;
+        
+        // ユーザー指定のジャンプ高ゾーン (-30, 30-35, 35-40, 40-50, 50-)
+        const jumpZone1Count = ig.jumps.filter(j => j < 30).length;
+        const jumpZone2Count = ig.jumps.filter(j => j >= 30 && j < 35).length;
+        const jumpZone3Count = ig.jumps.filter(j => j >= 35 && j < 40).length;
         const jumpZone4Count = ig.jumps.filter(j => j >= 40 && j < 50).length;
         const jumpZone5Count = ig.jumps.filter(j => j >= 50).length;
 
         const maxAcceleration = ig.accelerations.length > 0 ? Math.max(...ig.accelerations) : undefined;
         const avgAcceleration = ig.accelerations.length > 0 ? ig.accelerations.reduce((a, b) => a + b, 0) / ig.accelerations.length : undefined;
         const accelCount = ig.accelerations.length;
+        const accelVolume = ig.accelerations.reduce((a, b) => a + b, 0);
 
         const jumpVolumes: Record<string, number> = {};
+        const menuJumpsDetail: Record<string, any> = {};
         for (const mName of Object.keys(ig.menuJumps)) {
-          const sum = ig.menuJumps[mName].reduce((a, b) => a + b, 0);
-          jumpVolumes[mName] = parseFloat(sum.toFixed(2));
+          const list = ig.menuJumps[mName];
+          const mSum = list.reduce((a, b) => a + b, 0);
+          jumpVolumes[mName] = parseFloat(mSum.toFixed(2));
+
+          const mMax = list.length > 0 ? Math.max(...list) : 0;
+          const mAvg = list.length > 0 ? mSum / list.length : 0;
+          const mSorted = [...list].sort((a, b) => b - a);
+          const mTop5 = mSorted.slice(0, 5);
+          const mTop5Avg = mTop5.length > 0 ? mTop5.reduce((a, b) => a + b, 0) / mTop5.length : 0;
+          menuJumpsDetail[mName] = {
+            count: list.length,
+            volume: parseFloat(mSum.toFixed(2)),
+            avg: parseFloat(mAvg.toFixed(2)),
+            max: parseFloat(mMax.toFixed(2)),
+            top5Avg: parseFloat(mTop5Avg.toFixed(2))
+          };
         }
 
         const accelVolumes: Record<string, number> = {};
+        const menuAccelsDetail: Record<string, any> = {};
         for (const mName of Object.keys(ig.menuAccelerations)) {
-          const sum = ig.menuAccelerations[mName].reduce((a, b) => a + b, 0);
-          accelVolumes[mName] = parseFloat(sum.toFixed(2));
+          const list = ig.menuAccelerations[mName];
+          const mSum = list.reduce((a, b) => a + b, 0);
+          accelVolumes[mName] = parseFloat(mSum.toFixed(2));
+
+          const mMax = list.length > 0 ? Math.max(...list) : 0;
+          const mAvg = list.length > 0 ? mSum / list.length : 0;
+          const mSorted = [...list].sort((a, b) => b - a);
+          const mTop5 = mSorted.slice(0, 5);
+          const mTop5Avg = mTop5.length > 0 ? mTop5.reduce((a, b) => a + b, 0) / mTop5.length : 0;
+          menuAccelsDetail[mName] = {
+            count: list.length,
+            volume: parseFloat(mSum.toFixed(2)),
+            avg: parseFloat(mAvg.toFixed(2)),
+            max: parseFloat(mMax.toFixed(2)),
+            top5Avg: parseFloat(mTop5Avg.toFixed(2))
+          };
         }
+
+        const directionAccels: Record<string, any> = {};
+        for (const dirName of Object.keys(ig.directionAccelerations)) {
+          const list = ig.directionAccelerations[dirName];
+          const dSum = list.reduce((a, b) => a + b, 0);
+          directionAccels[dirName] = {
+            count: list.length,
+            volume: parseFloat(dSum.toFixed(2))
+          };
+        }
+
+        const zoneAccels = {
+          under2_5: ig.accelerations.filter(a => a < 2.5).length,
+          between2_5_3_5: ig.accelerations.filter(a => a >= 2.5 && a < 3.5).length,
+          over3_5: ig.accelerations.filter(a => a >= 3.5).length
+        };
+
+        const zoneJumps = {
+          under30: jumpZone1Count,
+          between30_35: jumpZone2Count,
+          between35_40: jumpZone3Count,
+          between40_50: jumpZone4Count,
+          over50: jumpZone5Count
+        };
 
         await mergePerformanceData(db, teamId, {
           athleteId: matchedAthlete.id,
@@ -2653,8 +2772,21 @@ export async function importPerformanceCsv(
           maxAcceleration: maxAcceleration ? maxAcceleration.toFixed(2) : undefined,
           avgAcceleration: avgAcceleration ? avgAcceleration.toFixed(2) : undefined,
           accelCount,
+          accelVolume: accelVolume.toFixed(2),
           sessionType: ig.sessionType,
-          rawMenuData: JSON.stringify({ jumpVolumes, accelVolumes }),
+          rawMenuData: JSON.stringify({ 
+            jumpVolumes, 
+            accelVolumes,
+            jumpsDetail: {
+              menuJumps: menuJumpsDetail,
+              zoneJumps
+            },
+            accelsDetail: {
+              menuAccels: menuAccelsDetail,
+              zoneAccels,
+              directionAccels
+            }
+          }),
           rawCsvData: JSON.stringify({ note: "Catapult IMA events", fileName, sessionType: ig.sessionType })
         });
         importedCount++;

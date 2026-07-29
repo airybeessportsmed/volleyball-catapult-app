@@ -216,24 +216,54 @@ Ball game - Sakura,1,2026-06-30,200.00`;
 
 
 
-  it("should parse Catapult IMA event log and calculate jump zones", async () => {
+  it("should parse Catapult IMA event log and calculate detailed metrics", async () => {
     const csv = `Category,Tag,start_time,event_time,end_time,Athlete,Position,Period,athlete_id,period_id,OF Event,Intensity (m/s),Direction,Duration,Movement Type,Basketball Load,Jump Attribute,Height (m)
-1 宮下 さくら,Basketball Jumping,1782890000000,1782890000000,1782890000000,宮下 さくら,,Individual,1,1,Basketball Jumping,,,1,Jumping,,1.09,0.45
-1 宮下 さくら,Basketball Jumping,1782890001000,1782890001000,1782890001000,宮下 さくら,,Individual,1,1,Basketball Jumping,,,1,Jumping,,1.09,0.35`;
+1 宮下 さくら,IMA Jump,1782890000000,1782890000000,1782890000000,宮下 さくら,,Individual,1,1,IMA Jump,,,1,Jumping,,1.09,0.45
+1 宮下 さくら,IMA Jump,1782890001000,1782890001000,1782890001000,宮下 さくら,,Individual,1,1,IMA Jump,,,1,Jumping,,1.09,0.35
+1 宮下 さくら,IMA Acceleration,1782890002000,1782890002000,1782890002000,宮下 さくら,,Practice,1,1,IMA Acceleration,3.2,Accel,1,Running,,,
+1 宮下 さくら,IMA Acceleration,1782890003000,1782890003000,1782890003000,宮下 さくら,,Practice,1,1,IMA Acceleration,4.0,Right,1,Running,,,`;
 
     const result = await importPerformanceCsv(1, 1, csv, "catapult_ima.csv");
     expect(result.success).toBe(true);
 
     const records = await getPerformanceDataByAthleteId(1);
-    // Find record by matching epoch timestamp date (approx June 2026 or dynamic eventTime fallback)
     const latest = records[records.length - 1]; 
     expect(latest).toBeDefined();
+    
+    // Jump metrics
     expect(Number(latest.maxJumpHeight)).toBe(45);
     expect(Number(latest.avgJumpHeight)).toBe(40); // (45 + 35) / 2
     expect(latest.totalJumps).toBe(2);
     expect(latest.jumpsOver40cm).toBe(1);
-    expect(latest.jumpZone3Count).toBe(1); // 30-40cm zone (35cm)
-    expect(latest.jumpZone4Count).toBe(1); // 40-50cm zone (45cm)
+    expect(latest.jumpZone3Count).toBe(1); // 35-40cm zone (35cm) -> Zone 3
+    expect(latest.jumpZone4Count).toBe(1); // 40-50cm zone (45cm) -> Zone 4
+
+    // Accel metrics
+    expect(Number(latest.maxAcceleration)).toBe(4.00);
+    expect(Number(latest.avgAcceleration)).toBe(3.60); // (3.2 + 4.0) / 2
+    expect(latest.accelCount).toBe(2);
+    expect(Number(latest.accelVolume)).toBe(7.20); // 3.2 + 4.0
+
+    // Detailed JSON (rawMenuData) verification
+    expect(latest.rawMenuData).toBeDefined();
+    const menuData = JSON.parse(latest.rawMenuData!);
+    
+    // Jump details
+    expect(menuData.jumpsDetail).toBeDefined();
+    expect(menuData.jumpsDetail.menuJumps.Individual).toBeDefined();
+    expect(menuData.jumpsDetail.menuJumps.Individual.count).toBe(2);
+    expect(menuData.jumpsDetail.menuJumps.Individual.max).toBe(45);
+    expect(menuData.jumpsDetail.zoneJumps.between35_40).toBe(1);
+
+    // Accel details
+    expect(menuData.accelsDetail).toBeDefined();
+    expect(menuData.accelsDetail.menuAccels.Practice).toBeDefined();
+    expect(menuData.accelsDetail.menuAccels.Practice.count).toBe(2);
+    expect(menuData.accelsDetail.menuAccels.Practice.max).toBe(4.0);
+    expect(menuData.accelsDetail.zoneAccels.between2_5_3_5).toBe(1); // 3.2
+    expect(menuData.accelsDetail.zoneAccels.over3_5).toBe(1); // 4.0
+    expect(menuData.accelsDetail.directionAccels.Accel.count).toBe(1);
+    expect(menuData.accelsDetail.directionAccels.Right.count).toBe(1);
   });
 
   it("should parse new SOXAI wide format using jersey number headers", async () => {

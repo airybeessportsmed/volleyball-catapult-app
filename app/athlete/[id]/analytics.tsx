@@ -445,11 +445,11 @@ export default function AthleteAnalyticsScreen() {
     const z5 = latest.jumpZone5Count || 0;
     
     const zones = [
-      { name: "Zone 1 (~20)", count: z1, color: "bg-blue-500/20 text-blue-700" },
-      { name: "Zone 2 (20~30)", count: z2, color: "bg-cyan-500/20 text-cyan-700" },
-      { name: "Zone 3 (30~40)", count: z3, color: "bg-amber-500/20 text-amber-700" },
-      { name: "Zone 4 (40~50)", count: z4, color: "bg-orange-500/30 text-orange-700" },
-      { name: "Zone 5 (50+)", count: z5, color: "bg-red-500/30 text-red-700" },
+      { name: "Zone 1 (~30cm)", count: z1, color: "bg-blue-500/20 text-blue-700" },
+      { name: "Zone 2 (30~35cm)", count: z2, color: "bg-cyan-500/20 text-cyan-700" },
+      { name: "Zone 3 (35~40cm)", count: z3, color: "bg-amber-500/20 text-amber-700" },
+      { name: "Zone 4 (40~50cm)", count: z4, color: "bg-orange-500/30 text-orange-700" },
+      { name: "Zone 5 (50cm~)", count: z5, color: "bg-red-500/30 text-red-700" },
     ];
     
     const totalJumps = latest.totalJumps || 0;
@@ -457,6 +457,18 @@ export default function AthleteAnalyticsScreen() {
     const ratio40 = totalJumps > 0 ? ((jumpsOver40 / totalJumps) * 100).toFixed(1) : "0.0";
     
     const maxCount = Math.max(...zones.map(z => z.count), 1);
+
+    let menuJumps: Record<string, { count: number; volume: number; avg: number; max: number; top5Avg: number }> = {};
+    try {
+      if (latest.rawMenuData) {
+        const parsed = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
+        if (parsed && parsed.jumpsDetail && parsed.jumpsDetail.menuJumps) {
+          menuJumps = parsed.jumpsDetail.menuJumps;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse jumpsDetail", e);
+    }
 
     return (
       <View className="bg-surface rounded-3xl border border-border p-5 shadow-sm gap-5">
@@ -519,6 +531,32 @@ export default function AthleteAnalyticsScreen() {
           </View>
         </View>
 
+        {Object.keys(menuJumps).length > 0 && (
+          <View className="gap-3 mt-2">
+            <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">メニュー別ジャンプ詳細</Text>
+            <View className="bg-muted/10 rounded-2xl border border-border/40 overflow-hidden">
+              <View className="flex-row bg-muted/20 p-2.5 border-b border-border/40">
+                <Text className="text-[9px] font-bold text-muted flex-2">メニュー名</Text>
+                <Text className="text-[9px] font-bold text-muted flex-1 text-center">回数</Text>
+                <Text className="text-[9px] font-bold text-muted flex-1 text-center">ボリューム</Text>
+                <Text className="text-[9px] font-bold text-muted flex-1 text-center">平均</Text>
+                <Text className="text-[9px] font-bold text-muted flex-1 text-center">最大</Text>
+                <Text className="text-[9px] font-bold text-muted flex-1 text-center">Top5平均</Text>
+              </View>
+              {Object.entries(menuJumps).map(([mName, detail], idx) => (
+                <View key={idx} className="flex-row p-2.5 border-b border-border/20 items-center">
+                  <Text className="text-[9px] font-bold text-foreground flex-2">{mName}</Text>
+                  <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.count}回</Text>
+                  <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{(detail.volume / 100).toFixed(2)}m</Text>
+                  <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.avg.toFixed(1)}cm</Text>
+                  <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.max.toFixed(1)}cm</Text>
+                  <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.top5Avg.toFixed(1)}cm</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {!!latest.duration && (
           <View className="bg-muted/10 p-4 rounded-2xl border border-border/40 flex-row justify-between items-center">
             <View className="gap-0.5">
@@ -545,6 +583,10 @@ export default function AthleteAnalyticsScreen() {
   const renderMenuLoadAnalytics = () => {
     let menuLoads: Record<string, number> = {};
     let menuIma: Record<string, number> = {};
+    let menuAccels: Record<string, { count: number; volume: number; avg: number; max: number; top5Avg: number }> = {};
+    let zoneAccels = { under2_5: 0, between2_5_3_5: 0, over3_5: 0 };
+    let directionAccels: Record<string, { count: number; volume: number }> = {};
+
     try {
       if (latest.rawMenuData) {
         const parsed = typeof latest.rawMenuData === "string" ? JSON.parse(latest.rawMenuData) : latest.rawMenuData;
@@ -552,9 +594,7 @@ export default function AthleteAnalyticsScreen() {
           menuLoads = parsed.loads;
           menuIma = parsed.ima || {};
         } else {
-          // 互換用: すべてを load と見なす
           menuLoads = parsed || {};
-          // ima は load の比率から適当に分配
           const totalIma = latest.accelCount || 0;
           const rawTotalLoad = latest.totalLoad ? Number(latest.totalLoad) : 0;
           const totalLoad = isNaN(rawTotalLoad) || !isFinite(rawTotalLoad) || rawTotalLoad <= 0 ? 1 : rawTotalLoad;
@@ -563,6 +603,12 @@ export default function AthleteAnalyticsScreen() {
             const safeRawVal = isNaN(rawVal) || !isFinite(rawVal) ? 0 : rawVal;
             menuIma[name] = Math.round((safeRawVal / totalLoad) * totalIma);
           });
+        }
+
+        if (parsed && parsed.accelsDetail) {
+          menuAccels = parsed.accelsDetail.menuAccels || {};
+          zoneAccels = parsed.accelsDetail.zoneAccels || zoneAccels;
+          directionAccels = parsed.accelsDetail.directionAccels || {};
         }
       }
     } catch (e) {
@@ -590,7 +636,7 @@ export default function AthleteAnalyticsScreen() {
               {isLoad ? "練習メニュー別運動量 (PlayerLoad)" : "練習メニュー別加速回数 (IMA)"}
             </Text>
             <Text className="text-[10px] text-muted font-medium">
-              {isLoad ? "メニューごとの負荷配分と自主練 of 運動量" : "メニューごとの加速・動作アクションの回数"}
+              {isLoad ? "メニューごとの負荷配分と自主練の運動量" : "メニューごとの加速・動作アクションの回数"}
             </Text>
           </View>
 
@@ -676,6 +722,84 @@ export default function AthleteAnalyticsScreen() {
                 );
               })}
             </View>
+
+            {/* 加速度ゾーン別分布 */}
+            {(zoneAccels.under2_5 + zoneAccels.between2_5_3_5 + zoneAccels.over3_5 > 0) && (
+              <View className="gap-3 mt-2">
+                <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">加速度ゾーン別分布</Text>
+                <View className="gap-3 mt-1">
+                  {[
+                    { name: "弱加速 (~2.5 m/s)", count: zoneAccels.under2_5, color: "bg-emerald-500/20 text-emerald-700" },
+                    { name: "中加速 (2.5~3.5 m/s)", count: zoneAccels.between2_5_3_5, color: "bg-amber-500/20 text-amber-700" },
+                    { name: "強加速 (3.5 m/s~)", count: zoneAccels.over3_5, color: "bg-red-500/30 text-red-700" }
+                  ].map((zone, idx) => {
+                    const totalZAccels = zoneAccels.under2_5 + zoneAccels.between2_5_3_5 + zoneAccels.over3_5;
+                    const percent = totalZAccels > 0 ? (zone.count / totalZAccels) * 100 : 0;
+                    return (
+                      <View key={idx} className="flex-row items-center gap-3">
+                        <Text className="text-[10px] font-bold text-muted w-28">{zone.name}</Text>
+                        <View className="flex-1 h-5 bg-muted/20 rounded-lg overflow-hidden relative justify-center">
+                          <View 
+                            style={{ width: `${percent}%` as any }} 
+                            className={`h-full ${zone.color.split(" ")[0]} rounded-lg absolute`}
+                          />
+                          <Text className="text-[9px] font-extrabold text-foreground pl-2.5 z-10 font-mono">
+                            {zone.count} 回 ({percent.toFixed(1)}%)
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* 加速度の方向別集計 */}
+            {Object.keys(directionAccels).length > 0 && (
+              <View className="gap-3 mt-2">
+                <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">加速度の方向別集計</Text>
+                <View className="flex-row flex-wrap gap-2.5 mt-1">
+                  {Object.entries(directionAccels).map(([dir, info], idx) => (
+                    <View key={idx} className="flex-1 min-w-[45%] bg-muted/10 p-3 rounded-2xl border border-border/40 gap-1">
+                      <Text className="text-[9px] font-extrabold text-muted">{dir}</Text>
+                      <Text className="text-sm font-black text-foreground font-mono">
+                        {info.count} 回
+                        <Text className="text-[9px] font-normal text-muted ml-1">
+                          (Vol: {info.volume.toFixed(1)} m/s)
+                        </Text>
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* メニュー別加速詳細 */}
+            {Object.keys(menuAccels).length > 0 && (
+              <View className="gap-3 mt-2">
+                <Text className="text-xs font-bold text-foreground pb-1 border-b border-border/50">メニュー別加速詳細</Text>
+                <View className="bg-muted/10 rounded-2xl border border-border/40 overflow-hidden mt-1">
+                  <View className="flex-row bg-muted/20 p-2.5 border-b border-border/40">
+                    <Text className="text-[9px] font-bold text-muted flex-2">メニュー名</Text>
+                    <Text className="text-[9px] font-bold text-muted flex-1 text-center">回数</Text>
+                    <Text className="text-[9px] font-bold text-muted flex-1 text-center">ボリューム</Text>
+                    <Text className="text-[9px] font-bold text-muted flex-1 text-center">平均</Text>
+                    <Text className="text-[9px] font-bold text-muted flex-1 text-center">最高</Text>
+                    <Text className="text-[9px] font-bold text-muted flex-1 text-center">Top5平均</Text>
+                  </View>
+                  {Object.entries(menuAccels).map(([mName, detail], idx) => (
+                    <View key={idx} className="flex-row p-2.5 border-b border-border/20 items-center">
+                      <Text className="text-[9px] font-bold text-foreground flex-2">{mName}</Text>
+                      <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.count}回</Text>
+                      <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.volume.toFixed(1)}</Text>
+                      <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.avg.toFixed(2)}</Text>
+                      <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.max.toFixed(2)}</Text>
+                      <Text className="text-[9px] font-bold text-foreground flex-1 text-center">{detail.top5Avg.toFixed(2)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         ) : (
           <View className="py-8 items-center justify-center">
