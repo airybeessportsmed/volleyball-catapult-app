@@ -280,7 +280,9 @@ Ball game - Sakura,1,2026-06-30,200.00`;
     expect(Number(latestSakura!.wellnessSleep)).toBe(90);
     expect(Number(latestSakura!.hrv)).toBe(75.5);
     expect(latestSakura!.avgHeartRate).toBe(55);
-    expect(latestSakura!.accelCount).toBe(8500);
+    expect(latestSakura!.accelCount).toBeNull();
+    const soxaiData = latestSakura!.soxaiData ? JSON.parse(latestSakura!.soxaiData) : {};
+    expect(Number(soxaiData.soxaiSteps)).toBe(8500);
 
     const recordsHinata = await getPerformanceDataByAthleteId(2);
     const latestHinata = recordsHinata.find(p => formatDateKey(p.date) === "2026-06-04");

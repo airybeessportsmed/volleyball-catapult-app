@@ -2400,7 +2400,7 @@ export async function importPerformanceCsv(
               } else if (h.includes("心拍_平均") || h.includes("睡眠時心拍_平均")) {
                 metricKey = "avgHeartRate";
               } else if (h.includes("歩数")) {
-                metricKey = "accelCount";
+                metricKey = "soxaiSteps";
               } else if (h.includes("睡眠時間")) {
                 metricKey = "soxaiSleepDuration";
               } else if (h.includes("全就床時間")) {
