@@ -2176,7 +2176,8 @@ export async function importPerformanceCsv(
         const itemStr = vals[itemCol];
         const valNum = parseFloat(vals[valCol]);
         const jerseyStr = jerseyCol !== -1 ? vals[jerseyCol] : "";
-        const jerseyNumber = jerseyStr ? parseInt(jerseyStr.replace(/\D/g, ""), 10) : undefined;
+        const parsedJersey = jerseyStr ? parseInt(jerseyStr.replace(/\D/g, ""), 10) : NaN;
+        const jerseyNumber = isNaN(parsedJersey) ? undefined : parsedJersey;
 
         if (!dateStr || !nameStr || isNaN(valNum)) continue;
 
@@ -2221,10 +2222,10 @@ export async function importPerformanceCsv(
           athleteId: matchedAthlete.id,
           teamId,
           date: wg.dateObj,
-          wellnessFatigue: wg.fatigue,
-          wellnessSleep: wg.sleep,
-          wellnessStress: wg.motivation,
-          wellnessSoreness: wg.appetite,
+          wellnessFatigue: wg.fatigue !== undefined && !isNaN(wg.fatigue) ? Math.round(wg.fatigue) : undefined,
+          wellnessSleep: wg.sleep !== undefined && !isNaN(wg.sleep) ? Math.round(wg.sleep) : undefined,
+          wellnessStress: wg.motivation !== undefined && !isNaN(wg.motivation) ? Math.round(wg.motivation) : undefined,
+          wellnessSoreness: wg.appetite !== undefined && !isNaN(wg.appetite) ? Math.round(wg.appetite) : undefined,
           sessionType: targetSessionType !== "auto" ? targetSessionType : undefined,
           rawCsvData: JSON.stringify({ note: "Onetap Wellness EAV", fileName, sessionType: targetSessionType !== "auto" ? targetSessionType : "auto" })
         });
